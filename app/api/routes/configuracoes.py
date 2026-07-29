@@ -24,6 +24,7 @@ from app.schemas.entities import (
 )
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
+from app.services.notifications import notify_admins
 from app.services.ownership import require_client
 
 router = APIRouter(prefix="/configuracoes", tags=["Configurações"])
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/configuracoes", tags=["Configurações"])
 
 @router.get("/ia", response_model=ConfigIAOut | None)
 def obter_config_ia(
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_roles()),
     db: Session = Depends(get_db),
 ) -> ConfigIA | None:
     return db.scalar(
@@ -45,8 +46,6 @@ def salvar_config_ia(
     current_user: Usuario = Depends(require_roles()),
     db: Session = Depends(get_db),
 ) -> ConfigIA:
-    # Nenhum cargo da empresa pode alterar a IA. A escrita será transferida
-    # para o futuro painel independente do super administrador.
     item = db.scalar(
         select(ConfigIA).where(ConfigIA.empresa_id == current_user.empresa_id)
     )
@@ -73,7 +72,7 @@ def salvar_config_ia(
 @router.get("/memorias", response_model=list[MemoriaOut])
 def listar_memorias(
     cliente_id: int | None = None,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_roles()),
     db: Session = Depends(get_db),
 ) -> list[MemoriaIA]:
     query = select(MemoriaIA).where(
@@ -91,7 +90,7 @@ def listar_memorias(
 )
 def criar_memoria(
     data: MemoriaCreate,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_roles()),
     db: Session = Depends(get_db),
 ) -> MemoriaIA:
     require_client(db, current_user.empresa_id, data.cliente_id)
@@ -107,7 +106,7 @@ def criar_memoria(
 def atualizar_memoria(
     memoria_id: int,
     data: MemoriaUpdate,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_roles()),
     db: Session = Depends(get_db),
 ) -> MemoriaIA:
     item = db.scalar(
@@ -125,7 +124,7 @@ def atualizar_memoria(
 @router.delete("/memorias/{memoria_id}", status_code=status.HTTP_204_NO_CONTENT)
 def excluir_memoria(
     memoria_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_roles()),
     db: Session = Depends(get_db),
 ) -> Response:
     item = db.scalar(
@@ -171,6 +170,14 @@ def criar_integracao(
     )
     db.add(item)
     db.flush()
+
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Integração criada",
+        mensagem=f"{current_user.nome} cadastrou a integração {item.tipo.value}.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
@@ -200,7 +207,15 @@ def atualizar_integracao(
     )
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Integração não encontrada.")
+
     apply_patch(item, data.model_dump(exclude_unset=True))
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Integração atualizada",
+        mensagem=f"{current_user.nome} atualizou a integração {item.tipo.value}.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
