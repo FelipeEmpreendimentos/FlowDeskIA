@@ -35,10 +35,10 @@ def validate_employee_appointment_update(
     appointment: Agendamento,
     values: dict,
 ) -> None:
-    """Permite ao funcionário operar apenas o atendimento assumido por ele.
+    """Valida a atuação do funcionário sem alterar o objeto do banco.
 
-    Funcionários podem visualizar toda a agenda, criar agendamentos e atualizar
-    somente status, observações e forma de pagamento de um agendamento próprio
+    Funcionários visualizam toda a agenda, podem criar agendamentos e atualizar
+    apenas status, observações e forma de pagamento de um atendimento próprio
     ou ainda sem responsável. Alterações estruturais continuam restritas à
     gestão.
     """
@@ -71,6 +71,3 @@ def validate_employee_appointment_update(
             status.HTTP_403_FORBIDDEN,
             "Funcionários não podem cancelar nem retornar o agendamento para pendente.",
         )
-
-    if appointment.funcionario_id is None:
-        appointment.funcionario_id = user.id
