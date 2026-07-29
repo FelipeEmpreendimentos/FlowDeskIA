@@ -11,6 +11,7 @@ from app.models.models import BloqueioAgenda, Usuario
 from app.schemas.entities import BloqueioCreate, BloqueioOut
 from app.services.audit import add_audit_log
 from app.services.db_utils import commit_or_conflict
+from app.services.notifications import notify_management, notify_user
 from app.services.ownership import require_user
 
 router = APIRouter(prefix="/bloqueios-agenda", tags=["Bloqueios da agenda"])
@@ -48,6 +49,18 @@ def _validar_bloqueio(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "O horário inicial deve ser menor que o final.",
         )
+
+
+def _descricao_bloqueio(item: BloqueioAgenda) -> str:
+    periodo = item.data_inicio.strftime("%d/%m/%Y")
+    if item.data_fim != item.data_inicio:
+        periodo += f" até {item.data_fim.strftime('%d/%m/%Y')}"
+    if item.hora_inicio and item.hora_fim:
+        periodo += (
+            f", das {item.hora_inicio.strftime('%H:%M')} "
+            f"às {item.hora_fim.strftime('%H:%M')}"
+        )
+    return periodo
 
 
 @router.get("", response_model=list[BloqueioOut])
@@ -90,6 +103,24 @@ def criar_bloqueio(
     )
     db.add(item)
     db.flush()
+
+    descricao = _descricao_bloqueio(item)
+    if item.funcionario_id and item.funcionario_id != current_user.id:
+        notify_user(
+            db,
+            empresa_id=current_user.empresa_id,
+            usuario_id=item.funcionario_id,
+            titulo="Novo bloqueio na sua agenda",
+            mensagem=f"Sua agenda foi bloqueada em {descricao}.",
+        )
+
+    notify_management(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Bloqueio de agenda criado",
+        mensagem=f"{current_user.nome} criou um bloqueio em {descricao}.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
@@ -116,7 +147,27 @@ def excluir_bloqueio(
     )
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Bloqueio não encontrado.")
+
+    descricao = _descricao_bloqueio(item)
+    affected_user_id = item.funcionario_id
     db.delete(item)
+
+    if affected_user_id and affected_user_id != current_user.id:
+        notify_user(
+            db,
+            empresa_id=current_user.empresa_id,
+            usuario_id=affected_user_id,
+            titulo="Bloqueio removido da sua agenda",
+            mensagem=f"O bloqueio de {descricao} foi removido.",
+        )
+
+    notify_management(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Bloqueio de agenda removido",
+        mensagem=f"{current_user.nome} removeu o bloqueio de {descricao}.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
