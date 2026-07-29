@@ -42,11 +42,11 @@ def obter_config_ia(
 @router.put("/ia", response_model=ConfigIAOut)
 def salvar_config_ia(
     data: ConfigIAPut,
-    current_user: Usuario = Depends(
-        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
-    ),
+    current_user: Usuario = Depends(require_roles()),
     db: Session = Depends(get_db),
 ) -> ConfigIA:
+    # Nenhum cargo da empresa pode alterar a IA. A escrita será transferida
+    # para o futuro painel independente do super administrador.
     item = db.scalar(
         select(ConfigIA).where(ConfigIA.empresa_id == current_user.empresa_id)
     )
@@ -143,9 +143,7 @@ def excluir_memoria(
 
 @router.get("/integracoes", response_model=list[IntegracaoOut])
 def listar_integracoes(
-    current_user: Usuario = Depends(
-        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
-    ),
+    current_user: Usuario = Depends(require_roles(CargoUsuario.ADMIN)),
     db: Session = Depends(get_db),
 ) -> list[Integracao]:
     return list(
