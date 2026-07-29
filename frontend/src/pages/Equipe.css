@@ -1,0 +1,321 @@
+.team-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.team-user-search {
+  flex: 1 1 auto;
+  min-width: 240px;
+}
+
+.team-toolbar > select {
+  width: 220px;
+  flex: 0 0 220px;
+}
+
+.team-user-table th:nth-child(1) {
+  width: 29%;
+}
+
+.team-user-table th:nth-child(2) {
+  width: 16%;
+}
+
+.team-user-table th:nth-child(3) {
+  width: 16%;
+}
+
+.team-user-table th:nth-child(4) {
+  width: 20%;
+}
+
+.team-user-table th:nth-child(5) {
+  width: 11%;
+}
+
+.team-journey-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.team-journey-card {
+  display: grid;
+  gap: 17px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: #fff;
+}
+
+.team-journey-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.team-journey-card > header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.team-journey-card h3 {
+  margin: 0;
+  color: #263248;
+  font-size: 15px;
+}
+
+.team-journey-card header p {
+  max-width: 250px;
+  overflow: hidden;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-journey-status {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.team-journey-status.configured {
+  border-color: #a7e5cb;
+  color: #116647;
+  background: var(--success-soft);
+}
+
+.team-journey-status.empty {
+  border-color: #d7dfeb;
+  color: #718096;
+  background: #f4f6fa;
+}
+
+.team-journey-days {
+  display: grid;
+  gap: 7px;
+}
+
+.team-journey-days > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #f7f9fc;
+}
+
+.team-journey-days span {
+  color: #66758d;
+  font-size: 11px;
+}
+
+.team-journey-days strong {
+  color: #234fd4;
+  font-size: 11px;
+}
+
+.team-journey-empty-copy {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed #d5deeb;
+  border-radius: 11px;
+  color: var(--muted);
+  background: #fafbfd;
+  font-size: 11px;
+  text-align: center;
+}
+
+.team-journey-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 3px;
+}
+
+.team-journey-card > footer .button {
+  min-height: 38px;
+}
+
+.team-journey-employee {
+  margin-bottom: 18px;
+}
+
+.team-week-section {
+  display: grid;
+  gap: 13px;
+  margin-top: 15px;
+  padding: 16px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #f8faff;
+}
+
+.team-week-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e7f2;
+}
+
+.team-week-section h3 {
+  margin: 0;
+  color: #263248;
+  font-size: 14px;
+}
+
+.team-week-section header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.team-apply-weekdays {
+  min-height: 36px;
+  padding: 8px 11px;
+  font-size: 10px;
+}
+
+.team-day-list {
+  display: grid;
+  gap: 9px;
+}
+
+.team-day-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) 155px 155px;
+  align-items: end;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e0e6ef;
+  border-radius: 11px;
+  background: #f3f5f9;
+  transition:
+    border-color 0.18s,
+    background 0.18s,
+    opacity 0.18s;
+}
+
+.team-day-row.active {
+  border-color: #c8d6ff;
+  background: #fff;
+}
+
+.team-day-row:not(.active) .field {
+  opacity: 0.55;
+}
+
+.team-day-row .field {
+  gap: 5px;
+  margin: 0;
+  font-size: 10px;
+}
+
+.team-day-row .field input {
+  min-height: 40px;
+}
+
+.team-day-toggle {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  color: #33425c;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.team-day-toggle input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+}
+
+.team-block-table th:nth-child(1) {
+  width: 23%;
+}
+
+.team-block-table th:nth-child(2),
+.team-block-table th:nth-child(3) {
+  width: 16%;
+}
+
+.team-block-table th:nth-child(4) {
+  width: 35%;
+}
+
+@media (max-width: 1100px) {
+  .team-journey-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .team-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .team-toolbar > select,
+  .team-user-search {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+
+  .team-week-section > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .team-apply-weekdays {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .team-day-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .team-day-toggle {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .team-day-row {
+    grid-template-columns: 1fr;
+  }
+
+  .team-day-toggle {
+    grid-column: auto;
+  }
+
+  .team-journey-card > header,
+  .team-journey-card > footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .team-journey-card > footer .button {
+    width: 100%;
+    justify-content: center;
+  }
+}

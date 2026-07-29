@@ -1,0 +1,22 @@
+﻿# Segredos
+.env
+frontend/.env
+*.local
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+uploads/
+*.log
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Editores e Windows
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
