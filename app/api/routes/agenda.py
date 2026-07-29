@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
+from app.core.permissions import is_management, validate_employee_appointment_update
 from app.database.database import get_db
-from app.models.enums import StatusAgendamento
+from app.models.enums import CargoUsuario, StatusAgendamento
 from app.models.models import Agendamento, Servico, Usuario, Veiculo
 from app.schemas.entities import (
     AgendamentoCreate,
@@ -18,6 +19,7 @@ from app.schemas.entities import (
 from app.services.agenda import add_minutes, available_slots, ensure_available
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
+from app.services.notifications import notify_management, notify_user
 from app.services.ownership import (
     require_client,
     require_service,
@@ -77,6 +79,31 @@ def _calcular_preco(
     return valor_base, valor_adicional, valor_base + valor_adicional
 
 
+def _formatar_horario(data_agendamento: date, hora_inicio) -> str:
+    return f"{data_agendamento.strftime('%d/%m/%Y')} às {hora_inicio.strftime('%H:%M')}"
+
+
+def _registrar_conflito(
+    db: Session,
+    *,
+    current_user: Usuario,
+    data_agendamento: date,
+    hora_inicio,
+    detalhe: str,
+) -> None:
+    notify_management(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Conflito de agenda identificado",
+        mensagem=(
+            f"{current_user.nome} tentou agendar em "
+            f"{_formatar_horario(data_agendamento, hora_inicio)}. {detalhe}"
+        ),
+        exclude_user_ids=(current_user.id,),
+    )
+    db.commit()
+
+
 @router.get("", response_model=list[AgendamentoOut])
 def listar_agendamentos(
     data_inicio: date | None = None,
@@ -89,6 +116,7 @@ def listar_agendamentos(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[Agendamento]:
+    # Todos os cargos visualizam toda a agenda da empresa.
     query = select(Agendamento).where(
         Agendamento.empresa_id == current_user.empresa_id
     )
@@ -134,7 +162,7 @@ def criar_agendamento(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Agendamento:
-    require_client(db, current_user.empresa_id, data.cliente_id)
+    cliente = require_client(db, current_user.empresa_id, data.cliente_id)
     servico = require_service(db, current_user.empresa_id, data.servico_id)
 
     veiculo: Veiculo | None = None
@@ -155,14 +183,26 @@ def criar_agendamento(
         tipo_veiculo,
     )
     end = data.hora_fim or add_minutes(data.hora_inicio, servico.duracao_minutos)
-    ensure_available(
-        db,
-        empresa_id=current_user.empresa_id,
-        target_date=data.data,
-        start=data.hora_inicio,
-        end=end,
-        funcionario_id=data.funcionario_id,
-    )
+
+    try:
+        ensure_available(
+            db,
+            empresa_id=current_user.empresa_id,
+            target_date=data.data,
+            start=data.hora_inicio,
+            end=end,
+            funcionario_id=data.funcionario_id,
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_409_CONFLICT:
+            _registrar_conflito(
+                db,
+                current_user=current_user,
+                data_agendamento=data.data,
+                hora_inicio=data.hora_inicio,
+                detalhe=str(exc.detail),
+            )
+        raise
 
     values = data.model_dump(
         exclude={"hora_fim", "valor_final", "tipo_veiculo"}
@@ -183,6 +223,19 @@ def criar_agendamento(
 
     db.add(appointment)
     db.flush()
+
+    if appointment.funcionario_id and appointment.funcionario_id != current_user.id:
+        notify_user(
+            db,
+            empresa_id=current_user.empresa_id,
+            usuario_id=appointment.funcionario_id,
+            titulo="Novo agendamento atribuído",
+            mensagem=(
+                f"{cliente.nome} - {servico.nome}, "
+                f"{_formatar_horario(appointment.data, appointment.hora_inicio)}."
+            ),
+        )
+
     add_audit_log(
         db,
         user=current_user,
@@ -217,6 +270,10 @@ def atualizar_agendamento(
 ) -> Agendamento:
     appointment = _get_appointment(db, current_user.empresa_id, agendamento_id)
     values = data.model_dump(exclude_unset=True)
+    validate_employee_appointment_update(current_user, appointment, values)
+
+    old_status = appointment.status
+    old_employee_id = appointment.funcionario_id
     tipo_informado = values.pop("tipo_veiculo", appointment.tipo_veiculo_cobrado)
     values.pop("valor_final", None)
 
@@ -246,15 +303,32 @@ def atualizar_agendamento(
             end = appointment.hora_fim
 
     target_employee = values.get("funcionario_id", appointment.funcionario_id)
-    ensure_available(
-        db,
-        empresa_id=current_user.empresa_id,
-        target_date=target_date,
-        start=start,
-        end=end,
-        funcionario_id=target_employee,
-        ignore_id=appointment.id,
-    )
+    if not is_management(current_user) and target_employee is None:
+        target_employee = current_user.id
+
+    try:
+        ensure_available(
+            db,
+            empresa_id=current_user.empresa_id,
+            target_date=target_date,
+            start=start,
+            end=end,
+            funcionario_id=target_employee,
+            ignore_id=appointment.id,
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_409_CONFLICT:
+            _registrar_conflito(
+                db,
+                current_user=current_user,
+                data_agendamento=target_date,
+                hora_inicio=start,
+                detalhe=str(exc.detail),
+            )
+        raise
+
+    if not is_management(current_user) and appointment.funcionario_id is None:
+        appointment.funcionario_id = current_user.id
 
     tipo_veiculo = _resolve_tipo_veiculo(vehicle, tipo_informado)
     pricing_changed = (
@@ -274,7 +348,6 @@ def atualizar_agendamento(
             tipo_veiculo_cobrado=tipo_veiculo,
         )
 
-    old_status = appointment.status
     apply_patch(appointment, values)
     now = datetime.now(timezone.utc)
     if appointment.status != old_status:
@@ -284,6 +357,32 @@ def atualizar_agendamento(
             appointment.cancelado_em = now
         elif appointment.status == StatusAgendamento.FINALIZADO:
             appointment.finalizado_em = now
+
+    employee_changed = appointment.funcionario_id != old_employee_id
+    if appointment.funcionario_id and appointment.funcionario_id != current_user.id:
+        titulo = (
+            "Novo agendamento atribuído"
+            if employee_changed
+            else "Agendamento atualizado"
+        )
+        notify_user(
+            db,
+            empresa_id=current_user.empresa_id,
+            usuario_id=appointment.funcionario_id,
+            titulo=titulo,
+            mensagem=_formatar_horario(appointment.data, appointment.hora_inicio),
+        )
+
+    if appointment.status == StatusAgendamento.CANCELADO and old_status != appointment.status:
+        notify_management(
+            db,
+            empresa_id=current_user.empresa_id,
+            titulo="Agendamento cancelado",
+            mensagem=(
+                f"Agendamento #{appointment.id} cancelado por {current_user.nome}."
+            ),
+            exclude_user_ids=(current_user.id,),
+        )
 
     add_audit_log(
         db,
@@ -302,12 +401,34 @@ def atualizar_agendamento(
 @router.delete("/{agendamento_id}", status_code=status.HTTP_204_NO_CONTENT)
 def cancelar_agendamento(
     agendamento_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
     db: Session = Depends(get_db),
 ) -> Response:
     appointment = _get_appointment(db, current_user.empresa_id, agendamento_id)
     appointment.status = StatusAgendamento.CANCELADO
     appointment.cancelado_em = datetime.now(timezone.utc)
+
+    if appointment.funcionario_id and appointment.funcionario_id != current_user.id:
+        notify_user(
+            db,
+            empresa_id=current_user.empresa_id,
+            usuario_id=appointment.funcionario_id,
+            titulo="Agendamento cancelado",
+            mensagem=(
+                f"O atendimento de {_formatar_horario(appointment.data, appointment.hora_inicio)} "
+                "foi cancelado."
+            ),
+        )
+
+    notify_management(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Agendamento cancelado",
+        mensagem=f"Agendamento #{appointment.id} cancelado por {current_user.nome}.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,

@@ -1,7 +1,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -73,6 +73,10 @@ def dashboard(
         select(func.count()).select_from(Notificacao).where(
             Notificacao.empresa_id == empresa_id,
             Notificacao.lida.is_(False),
+            or_(
+                Notificacao.usuario_id.is_(None),
+                Notificacao.usuario_id == current_user.id,
+            ),
         )
     ) or 0
 
@@ -97,9 +101,7 @@ def listar_planos(
 
 @router.get("/assinaturas", response_model=list[AssinaturaOut])
 def listar_assinaturas(
-    current_user: Usuario = Depends(
-        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
-    ),
+    current_user: Usuario = Depends(require_roles(CargoUsuario.ADMIN)),
     db: Session = Depends(get_db),
 ) -> list[Assinatura]:
     return list(
@@ -115,9 +117,7 @@ def listar_assinaturas(
 def listar_logs(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=300),
-    current_user: Usuario = Depends(
-        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
-    ),
+    current_user: Usuario = Depends(require_roles(CargoUsuario.ADMIN)),
     db: Session = Depends(get_db),
 ) -> list[Log]:
     return list(

@@ -12,9 +12,9 @@ from app.models.models import Empresa, Usuario
 from app.schemas.entities import EmpresaOut, EmpresaUpdate
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
+from app.services.notifications import notify_admins
 
 router = APIRouter(prefix="/empresa", tags=["Empresa"])
-
 
 COMPANY_LOGOS_DIR = PROJECT_ROOT / "uploads" / "company_logos"
 COMPANY_LOGOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,6 @@ def _remove_local_logo(logo_url: str | None) -> None:
     try:
         target.unlink(missing_ok=True)
     except OSError:
-        # A falha na limpeza do arquivo antigo não deve impedir o uso do sistema.
         pass
 
 
@@ -62,9 +61,7 @@ def obter_empresa(
 @router.patch("", response_model=EmpresaOut)
 def atualizar_empresa(
     data: EmpresaUpdate,
-    current_user: Usuario = Depends(
-        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
-    ),
+    current_user: Usuario = Depends(require_roles(CargoUsuario.ADMIN)),
     db: Session = Depends(get_db),
 ) -> Empresa:
     empresa = db.get(Empresa, current_user.empresa_id)
@@ -72,6 +69,13 @@ def atualizar_empresa(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Empresa não encontrada.")
 
     apply_patch(empresa, data.model_dump(exclude_unset=True))
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Dados da empresa atualizados",
+        mensagem=f"{current_user.nome} atualizou as informações da empresa.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
@@ -85,9 +89,7 @@ def atualizar_empresa(
 @router.post("/logo", response_model=EmpresaOut)
 async def atualizar_logo_empresa(
     logo: UploadFile = File(...),
-    current_user: Usuario = Depends(
-        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
-    ),
+    current_user: Usuario = Depends(require_roles(CargoUsuario.ADMIN)),
     db: Session = Depends(get_db),
 ) -> Empresa:
     empresa = db.get(Empresa, current_user.empresa_id)
@@ -118,6 +120,13 @@ async def atualizar_logo_empresa(
 
     old_logo = empresa.logo
     empresa.logo = f"/uploads/company_logos/{filename}"
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Logo da empresa atualizado",
+        mensagem=f"{current_user.nome} alterou o logo da empresa.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
@@ -138,9 +147,7 @@ async def atualizar_logo_empresa(
 
 @router.delete("/logo", response_model=EmpresaOut)
 def remover_logo_empresa(
-    current_user: Usuario = Depends(
-        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
-    ),
+    current_user: Usuario = Depends(require_roles(CargoUsuario.ADMIN)),
     db: Session = Depends(get_db),
 ) -> Empresa:
     empresa = db.get(Empresa, current_user.empresa_id)
@@ -149,6 +156,13 @@ def remover_logo_empresa(
 
     old_logo = empresa.logo
     empresa.logo = None
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Logo da empresa removido",
+        mensagem=f"{current_user.nome} removeu o logo da empresa.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,

@@ -3,12 +3,13 @@ from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
+from app.core.permissions import is_management
 from app.database.database import get_db
-from app.models.enums import RemetenteMensagem, StatusConversa
+from app.models.enums import CargoUsuario, RemetenteMensagem, StatusConversa
 from app.models.models import Conversa, Mensagem, Usuario
 from app.schemas.entities import (
     ConversaAvaliacaoResposta,
@@ -22,6 +23,7 @@ from app.schemas.entities import (
 )
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
+from app.services.notifications import notify_management, notify_user
 from app.services.ownership import require_client, require_user
 
 router = APIRouter(prefix="/conversas", tags=["Conversas"])
@@ -37,6 +39,22 @@ def _get(db: Session, empresa_id: int, conversa_id: int) -> Conversa:
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversa não encontrada.")
     return item
+
+
+def _ensure_access(item: Conversa, current_user: Usuario) -> None:
+    if is_management(current_user):
+        return
+
+    if item.responsavel_id == current_user.id:
+        return
+
+    if item.responsavel_id is None and item.status == StatusConversa.ABERTA:
+        return
+
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        "Você só pode acessar conversas atribuídas a você ou ainda sem responsável.",
+    )
 
 
 def _limpar_finalizacao(item: Conversa) -> None:
@@ -67,6 +85,17 @@ def listar_conversas(
     query = select(Conversa).where(
         Conversa.empresa_id == current_user.empresa_id
     )
+
+    if not is_management(current_user):
+        query = query.where(
+            or_(
+                Conversa.responsavel_id == current_user.id,
+                (
+                    Conversa.responsavel_id.is_(None)
+                    & (Conversa.status == StatusConversa.ABERTA)
+                ),
+            )
+        )
 
     if grupo == "ATUAIS":
         query = query.where(
@@ -100,20 +129,52 @@ def criar_conversa(
     db: Session = Depends(get_db),
 ) -> Conversa:
     require_client(db, current_user.empresa_id, data.cliente_id)
-    if data.responsavel_id:
-        require_user(db, current_user.empresa_id, data.responsavel_id)
+    values = data.model_dump()
+
+    if not is_management(current_user):
+        if values.get("responsavel_id") not in (None, current_user.id):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Funcionários podem atribuir novas conversas somente a si mesmos.",
+            )
+        values["responsavel_id"] = current_user.id
+
+    if values.get("responsavel_id"):
+        require_user(
+            db,
+            current_user.empresa_id,
+            values["responsavel_id"],
+        )
 
     item = Conversa(
         empresa_id=current_user.empresa_id,
-        **data.model_dump(),
+        **values,
     )
 
-    if data.responsavel_id:
+    if item.responsavel_id:
         item.status = StatusConversa.EM_ATENDIMENTO
         item.ia_ativa = False
 
     db.add(item)
     db.flush()
+
+    if item.responsavel_id and item.responsavel_id != current_user.id:
+        notify_user(
+            db,
+            empresa_id=current_user.empresa_id,
+            usuario_id=item.responsavel_id,
+            titulo="Nova conversa atribuída",
+            mensagem=f"A conversa #{item.id} foi atribuída a você.",
+        )
+    elif item.responsavel_id is None:
+        notify_management(
+            db,
+            empresa_id=current_user.empresa_id,
+            titulo="Nova conversa sem responsável",
+            mensagem=f"A conversa #{item.id} aguarda um atendente.",
+            exclude_user_ids=(current_user.id,),
+        )
+
     add_audit_log(
         db,
         user=current_user,
@@ -135,6 +196,8 @@ def listar_responsaveis(
     query = select(Usuario).where(
         Usuario.empresa_id == current_user.empresa_id
     )
+    if not is_management(current_user):
+        query = query.where(Usuario.id == current_user.id)
     if ativo is not None:
         query = query.where(Usuario.ativo == ativo)
     return list(
@@ -148,7 +211,9 @@ def obter_conversa(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Conversa:
-    return _get(db, current_user.empresa_id, conversa_id)
+    item = _get(db, current_user.empresa_id, conversa_id)
+    _ensure_access(item, current_user)
+    return item
 
 
 @router.patch("/{conversa_id}", response_model=ConversaOut)
@@ -159,6 +224,7 @@ def atualizar_conversa(
     db: Session = Depends(get_db),
 ) -> Conversa:
     item = _get(db, current_user.empresa_id, conversa_id)
+    _ensure_access(item, current_user)
     values = data.model_dump(exclude_unset=True)
 
     if item.status == StatusConversa.FINALIZADA:
@@ -172,6 +238,25 @@ def atualizar_conversa(
             status.HTTP_400_BAD_REQUEST,
             "Use a opção Finalizar conversa para confirmar essa ação.",
         )
+
+    old_responsible_id = item.responsavel_id
+
+    if not is_management(current_user):
+        if values.get("responsavel_id") not in (None, current_user.id):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Funcionários não podem transferir conversas para outro usuário.",
+            )
+        if values.get("status") == StatusConversa.ABERTA:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Somente a gestão pode devolver uma conversa para a fila.",
+            )
+        if "ia_ativa" in values:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Funcionários não podem alterar o controle da IA.",
+            )
 
     if "responsavel_id" in values and values["responsavel_id"] is not None:
         require_user(
@@ -192,6 +277,20 @@ def atualizar_conversa(
         values.setdefault("ia_ativa", True)
 
     apply_patch(item, values)
+
+    if (
+        item.responsavel_id
+        and item.responsavel_id != old_responsible_id
+        and item.responsavel_id != current_user.id
+    ):
+        notify_user(
+            db,
+            empresa_id=current_user.empresa_id,
+            usuario_id=item.responsavel_id,
+            titulo="Nova conversa atribuída",
+            mensagem=f"A conversa #{item.id} foi atribuída a você.",
+        )
+
     add_audit_log(
         db,
         user=current_user,
@@ -211,6 +310,7 @@ def finalizar_conversa(
     db: Session = Depends(get_db),
 ) -> Conversa:
     item = _get(db, current_user.empresa_id, conversa_id)
+    _ensure_access(item, current_user)
     if item.status == StatusConversa.FINALIZADA:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -254,6 +354,7 @@ def reabrir_conversa(
     db: Session = Depends(get_db),
 ) -> Conversa:
     item = _get(db, current_user.empresa_id, conversa_id)
+    _ensure_access(item, current_user)
     if item.status != StatusConversa.FINALIZADA:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -280,7 +381,9 @@ def reabrir_conversa(
 def registrar_avaliacao(
     conversa_id: int,
     data: ConversaAvaliacaoResposta,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
     db: Session = Depends(get_db),
 ) -> Conversa:
     item = _get(db, current_user.empresa_id, conversa_id)
@@ -317,7 +420,8 @@ def listar_mensagens(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[Mensagem]:
-    _get(db, current_user.empresa_id, conversa_id)
+    item = _get(db, current_user.empresa_id, conversa_id)
+    _ensure_access(item, current_user)
     return list(
         db.scalars(
             select(Mensagem)
@@ -341,6 +445,16 @@ def criar_mensagem(
     db: Session = Depends(get_db),
 ) -> Mensagem:
     conversation = _get(db, current_user.empresa_id, conversa_id)
+    _ensure_access(conversation, current_user)
+
+    if (
+        current_user.cargo == CargoUsuario.FUNCIONARIO
+        and data.remetente != RemetenteMensagem.FUNCIONARIO
+    ):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Funcionários só podem enviar mensagens como funcionário.",
+        )
 
     message = Mensagem(
         conversa_id=conversa_id,
@@ -367,6 +481,23 @@ def criar_mensagem(
             conversation.ia_ativa = True
             _limpar_finalizacao(conversation)
             _limpar_avaliacao_pendente(conversation)
+
+        if conversation.responsavel_id:
+            notify_user(
+                db,
+                empresa_id=current_user.empresa_id,
+                usuario_id=conversation.responsavel_id,
+                titulo="Nova mensagem de cliente",
+                mensagem=f"A conversa #{conversation.id} recebeu uma nova mensagem.",
+            )
+        else:
+            notify_management(
+                db,
+                empresa_id=current_user.empresa_id,
+                titulo="Cliente aguardando atendimento",
+                mensagem=f"A conversa #{conversation.id} recebeu uma nova mensagem.",
+                exclude_user_ids=(current_user.id,),
+            )
     elif data.remetente == RemetenteMensagem.IA:
         conversation.ia_ativa = True
 
@@ -391,7 +522,8 @@ def marcar_mensagem_lida(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Mensagem:
-    _get(db, current_user.empresa_id, conversa_id)
+    conversation = _get(db, current_user.empresa_id, conversa_id)
+    _ensure_access(conversation, current_user)
     message = db.scalar(
         select(Mensagem).where(
             Mensagem.id == mensagem_id,

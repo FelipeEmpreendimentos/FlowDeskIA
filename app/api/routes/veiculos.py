@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
 from app.database.database import get_db
+from app.models.enums import CargoUsuario
 from app.models.models import Cliente, Usuario, Veiculo
 from app.schemas.entities import VeiculoCreate, VeiculoOut, VeiculoUpdate
 from app.services.audit import add_audit_log
@@ -119,7 +120,9 @@ def atualizar_veiculo(
 @router.delete("/{veiculo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def excluir_veiculo(
     veiculo_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
     db: Session = Depends(get_db),
 ) -> Response:
     veiculo = require_vehicle(db, current_user.empresa_id, veiculo_id)

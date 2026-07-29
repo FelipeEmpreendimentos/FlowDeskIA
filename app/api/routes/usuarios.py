@@ -10,6 +10,7 @@ from app.models.models import Usuario
 from app.schemas.entities import UsuarioCreate, UsuarioOut, UsuarioUpdate
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
+from app.services.notifications import notify_admins
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
@@ -146,6 +147,16 @@ def criar_usuario(
     )
     db.add(usuario)
     db.flush()
+
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Novo usuário cadastrado",
+        mensagem=(
+            f"{current_user.nome} cadastrou {usuario.nome} como {usuario.cargo.value}."
+        ),
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
@@ -205,9 +216,18 @@ def atualizar_usuario(
 
     if status_alterado:
         action = "REATIVOU_USUARIO" if usuario.ativo else "DESATIVOU_USUARIO"
+        descricao = "reativou" if usuario.ativo else "desativou"
     else:
         action = "ATUALIZOU_USUARIO"
+        descricao = "atualizou"
 
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Alteração na equipe",
+        mensagem=f"{current_user.nome} {descricao} o usuário {usuario.nome}.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,
@@ -234,6 +254,13 @@ def desativar_usuario(
     _validar_desativacao(db, current_user, usuario)
 
     usuario.ativo = False
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Usuário desativado",
+        mensagem=f"{current_user.nome} desativou o usuário {usuario.nome}.",
+        exclude_user_ids=(current_user.id,),
+    )
     add_audit_log(
         db,
         user=current_user,

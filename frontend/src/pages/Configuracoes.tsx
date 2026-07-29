@@ -1,19 +1,28 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { useOutletContext } from "react-router";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
-import { Alert, LoadingState, PageHeader, StatusBadge } from "../components/UI";
+import {
+  Alert,
+  LoadingState,
+  PageHeader,
+  StatusBadge,
+} from "../components/UI";
 import { apiRequest } from "../services/api";
 import type {
   AppOutletContext,
-  ConfigIA,
   Empresa,
-  Integracao,
   Notificacao,
 } from "../types";
 import { formatDateTime, normalizeNullable } from "../utils/format";
 
-type AbaConfiguracao = "empresa" | "ia" | "notificacoes" | "seguranca";
+type AbaConfiguracao = "empresa" | "notificacoes" | "seguranca";
 
 interface EmpresaForm {
   nome: string;
@@ -22,13 +31,6 @@ interface EmpresaForm {
   cidade: string;
   estado: string;
   timezone: string;
-}
-
-interface IAForm {
-  nome_assistente: string;
-  mensagem_boas_vindas: string;
-  prompt: string;
-  temperatura: string;
 }
 
 interface SenhaForm {
@@ -55,7 +57,8 @@ function resolverLogoUrl(valor: string | null | undefined): string {
 }
 
 export function Configuracoes() {
-  const { usuario, atualizarUsuario } = useOutletContext<AppOutletContext>();
+  const { usuario, atualizarUsuario } =
+    useOutletContext<AppOutletContext>();
   const [aba, setAba] = useState<AbaConfiguracao>("empresa");
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [empresaForm, setEmpresaForm] = useState<EmpresaForm>({
@@ -66,19 +69,13 @@ export function Configuracoes() {
     estado: "",
     timezone: "America/Sao_Paulo",
   });
-  const [iaForm, setIaForm] = useState<IAForm>({
-    nome_assistente: "Assistente",
-    mensagem_boas_vindas: "",
-    prompt: "",
-    temperatura: "0.70",
-  });
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
-  const [integracoes, setIntegracoes] = useState<Integracao[]>([]);
   const [senhaForm, setSenhaForm] = useState<SenhaForm>({
     senha_atual: "",
     nova_senha: "",
     confirmar_senha: "",
   });
+
   const inputLogoRef = useRef<HTMLInputElement | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -93,29 +90,17 @@ export function Configuracoes() {
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
 
-  const podeEditar = ["ADMIN", "GERENTE"].includes(usuario.cargo);
+  const podeEditarEmpresa = usuario.cargo === "ADMIN";
 
   async function carregar() {
     setCarregando(true);
     setErro("");
 
     try {
-      const requests: [
-        Promise<Empresa>,
-        Promise<ConfigIA | null>,
-        Promise<Notificacao[]>,
-        Promise<Integracao[] | null>,
-      ] = [
+      const [dadosEmpresa, dadosNotificacoes] = await Promise.all([
         apiRequest<Empresa>("/empresa"),
-        apiRequest<ConfigIA | null>("/configuracoes/ia"),
         apiRequest<Notificacao[]>("/notificacoes"),
-        ["ADMIN", "GERENTE"].includes(usuario.cargo)
-          ? apiRequest<Integracao[]>("/configuracoes/integracoes")
-          : Promise.resolve(null),
-      ];
-
-      const [dadosEmpresa, dadosIA, dadosNotificacoes, dadosIntegracoes] =
-        await Promise.all(requests);
+      ]);
 
       setEmpresa(dadosEmpresa);
       setEmpresaForm({
@@ -126,20 +111,13 @@ export function Configuracoes() {
         estado: dadosEmpresa.estado ?? "",
         timezone: dadosEmpresa.timezone || "America/Sao_Paulo",
       });
-
-      if (dadosIA) {
-        setIaForm({
-          nome_assistente: dadosIA.nome_assistente,
-          mensagem_boas_vindas: dadosIA.mensagem_boas_vindas ?? "",
-          prompt: dadosIA.prompt ?? "",
-          temperatura: String(dadosIA.temperatura),
-        });
-      }
-
       setNotificacoes(dadosNotificacoes);
-      setIntegracoes(dadosIntegracoes ?? []);
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível carregar as configurações.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível carregar as configurações.",
+      );
     } finally {
       setCarregando(false);
     }
@@ -151,28 +129,17 @@ export function Configuracoes() {
 
   useEffect(() => {
     if (!sucesso) return;
-
-    const timer = window.setTimeout(() => {
-      setSucesso("");
-    }, 4000);
-
+    const timer = window.setTimeout(() => setSucesso(""), 4000);
     return () => window.clearTimeout(timer);
   }, [sucesso]);
 
-
   useEffect(() => {
     if (!erroTemporario) return;
-
-    const timer = window.setTimeout(() => {
-      setErroTemporario("");
-    }, 4000);
-
+    const timer = window.setTimeout(() => setErroTemporario(""), 4000);
     return () => window.clearTimeout(timer);
   }, [erroTemporario]);
 
-  function solicitarConfirmacaoEmpresa(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  function solicitarConfirmacaoEmpresa(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro("");
     setConfirmarDadosEmpresa(true);
@@ -180,7 +147,6 @@ export function Configuracoes() {
 
   function fecharConfirmacaoEmpresa() {
     if (salvando) return;
-
     setConfirmarDadosEmpresa(false);
     setErro("");
   }
@@ -224,12 +190,12 @@ export function Configuracoes() {
 
     const formatosPermitidos = ["image/png", "image/jpeg", "image/webp"];
     if (!formatosPermitidos.includes(arquivo.type)) {
-      setErro("Escolha uma imagem PNG, JPG ou WebP.");
+      setErroTemporario("Escolha uma imagem PNG, JPG ou WebP.");
       return;
     }
 
     if (arquivo.size > 2 * 1024 * 1024) {
-      setErro("A imagem deve ter no máximo 2 MB.");
+      setErroTemporario("A imagem deve ter no máximo 2 MB.");
       return;
     }
 
@@ -266,7 +232,6 @@ export function Configuracoes() {
 
   function fecharConfirmacaoRemocaoLogo() {
     if (salvandoLogo) return;
-
     setConfirmarRemocaoLogo(false);
     setErro("");
   }
@@ -294,28 +259,6 @@ export function Configuracoes() {
     }
   }
 
-  async function salvarIA(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSalvando(true);
-    setErro("");
-    try {
-      await apiRequest<ConfigIA>("/configuracoes/ia", {
-        method: "PUT",
-        body: JSON.stringify({
-          nome_assistente: iaForm.nome_assistente.trim(),
-          mensagem_boas_vindas: normalizeNullable(iaForm.mensagem_boas_vindas),
-          prompt: normalizeNullable(iaForm.prompt),
-          temperatura: Number(iaForm.temperatura),
-        }),
-      });
-      setSucesso("Configuração da IA salva.");
-    } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível salvar a IA.");
-    } finally {
-      setSalvando(false);
-    }
-  }
-
   async function marcarLida(item: Notificacao) {
     try {
       const atualizada = await apiRequest<Notificacao>(
@@ -328,26 +271,30 @@ export function Configuracoes() {
         ),
       );
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível marcar a notificação.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível marcar a notificação.",
+      );
     }
   }
 
   async function marcarTodas() {
     try {
-      const pendentes = notificacoes.filter((item) => !item.lida);
-      await Promise.all(
-        pendentes.map((item) =>
-          apiRequest<Notificacao>(`/notificacoes/${item.id}/lida`, {
-            method: "PATCH",
-          }),
-        ),
+      await apiRequest<{ mensagem: string }>(
+        "/notificacoes/marcar-todas-lidas",
+        { method: "PATCH" },
       );
       setNotificacoes((atuais) =>
         atuais.map((item) => ({ ...item, lida: true })),
       );
       setSucesso("Notificações marcadas como lidas.");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível marcar as notificações.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível marcar as notificações.",
+      );
     }
   }
 
@@ -371,7 +318,6 @@ export function Configuracoes() {
 
   function fecharConfirmacaoAlteracaoSenha() {
     if (salvando) return;
-
     setConfirmarAlteracaoSenha(false);
     setErro("");
   }
@@ -414,7 +360,7 @@ export function Configuracoes() {
       <PageHeader
         eyebrow="Preferências"
         title="Configurações"
-        description="Gerencie a empresa, a IA, as integrações e a segurança."
+        description="Gerencie os dados da empresa, suas notificações e a segurança da conta."
       />
 
       {sucesso && (
@@ -469,24 +415,21 @@ export function Configuracoes() {
       <div className="tabs">
         <button
           className={aba === "empresa" ? "tab-active" : ""}
+          type="button"
           onClick={() => setAba("empresa")}
         >
           Empresa
         </button>
         <button
-          className={aba === "ia" ? "tab-active" : ""}
-          onClick={() => setAba("ia")}
-        >
-          Inteligência artificial
-        </button>
-        <button
           className={aba === "notificacoes" ? "tab-active" : ""}
+          type="button"
           onClick={() => setAba("notificacoes")}
         >
           Notificações
         </button>
         <button
           className={aba === "seguranca" ? "tab-active" : ""}
+          type="button"
           onClick={() => setAba("seguranca")}
         >
           Segurança
@@ -506,6 +449,12 @@ export function Configuracoes() {
               <Icon name="building" size={24} />
             </div>
 
+            {!podeEditarEmpresa && (
+              <Alert type="info">
+                Somente administradores podem alterar os dados e o logo da empresa.
+              </Alert>
+            )}
+
             <form onSubmit={solicitarConfirmacaoEmpresa}>
               <div className="form-grid form-grid-2">
                 <div className="company-logo-editor field-span-2">
@@ -522,10 +471,8 @@ export function Configuracoes() {
 
                   <div className="company-logo-editor-copy">
                     <strong>Logo da empresa</strong>
-                    <p>
-                      Use uma imagem quadrada em PNG, JPG ou WebP, com até 2 MB.
-                    </p>
-                    {podeEditar && (
+                    <p>Use uma imagem quadrada em PNG, JPG ou WebP, com até 2 MB.</p>
+                    {podeEditarEmpresa && (
                       <div className="company-logo-actions">
                         <input
                           ref={inputLogoRef}
@@ -566,7 +513,7 @@ export function Configuracoes() {
                     onChange={(event) =>
                       setEmpresaForm({ ...empresaForm, nome: event.target.value })
                     }
-                    disabled={!podeEditar}
+                    disabled={!podeEditarEmpresa}
                     required
                   />
                 </label>
@@ -580,7 +527,7 @@ export function Configuracoes() {
                         telefone: event.target.value,
                       })
                     }
-                    disabled={!podeEditar}
+                    disabled={!podeEditarEmpresa}
                   />
                 </label>
                 <label className="field">
@@ -591,7 +538,7 @@ export function Configuracoes() {
                     onChange={(event) =>
                       setEmpresaForm({ ...empresaForm, email: event.target.value })
                     }
-                    disabled={!podeEditar}
+                    disabled={!podeEditarEmpresa}
                   />
                 </label>
                 <label className="field">
@@ -601,7 +548,7 @@ export function Configuracoes() {
                     onChange={(event) =>
                       setEmpresaForm({ ...empresaForm, cidade: event.target.value })
                     }
-                    disabled={!podeEditar}
+                    disabled={!podeEditarEmpresa}
                   />
                 </label>
                 <label className="field">
@@ -615,7 +562,7 @@ export function Configuracoes() {
                         estado: event.target.value.toUpperCase(),
                       })
                     }
-                    disabled={!podeEditar}
+                    disabled={!podeEditarEmpresa}
                   />
                 </label>
                 <label className="field field-span-2">
@@ -628,7 +575,7 @@ export function Configuracoes() {
                         timezone: event.target.value,
                       })
                     }
-                    disabled={!podeEditar}
+                    disabled={!podeEditarEmpresa}
                     required
                   >
                     {fusosBrasil.map((fuso) => (
@@ -644,7 +591,7 @@ export function Configuracoes() {
                 </label>
               </div>
 
-              {podeEditar && (
+              {podeEditarEmpresa && (
                 <div className="form-footer">
                   <button
                     className="button button-primary"
@@ -686,126 +633,6 @@ export function Configuracoes() {
                 <dd>{formatDateTime(empresa?.updated_at)}</dd>
               </div>
             </dl>
-          </aside>
-        </div>
-      ) : aba === "ia" ? (
-        <div className="settings-grid">
-          <section className="content-card">
-            <div className="card-heading">
-              <div>
-                <span>Assistente virtual</span>
-                <h2>Personalidade e atendimento</h2>
-              </div>
-              <Icon name="bot" size={26} />
-            </div>
-
-            <form onSubmit={salvarIA}>
-              <div className="form-grid">
-                <label className="field">
-                  Nome do assistente
-                  <input
-                    value={iaForm.nome_assistente}
-                    onChange={(event) =>
-                      setIaForm({
-                        ...iaForm,
-                        nome_assistente: event.target.value,
-                      })
-                    }
-                    disabled={!podeEditar}
-                    required
-                  />
-                </label>
-                <label className="field">
-                  Mensagem de boas-vindas
-                  <textarea
-                    rows={3}
-                    value={iaForm.mensagem_boas_vindas}
-                    onChange={(event) =>
-                      setIaForm({
-                        ...iaForm,
-                        mensagem_boas_vindas: event.target.value,
-                      })
-                    }
-                    disabled={!podeEditar}
-                  />
-                </label>
-                <label className="field">
-                  Instruções da IA
-                  <textarea
-                    rows={8}
-                    value={iaForm.prompt}
-                    onChange={(event) =>
-                      setIaForm({ ...iaForm, prompt: event.target.value })
-                    }
-                    placeholder="Explique como o assistente deve conversar, quais serviços oferecer e quando transferir para um atendente."
-                    disabled={!podeEditar}
-                  />
-                </label>
-                <label className="field">
-                  Criatividade: {Number(iaForm.temperatura).toFixed(1)}
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={iaForm.temperatura}
-                    onChange={(event) =>
-                      setIaForm({
-                        ...iaForm,
-                        temperatura: event.target.value,
-                      })
-                    }
-                    disabled={!podeEditar}
-                  />
-                </label>
-              </div>
-
-              {podeEditar && (
-                <div className="form-footer">
-                  <button
-                    className="button button-primary"
-                    type="submit"
-                    disabled={salvando}
-                  >
-                    {salvando ? "Salvando..." : "Salvar configuração"}
-                  </button>
-                </div>
-              )}
-            </form>
-          </section>
-
-          <aside className="content-card integration-card">
-            <div className="card-heading">
-              <div>
-                <span>Integrações</span>
-                <h2>Canais conectados</h2>
-              </div>
-            </div>
-            {integracoes.length === 0 ? (
-              <div className="compact-empty">
-                Nenhuma integração configurada. WhatsApp, Instagram e IA serão
-                conectados na etapa de integração real.
-              </div>
-            ) : (
-              <div className="integration-list">
-                {integracoes.map((item) => (
-                  <div key={item.id}>
-                    <span className="integration-icon">
-                      <Icon name="chat" size={18} />
-                    </span>
-                    <div>
-                      <strong>{item.nome ?? item.tipo}</strong>
-                      <small>{item.identificador ?? "Sem identificador"}</small>
-                    </div>
-                    <StatusBadge value={item.ativo ? "ATIVO" : "INATIVO"} />
-                  </div>
-                ))}
-              </div>
-            )}
-            <Alert type="info">
-              A tela já está preparada. A conexão real será feita após a
-              publicação segura do backend.
-            </Alert>
           </aside>
         </div>
       ) : aba === "notificacoes" ? (
@@ -907,9 +734,6 @@ export function Configuracoes() {
                       aria-label={
                         mostrarNovaSenha ? "Ocultar nova senha" : "Mostrar nova senha"
                       }
-                      title={
-                        mostrarNovaSenha ? "Ocultar nova senha" : "Mostrar nova senha"
-                      }
                     >
                       <Icon name="eye" size={18} />
                     </button>
@@ -937,11 +761,6 @@ export function Configuracoes() {
                         setMostrarConfirmacaoNovaSenha((atual) => !atual)
                       }
                       aria-label={
-                        mostrarConfirmacaoNovaSenha
-                          ? "Ocultar confirmação da senha"
-                          : "Mostrar confirmação da senha"
-                      }
-                      title={
                         mostrarConfirmacaoNovaSenha
                           ? "Ocultar confirmação da senha"
                           : "Mostrar confirmação da senha"
@@ -1002,7 +821,6 @@ export function Configuracoes() {
           <span className="confirmation-icon confirmation-icon-success">
             <Icon name="lock" size={24} />
           </span>
-
           <div className="confirmation-copy">
             <strong>Confirmar alteração da senha?</strong>
             <p>
@@ -1010,9 +828,7 @@ export function Configuracoes() {
               Utilize a nova senha no próximo acesso ao sistema.
             </p>
           </div>
-
           {erro && <Alert>{erro}</Alert>}
-
           <div className="modal-actions confirmation-actions">
             <button
               className="button button-secondary"
@@ -1045,7 +861,6 @@ export function Configuracoes() {
           <span className="confirmation-icon confirmation-icon-success">
             <Icon name="check" size={24} />
           </span>
-
           <div className="confirmation-copy">
             <strong>Salvar as alterações da empresa?</strong>
             <p>
@@ -1053,9 +868,7 @@ export function Configuracoes() {
               os valores preenchidos nesta tela.
             </p>
           </div>
-
           {erro && <Alert>{erro}</Alert>}
-
           <div className="modal-actions confirmation-actions">
             <button
               className="button button-secondary"
@@ -1088,7 +901,6 @@ export function Configuracoes() {
           <span className="confirmation-icon confirmation-icon-danger">
             <Icon name="trash" size={24} />
           </span>
-
           <div className="confirmation-copy">
             <strong>Remover o logo da empresa?</strong>
             <p>
@@ -1096,9 +908,7 @@ export function Configuracoes() {
               inicial do nome da empresa.
             </p>
           </div>
-
           {erro && <Alert>{erro}</Alert>}
-
           <div className="modal-actions confirmation-actions">
             <button
               className="button button-secondary"

@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
 from app.database.database import get_db
-from app.models.enums import StatusCliente
+from app.models.enums import CargoUsuario, StatusCliente
 from app.models.models import Cliente, Usuario
 from app.schemas.entities import ClienteCreate, ClienteOut, ClienteUpdate
 from app.services.audit import add_audit_log
@@ -98,7 +98,15 @@ def atualizar_cliente(
     db: Session = Depends(get_db),
 ) -> Cliente:
     cliente = require_client(db, current_user.empresa_id, cliente_id)
-    apply_patch(cliente, data.model_dump(exclude_unset=True))
+    values = data.model_dump(exclude_unset=True)
+
+    if current_user.cargo == CargoUsuario.FUNCIONARIO and "status" in values:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Funcionários não podem alterar o status de clientes.",
+        )
+
+    apply_patch(cliente, values)
     add_audit_log(
         db,
         user=current_user,
@@ -112,7 +120,9 @@ def atualizar_cliente(
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
 def desativar_cliente(
     cliente_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
     db: Session = Depends(get_db),
 ) -> Response:
     cliente = require_client(db, current_user.empresa_id, cliente_id)
