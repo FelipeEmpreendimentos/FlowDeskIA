@@ -12,6 +12,7 @@ from app.schemas.entities import ClienteCreate, ClienteOut, ClienteUpdate
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
 from app.services.ownership import require_client
+from app.services.plans import enforce_limit
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
@@ -30,15 +31,11 @@ def listar_clientes(
 
     if busca:
         term = f"%{busca.strip()}%"
-
         if campo_busca == "nome":
             query = query.where(Cliente.nome.ilike(term))
         elif campo_busca == "telefone":
             query = query.where(
-                or_(
-                    Cliente.telefone.ilike(term),
-                    Cliente.whatsapp.ilike(term),
-                )
+                or_(Cliente.telefone.ilike(term), Cliente.whatsapp.ilike(term))
             )
         elif campo_busca == "email":
             query = query.where(Cliente.email.ilike(term))
@@ -54,9 +51,7 @@ def listar_clientes(
     if status_cliente:
         query = query.where(Cliente.status == status_cliente)
 
-    return list(
-        db.scalars(query.order_by(Cliente.nome).offset(offset).limit(limit))
-    )
+    return list(db.scalars(query.order_by(Cliente.nome).offset(offset).limit(limit)))
 
 
 @router.post("", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
@@ -65,10 +60,8 @@ def criar_cliente(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Cliente:
-    cliente = Cliente(
-        empresa_id=current_user.empresa_id,
-        **data.model_dump(),
-    )
+    enforce_limit(db, current_user.empresa_id, "clientes")
+    cliente = Cliente(empresa_id=current_user.empresa_id, **data.model_dump())
     db.add(cliente)
     db.flush()
     add_audit_log(
@@ -105,6 +98,8 @@ def atualizar_cliente(
             status.HTTP_403_FORBIDDEN,
             "Funcionários não podem alterar o status de clientes.",
         )
+    if values.get("status") == StatusCliente.ATIVO and cliente.status == StatusCliente.INATIVO:
+        enforce_limit(db, current_user.empresa_id, "clientes")
 
     apply_patch(cliente, values)
     add_audit_log(
