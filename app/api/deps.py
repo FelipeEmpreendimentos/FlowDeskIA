@@ -3,12 +3,14 @@ from collections.abc import Callable
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database.database import get_db
 from app.models.enums import CargoUsuario
-from app.models.models import Usuario
+from app.models.models import Empresa, Usuario
+from app.models.platform import EmpresaPlataforma
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -26,6 +28,8 @@ def get_current_user(
 
     try:
         payload = decode_access_token(credentials.credentials)
+        if payload.get("kind", "company_user") != "company_user":
+            raise ValueError
         user_id = int(payload["sub"])
         empresa_id = int(payload["empresa_id"])
     except (ValueError, KeyError, TypeError) as exc:
@@ -48,6 +52,32 @@ def get_current_user(
             status.HTTP_401_UNAUTHORIZED,
             "Usuário inválido ou inativo.",
         )
+
+    empresa = db.scalar(
+        select(Empresa).where(
+            Empresa.id == empresa_id,
+            Empresa.ativo.is_(True),
+        )
+    )
+    if empresa is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "A empresa está inativa. Entre em contato com o suporte.",
+        )
+
+    try:
+        plataforma = db.get(EmpresaPlataforma, empresa_id)
+    except ProgrammingError:
+        # Mantém compatibilidade até a migração do Super Admin ser executada.
+        db.rollback()
+        plataforma = None
+
+    if plataforma and plataforma.status in {"SUSPENSA", "CANCELADA", "ARQUIVADA"}:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "O acesso da empresa está suspenso. Entre em contato com o suporte.",
+        )
+
     return user
 
 
