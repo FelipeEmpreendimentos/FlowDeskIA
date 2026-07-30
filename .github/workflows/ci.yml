@@ -35,7 +35,7 @@ jobs:
         run: python -m scripts.check_imports
 
       - name: Executar testes
-        run: pytest -q
+        run: python -m pytest -q
 
   frontend:
     name: Frontend
