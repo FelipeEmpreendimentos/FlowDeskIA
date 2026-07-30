@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -169,3 +170,20 @@ class PagamentoAtendimento(Base):
         "FechamentoFinanceiro",
         back_populates="pagamentos",
     )
+
+
+@event.listens_for(FechamentoFinanceiro, "before_insert")
+@event.listens_for(FechamentoFinanceiro, "before_update")
+def normalizar_desconto_percentual(
+    _mapper: object,
+    _connection: object,
+    target: FechamentoFinanceiro,
+) -> None:
+    """Mantém no banco o valor monetário efetivamente descontado.
+
+    A API aceita porcentagem como entrada, calcula o abatimento e normaliza o tipo
+    para VALOR antes de persistir. Assim pagamentos posteriores e estornos nunca
+    reinterpretam um valor em reais como se ainda fosse percentual.
+    """
+    if target.desconto_tipo == "PERCENTUAL":
+        target.desconto_tipo = "VALOR"
