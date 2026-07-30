@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -27,7 +28,7 @@ class PlanoConfiguracao(Base):
         primary_key=True,
     )
     codigo: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
-    preco_anual: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    preco_anual: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     periodo_teste_dias: Mapped[int] = mapped_column(
         Integer, nullable=False, default=14
     )
