@@ -41,11 +41,7 @@ class FechamentoFinanceiro(Base):
         ),
     )
 
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        primary_key=True,
-        autoincrement=True,
-    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     empresa_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("empresas.id", ondelete="CASCADE"),
@@ -56,54 +52,32 @@ class FechamentoFinanceiro(Base):
         ForeignKey("agendamentos.id", ondelete="CASCADE"),
         nullable=False,
     )
-    valor_original: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2),
-        nullable=False,
-    )
+    valor_original: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     desconto_tipo: Mapped[str | None] = mapped_column(String(20))
     desconto_valor: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2),
-        nullable=False,
-        default=Decimal("0.00"),
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
     )
-    valor_final: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2),
-        nullable=False,
-    )
+    valor_final: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     valor_recebido: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2),
-        nullable=False,
-        default=Decimal("0.00"),
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
     )
     valor_pendente: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2),
-        nullable=False,
-        default=Decimal("0.00"),
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
     )
-    status: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        default="PENDENTE",
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDENTE")
     observacoes: Mapped[str | None] = mapped_column(Text)
     fechado_por_id: Mapped[int | None] = mapped_column(
-        BigInteger,
-        ForeignKey("usuarios.id", ondelete="SET NULL"),
+        BigInteger, ForeignKey("usuarios.id", ondelete="SET NULL")
     )
     atualizado_por_id: Mapped[int | None] = mapped_column(
-        BigInteger,
-        ForeignKey("usuarios.id", ondelete="SET NULL"),
+        BigInteger, ForeignKey("usuarios.id", ondelete="SET NULL")
     )
     fechado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("NOW()"),
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("NOW()"),
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()")
     )
 
     pagamentos: Mapped[list["PagamentoAtendimento"]] = relationship(
@@ -122,21 +96,12 @@ class PagamentoAtendimento(Base):
             "status IN ('CONFIRMADO', 'ESTORNADO')",
             name="ck_pagamento_atendimento_status",
         ),
-        CheckConstraint(
-            "valor > 0",
-            name="ck_pagamento_atendimento_valor_positivo",
-        ),
+        CheckConstraint("valor > 0", name="ck_pagamento_atendimento_valor_positivo"),
     )
 
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        primary_key=True,
-        autoincrement=True,
-    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     empresa_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("empresas.id", ondelete="CASCADE"),
-        nullable=False,
+        BigInteger, ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False
     )
     fechamento_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -145,30 +110,20 @@ class PagamentoAtendimento(Base):
     )
     forma_pagamento: Mapped[str] = mapped_column(String(30), nullable=False)
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        default="CONFIRMADO",
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="CONFIRMADO")
     recebido_em: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("NOW()"),
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()")
     )
     registrado_por_id: Mapped[int | None] = mapped_column(
-        BigInteger,
-        ForeignKey("usuarios.id", ondelete="SET NULL"),
+        BigInteger, ForeignKey("usuarios.id", ondelete="SET NULL")
     )
     observacoes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("NOW()"),
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()")
     )
 
     fechamento: Mapped[FechamentoFinanceiro] = relationship(
-        "FechamentoFinanceiro",
-        back_populates="pagamentos",
+        "FechamentoFinanceiro", back_populates="pagamentos"
     )
 
 
@@ -179,11 +134,6 @@ def normalizar_desconto_percentual(
     _connection: object,
     target: FechamentoFinanceiro,
 ) -> None:
-    """Mantém no banco o valor monetário efetivamente descontado.
-
-    A API aceita porcentagem como entrada, calcula o abatimento e normaliza o tipo
-    para VALOR antes de persistir. Assim pagamentos posteriores e estornos nunca
-    reinterpretam um valor em reais como se ainda fosse percentual.
-    """
+    """Persiste o desconto percentual como valor monetário efetivamente aplicado."""
     if target.desconto_tipo == "PERCENTUAL":
         target.desconto_tipo = "VALOR"
