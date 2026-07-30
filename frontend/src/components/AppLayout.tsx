@@ -13,6 +13,7 @@ import { AppToast, LoadingState } from "./UI";
 const menu: Array<{ to: string; label: string; icon: IconName }> = [
   { to: "/dashboard", label: "Visão geral", icon: "dashboard" },
   { to: "/agenda", label: "Agenda", icon: "calendar" },
+  { to: "/financeiro", label: "Financeiro", icon: "finance" },
   { to: "/clientes", label: "Clientes", icon: "users" },
   { to: "/veiculos", label: "Veículos", icon: "car" },
   { to: "/servicos", label: "Serviços", icon: "services" },
