@@ -23,30 +23,46 @@ def verify_password(password: str, password_hash_value: str) -> bool:
         return False
 
 
-def create_access_token(
-    *,
-    user_id: int,
-    empresa_id: int,
-    cargo: str,
-) -> tuple[str, int]:
+def _encode_access_token(payload: dict[str, Any]) -> tuple[str, int]:
     expires_minutes = settings.access_token_minutes
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=expires_minutes)
-
-    payload: dict[str, Any] = {
-        "sub": str(user_id),
-        "empresa_id": empresa_id,
-        "cargo": cargo,
+    payload = {
+        **payload,
         "iat": now,
         "exp": expires_at,
     }
-
     token = jwt.encode(
         payload,
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
     return token, expires_minutes * 60
+
+
+def create_access_token(
+    *,
+    user_id: int,
+    empresa_id: int,
+    cargo: str,
+) -> tuple[str, int]:
+    return _encode_access_token(
+        {
+            "sub": str(user_id),
+            "empresa_id": empresa_id,
+            "cargo": cargo,
+            "kind": "company_user",
+        }
+    )
+
+
+def create_super_admin_access_token(*, super_admin_id: int) -> tuple[str, int]:
+    return _encode_access_token(
+        {
+            "sub": str(super_admin_id),
+            "kind": "super_admin",
+        }
+    )
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
