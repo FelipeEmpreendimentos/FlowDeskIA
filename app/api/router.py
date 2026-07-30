@@ -9,6 +9,7 @@ from app.api.routes import (
     configuracoes,
     conversas,
     empresas,
+    financeiro,
     horarios,
     notificacoes,
     servicos,
@@ -29,6 +30,7 @@ api_router.include_router(clientes.router)
 api_router.include_router(veiculos.router)
 api_router.include_router(servicos.router)
 api_router.include_router(agenda.router)
+api_router.include_router(financeiro.router)
 api_router.include_router(horarios.router)
 api_router.include_router(bloqueios.router)
 api_router.include_router(conversas.router)
