@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { AppToastType } from "../services/api";
 import { Icon, type IconName } from "./Icon";
 
 export function PageHeader({
@@ -64,6 +65,54 @@ export function Alert({
   children: ReactNode;
 }) {
   return <div className={`alert alert-${type}`}>{children}</div>;
+}
+
+export function AppToast({
+  type,
+  title,
+  message,
+  onClose,
+}: {
+  type: AppToastType;
+  title: string;
+  message: string;
+  onClose: () => void;
+}) {
+  const iconByType: Record<AppToastType, IconName> = {
+    success: "check",
+    error: "close",
+    warning: "lock",
+    info: "bell",
+  };
+
+  return (
+    <div
+      className="app-toast-region"
+      aria-live={type === "error" || type === "warning" ? "assertive" : "polite"}
+      aria-atomic="true"
+    >
+      <div
+        className={`app-toast app-toast-${type}`}
+        role={type === "error" || type === "warning" ? "alert" : "status"}
+      >
+        <span className={`app-toast-icon app-toast-icon-${type}`}>
+          <Icon name={iconByType[type]} size={18} />
+        </span>
+        <div className="app-toast-copy">
+          <strong>{title}</strong>
+          <span>{message}</span>
+        </div>
+        <button
+          className="app-toast-close"
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar notificação"
+        >
+          <Icon name="close" size={17} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function StatusBadge({ value }: { value: string }) {
