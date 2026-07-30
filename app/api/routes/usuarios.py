@@ -11,6 +11,7 @@ from app.schemas.entities import UsuarioCreate, UsuarioOut, UsuarioUpdate
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
 from app.services.notifications import notify_admins
+from app.services.plans import enforce_limit
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
@@ -136,6 +137,7 @@ def criar_usuario(
             "Gerentes podem criar apenas funcionários.",
         )
 
+    enforce_limit(db, current_user.empresa_id, "usuarios")
     usuario = Usuario(
         empresa_id=current_user.empresa_id,
         nome=data.nome,
@@ -210,6 +212,8 @@ def atualizar_usuario(
     novo_ativo = values.get("ativo")
     if novo_ativo is False and usuario.ativo:
         _validar_desativacao(db, current_user, usuario)
+    if novo_ativo is True and not usuario.ativo:
+        enforce_limit(db, current_user.empresa_id, "usuarios")
 
     status_alterado = "ativo" in values and bool(values["ativo"]) != usuario.ativo
     apply_patch(usuario, values)

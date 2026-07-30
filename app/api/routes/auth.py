@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -14,7 +15,8 @@ from app.core.security import (
     verify_password,
 )
 from app.database.database import get_db
-from app.models.models import PasswordResetToken, Usuario
+from app.models.models import Empresa, PasswordResetToken, Usuario
+from app.models.platform import EmpresaPlataforma
 from app.schemas.auth import (
     AlterarSenhaRequest,
     LoginRequest,
@@ -28,6 +30,32 @@ from app.schemas.common import MessageResponse
 from app.services.email import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
+
+
+def _validar_acesso_empresa(db: Session, empresa_id: int) -> None:
+    empresa = db.scalar(
+        select(Empresa).where(
+            Empresa.id == empresa_id,
+            Empresa.ativo.is_(True),
+        )
+    )
+    if empresa is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "A empresa está inativa. Entre em contato com o suporte.",
+        )
+
+    try:
+        plataforma = db.get(EmpresaPlataforma, empresa_id)
+    except ProgrammingError:
+        db.rollback()
+        plataforma = None
+
+    if plataforma and plataforma.status in {"SUSPENSA", "CANCELADA", "ARQUIVADA"}:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "O acesso da empresa está suspenso. Entre em contato com o suporte.",
+        )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -46,6 +74,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
             "Empresa, e-mail ou senha inválidos.",
         )
 
+    _validar_acesso_empresa(db, user.empresa_id)
     user.ultimo_login = datetime.now(timezone.utc)
     db.commit()
 
@@ -91,8 +120,6 @@ def recuperar_senha(
         "caixa de spam."
     )
 
-    # Não permite que o sistema finja ter enviado uma mensagem quando o
-    # serviço de e-mail ainda não foi configurado.
     if not settings.smtp_configured:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -107,8 +134,6 @@ def recuperar_senha(
         )
     )
 
-    # A resposta é intencionalmente igual para contas existentes e
-    # inexistentes, evitando revelar quais e-mails estão cadastrados.
     if user is None:
         return RecuperarSenhaResponse(mensagem=generic_message)
 
@@ -126,7 +151,6 @@ def recuperar_senha(
         .limit(1)
     )
 
-    # Evita vários e-mails seguidos para a mesma conta.
     if recent_request is not None:
         return RecuperarSenhaResponse(mensagem=generic_message)
 
@@ -147,7 +171,6 @@ def recuperar_senha(
     )
 
     if not email_sent:
-        # O token que não chegou ao destinatário não deve continuar válido.
         db.delete(reset_token)
         db.commit()
         raise HTTPException(
@@ -156,7 +179,6 @@ def recuperar_senha(
             "Tente novamente em alguns minutos.",
         )
 
-    # Depois do envio bem-sucedido, invalida os links anteriores.
     db.execute(
         update(PasswordResetToken)
         .where(

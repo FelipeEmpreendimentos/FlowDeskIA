@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router";
 import { AppLayout } from "./components/AppLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SuperAdminLayout } from "./components/SuperAdminLayout";
+import { SuperAdminProtectedRoute } from "./components/SuperAdminProtectedRoute";
 import { Agenda } from "./pages/Agenda";
 import { Clientes } from "./pages/Clientes";
 import { Configuracoes } from "./pages/Configuracoes";
@@ -11,6 +13,12 @@ import { Login } from "./pages/Login";
 import { RecuperarSenha } from "./pages/RecuperarSenha";
 import { RedefinirSenha } from "./pages/RedefinirSenha";
 import { Servicos } from "./pages/Servicos";
+import { SuperAdminAuditoria } from "./pages/SuperAdminAuditoria";
+import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
+import { SuperAdminEmpresaDetalhe } from "./pages/SuperAdminEmpresaDetalhe";
+import { SuperAdminEmpresas } from "./pages/SuperAdminEmpresas";
+import { SuperAdminLogin } from "./pages/SuperAdminLogin";
+import { SuperAdminPlanos } from "./pages/SuperAdminPlanos";
 import { Veiculos } from "./pages/Veiculos";
 
 function App() {
@@ -19,6 +27,23 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/recuperar-senha" element={<RecuperarSenha />} />
       <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+      <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+
+      <Route
+        path="/super-admin"
+        element={
+          <SuperAdminProtectedRoute>
+            <SuperAdminLayout />
+          </SuperAdminProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<SuperAdminDashboard />} />
+        <Route path="empresas" element={<SuperAdminEmpresas />} />
+        <Route path="empresas/:empresaId" element={<SuperAdminEmpresaDetalhe />} />
+        <Route path="planos" element={<SuperAdminPlanos />} />
+        <Route path="auditoria" element={<SuperAdminAuditoria />} />
+      </Route>
 
       <Route
         element={
