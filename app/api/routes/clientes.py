@@ -94,10 +94,15 @@ def atualizar_cliente(
     values = data.model_dump(exclude_unset=True)
 
     if current_user.cargo == CargoUsuario.FUNCIONARIO and "status" in values:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            "Funcionários não podem alterar o status de clientes.",
-        )
+        if values["status"] == cliente.status:
+            # O formulário compartilhado pode reenviar o status atual mesmo
+            # quando o funcionário editou apenas os dados operacionais.
+            values.pop("status")
+        else:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Funcionários não podem alterar o status de clientes.",
+            )
     if values.get("status") == StatusCliente.ATIVO and cliente.status == StatusCliente.INATIVO:
         enforce_limit(db, current_user.empresa_id, "clientes")
 
