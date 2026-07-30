@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router";
 import App from "./App";
 import "./index.css";
 import "./permission-ui.css";
+import "./financeiro.css";
 import "./super-admin.css";
 
 createRoot(document.getElementById("root")!).render(
