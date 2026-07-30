@@ -105,7 +105,13 @@ export async function apiRequest<T>(
       window.location.assign("/login");
     }
 
-    if (response.status === 403) {
+    const shouldUsePermissionToast =
+      response.status === 403 &&
+      Boolean(getToken()) &&
+      endpoint !== "/auth/me" &&
+      !publicAuthEndpoints.includes(endpoint);
+
+    if (shouldUsePermissionToast) {
       const isPlanRestriction = /plano|limite|recurso|franquia/i.test(message);
       emitAppToast({
         type: "warning",
