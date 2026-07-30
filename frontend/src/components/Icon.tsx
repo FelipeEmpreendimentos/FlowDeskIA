@@ -6,6 +6,7 @@ export type IconName =
   | "services"
   | "chat"
   | "team"
+  | "finance"
   | "settings"
   | "logout"
   | "plus"
@@ -89,6 +90,12 @@ export function Icon({ name, size = 20, className }: IconProps) {
       <>
         <circle cx="12" cy="7" r="4" />
         <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+      </>
+    ),
+    finance: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="M3 10h18M7 15h3M15 15h2" />
       </>
     ),
     settings: (
