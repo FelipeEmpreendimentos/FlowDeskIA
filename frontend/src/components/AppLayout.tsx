@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router";
-import { apiRequest } from "../services/api";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import {
+  APP_TOAST_EVENT,
+  apiRequest,
+  type AppToastEventDetail,
+} from "../services/api";
 import { clearSession } from "../services/auth";
 import type { AppOutletContext, UsuarioLogado } from "../types";
 import { Icon, type IconName } from "./Icon";
-import { LoadingState } from "./UI";
+import { AppToast, LoadingState } from "./UI";
 
 const menu: Array<{ to: string; label: string; icon: IconName }> = [
   { to: "/dashboard", label: "Visão geral", icon: "dashboard" },
@@ -19,9 +23,11 @@ const menu: Array<{ to: string; label: string; icon: IconName }> = [
 
 export function AppLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [usuario, setUsuario] = useState<UsuarioLogado | null>(null);
   const [erro, setErro] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
+  const [toast, setToast] = useState<AppToastEventDetail | null>(null);
 
   const atualizarUsuario = useCallback(async () => {
     try {
@@ -36,6 +42,23 @@ export function AppLayout() {
   useEffect(() => {
     void atualizarUsuario();
   }, [atualizarUsuario]);
+
+  useEffect(() => {
+    function receberToast(event: Event) {
+      const customEvent = event as CustomEvent<AppToastEventDetail>;
+      if (!customEvent.detail?.message) return;
+      setToast(customEvent.detail);
+    }
+
+    window.addEventListener(APP_TOAST_EVENT, receberToast);
+    return () => window.removeEventListener(APP_TOAST_EVENT, receberToast);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   function sair() {
     clearSession();
@@ -68,79 +91,93 @@ export function AppLayout() {
     usuario,
     atualizarUsuario,
   };
+  const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
+  const roleClass = `role-${usuario.cargo.toLowerCase()}`;
+  const routeClass = `route-${routeSection.replaceAll("_", "-")}`;
 
   return (
-    <div className="app-shell">
-      <button
-        className="mobile-menu-button"
-        type="button"
-        onClick={() => setMenuAberto(true)}
-        aria-label="Abrir menu"
-      >
-        <Icon name="menu" />
-      </button>
-
-      {menuAberto && (
+    <>
+      <div className={`app-shell ${roleClass} ${routeClass}`}>
         <button
-          className="sidebar-overlay"
+          className="mobile-menu-button"
           type="button"
-          onClick={() => setMenuAberto(false)}
-          aria-label="Fechar menu"
-        />
-      )}
+          onClick={() => setMenuAberto(true)}
+          aria-label="Abrir menu"
+        >
+          <Icon name="menu" />
+        </button>
 
-      <aside className={`sidebar ${menuAberto ? "sidebar-open" : ""}`}>
-        <div className="sidebar-brand">
-          <div className="sidebar-logo">F</div>
-          <div>
-            <strong>FlowDeskIA</strong>
-            <span>Gestão inteligente</span>
-          </div>
+        {menuAberto && (
           <button
-            className="sidebar-close"
+            className="sidebar-overlay"
             type="button"
             onClick={() => setMenuAberto(false)}
             aria-label="Fechar menu"
-          >
-            <Icon name="close" />
-          </button>
-        </div>
+          />
+        )}
 
-        <nav className="sidebar-nav" aria-label="Menu principal">
-          {menu.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
+        <aside className={`sidebar ${menuAberto ? "sidebar-open" : ""}`}>
+          <div className="sidebar-brand">
+            <div className="sidebar-logo">F</div>
+            <div>
+              <strong>FlowDeskIA</strong>
+              <span>Gestão inteligente</span>
+            </div>
+            <button
+              className="sidebar-close"
+              type="button"
               onClick={() => setMenuAberto(false)}
-              className={({ isActive }) =>
-                `nav-item ${isActive ? "nav-item-active" : ""}`
-              }
+              aria-label="Fechar menu"
             >
-              <Icon name={item.icon} size={19} />
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="sidebar-user">
-          <span className="sidebar-user-avatar">
-            {usuario.nome.charAt(0).toUpperCase()}
-          </span>
-          <div>
-            <strong>{usuario.nome}</strong>
-            <span>{usuario.cargo}</span>
+              <Icon name="close" />
+            </button>
           </div>
-        </div>
 
-        <button className="logout-button" type="button" onClick={sair}>
-          <Icon name="logout" size={18} />
-          Sair da conta
-        </button>
-      </aside>
+          <nav className="sidebar-nav" aria-label="Menu principal">
+            {menu.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setMenuAberto(false)}
+                className={({ isActive }) =>
+                  `nav-item ${isActive ? "nav-item-active" : ""}`
+                }
+              >
+                <Icon name={item.icon} size={19} />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
 
-      <main className="app-content">
-        <Outlet context={context} />
-      </main>
-    </div>
+          <div className="sidebar-user">
+            <span className="sidebar-user-avatar">
+              {usuario.nome.charAt(0).toUpperCase()}
+            </span>
+            <div>
+              <strong>{usuario.nome}</strong>
+              <span>{usuario.cargo}</span>
+            </div>
+          </div>
+
+          <button className="logout-button" type="button" onClick={sair}>
+            <Icon name="logout" size={18} />
+            Sair da conta
+          </button>
+        </aside>
+
+        <main className="app-content">
+          <Outlet context={context} />
+        </main>
+      </div>
+
+      {toast && (
+        <AppToast
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </>
   );
 }

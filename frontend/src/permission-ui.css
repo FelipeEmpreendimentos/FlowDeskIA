@@ -1,0 +1,112 @@
+/* ---------- Toasts globais ---------- */
+
+.app-toast-warning {
+  border-color: #f2d18f;
+}
+
+.app-toast-error {
+  border-color: #f5b8bf;
+}
+
+.app-toast-info {
+  border-color: #bfd0ff;
+}
+
+.app-toast-icon-warning {
+  color: #9b620e;
+  background: #fff8e8;
+}
+
+.app-toast-icon-error {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.app-toast-icon-info {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.alert:empty {
+  display: none;
+}
+
+/* ---------- Permissões visuais por cargo ---------- */
+
+/* Configurações ficam em modo somente leitura sem ocupar a tela com um alerta. */
+.role-funcionario.route-configuracoes
+  .settings-grid
+  > .content-card
+  > .alert-info,
+.role-gerente.route-configuracoes
+  .settings-grid
+  > .content-card
+  > .alert-info {
+  display: none;
+}
+
+/* Funcionários consultam o catálogo, mas a gestão dos serviços é administrativa. */
+.role-funcionario.route-servicos .page-actions,
+.role-funcionario.route-servicos .service-card-header .row-actions,
+.role-funcionario.route-servicos .empty-state .button,
+.role-funcionario .quick-action-grid a[href="/servicos"] {
+  display: none !important;
+}
+
+/* Funcionários podem cadastrar e editar veículos, mas não excluí-los. */
+.role-funcionario.route-veiculos button[title="Excluir veículo"] {
+  display: none;
+}
+
+/* Funcionários editam dados operacionais do cliente, sem trocar sua situação. */
+.role-funcionario.route-clientes button[title="Desativar"],
+.role-funcionario.route-clientes button[title="Reativar"],
+.role-funcionario.route-clientes
+  .modal
+  label:has(select option[value="BLOQUEADO"]) {
+  display: none;
+}
+
+/* Cancelamento de agendamento permanece reservado à gestão. */
+.role-funcionario.route-agenda button[title="Cancelar agendamento"] {
+  display: none;
+}
+
+/* ---------- Consistência dos botões de ação ---------- */
+
+.icon-button,
+.small-action {
+  flex: 0 0 auto;
+}
+
+.data-table .row-actions,
+.entity-card-top .row-actions,
+.service-card-header .row-actions,
+.timeline-footer .row-actions {
+  flex-wrap: nowrap;
+}
+
+.actions-column {
+  min-width: 148px;
+}
+
+.timeline-footer {
+  flex-wrap: wrap;
+}
+
+.timeline-footer > span,
+.timeline-price,
+.timeline-footer .row-actions {
+  flex: 0 0 auto;
+}
+
+.timeline-footer .row-actions {
+  margin-left: 0;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1100px) {
+  .timeline-footer .row-actions {
+    width: 100%;
+  }
+}
