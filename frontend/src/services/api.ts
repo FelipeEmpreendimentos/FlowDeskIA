@@ -3,6 +3,16 @@ import { clearSession, getToken } from "./auth";
 const API_URL =
   import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+export const APP_TOAST_EVENT = "flowdesk:toast";
+
+export type AppToastType = "success" | "error" | "warning" | "info";
+
+export interface AppToastEventDetail {
+  type: AppToastType;
+  title: string;
+  message: string;
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -11,6 +21,12 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+function emitAppToast(detail: AppToastEventDetail): void {
+  window.dispatchEvent(
+    new CustomEvent<AppToastEventDetail>(APP_TOAST_EVENT, { detail }),
+  );
 }
 
 export function buildQuery(
@@ -87,6 +103,19 @@ export async function apiRequest<T>(
     ) {
       clearSession();
       window.location.assign("/login");
+    }
+
+    if (response.status === 403) {
+      const isPlanRestriction = /plano|limite|recurso|franquia/i.test(message);
+      emitAppToast({
+        type: "warning",
+        title: isPlanRestriction ? "Recurso indisponível" : "Acesso restrito",
+        message,
+      });
+
+      // O aviso já foi exibido no canto da aplicação. A mensagem vazia impede
+      // que páginas antigas mostrem o mesmo erro novamente em um bloco grande.
+      throw new ApiError("", response.status);
     }
 
     throw new ApiError(message, response.status);
