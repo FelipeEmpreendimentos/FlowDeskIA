@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type CSSProperties, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { Icon } from "../components/Icon";
 import { superAdminApiRequest } from "../services/superAdminApi";
@@ -11,6 +11,13 @@ interface LoginResponse {
   access_token: string;
   expires_in: number;
 }
+
+const loginTheme = {
+  "--sa-primary": "#6d4aff",
+  "--sa-primary-dark": "#5637dc",
+  "--sa-border": "#dfe6f0",
+  "--sa-text": "#18233a",
+} as CSSProperties;
 
 export function SuperAdminLogin() {
   const navigate = useNavigate();
@@ -38,22 +45,24 @@ export function SuperAdminLogin() {
       const state = location.state as { from?: string } | null;
       navigate(state?.from ?? "/super-admin/dashboard", { replace: true });
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível entrar.");
+      setErro(
+        error instanceof Error ? error.message : "Não foi possível entrar.",
+      );
     } finally {
       setEnviando(false);
     }
   }
 
   return (
-    <main className="super-admin-login-page">
+    <main className="super-admin-login-page" style={loginTheme}>
       <section className="super-admin-login-brand">
         <div>
           <span className="super-admin-login-logo">F</span>
           <small>FLOWDESKIA PLATFORM</small>
           <h1>Controle total da sua operação SaaS.</h1>
           <p>
-            Empresas, planos, testes, inteligência artificial, limites e auditoria
-            em um ambiente separado e protegido.
+            Empresas, planos, testes, inteligência artificial, limites e
+            auditoria em um ambiente separado e protegido.
           </p>
           <div className="super-admin-login-features">
             <span>Planos editáveis</span>
@@ -105,7 +114,11 @@ export function SuperAdminLogin() {
             </div>
           </label>
 
-          <button className="super-admin-primary-button" type="submit" disabled={enviando}>
+          <button
+            className="super-admin-primary-button"
+            type="submit"
+            disabled={enviando}
+          >
             <Icon name="lock" size={18} />
             {enviando ? "Entrando..." : "Entrar no painel"}
           </button>
