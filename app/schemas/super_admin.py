@@ -39,10 +39,8 @@ class SuperAdminAlterarSenhaRequest(BaseModel):
 class PlanoBase(BaseModel):
     nome: str = Field(min_length=2, max_length=60)
     descricao: str | None = None
-    preco: Decimal = Field(ge=0, max_digits=10, decimal_places=2)
-    preco_anual: Decimal | None = Field(
-        default=None, ge=0, max_digits=10, decimal_places=2
-    )
+    preco: float = Field(ge=0)
+    preco_anual: float | None = Field(default=None, ge=0)
     ativo: bool = True
     periodo_teste_dias: int = Field(default=14, ge=0, le=90)
     limite_usuarios: int | None = Field(default=None, ge=1)
@@ -64,12 +62,8 @@ class PlanoCreate(PlanoBase):
 class PlanoUpdate(BaseModel):
     nome: str | None = Field(default=None, min_length=2, max_length=60)
     descricao: str | None = None
-    preco: Decimal | None = Field(
-        default=None, ge=0, max_digits=10, decimal_places=2
-    )
-    preco_anual: Decimal | None = Field(
-        default=None, ge=0, max_digits=10, decimal_places=2
-    )
+    preco: float | None = Field(default=None, ge=0)
+    preco_anual: float | None = Field(default=None, ge=0)
     ativo: bool | None = None
     periodo_teste_dias: int | None = Field(default=None, ge=0, le=90)
     limite_usuarios: int | None = Field(default=None, ge=1)
