@@ -44,7 +44,7 @@ Cada plano pode controlar:
 
 O Super Admin pode substituir recursos e limites para uma empresa específica sem criar outro plano.
 
-A primeira versão aplica bloqueio real no backend para os limites de usuários e clientes. Os demais contadores já estão preparados para controle e exibição no painel.
+O backend bloqueia recursos que não pertencem ao plano e fiscaliza a criação de usuários, clientes, agendamentos, conversas e canais quando a franquia configurada é atingida. Os contadores de mensagens de IA e armazenamento também ficam disponíveis no painel para a evolução das integrações reais.
 
 ## Preparação local após o merge
 
