@@ -13,7 +13,9 @@ from app.api.routes import (
     financeiro,
     horarios,
     notificacoes,
+    onboarding,
     plano_empresa,
+    preferencias_notificacoes,
     relatorios,
     servicos,
     super_admin,
@@ -37,6 +39,8 @@ api_router.include_router(financeiro.router)
 api_router.include_router(relatorios.router)
 api_router.include_router(plano_empresa.router)
 api_router.include_router(atividades.router)
+api_router.include_router(onboarding.router)
+api_router.include_router(preferencias_notificacoes.router)
 api_router.include_router(horarios.router)
 api_router.include_router(bloqueios.router)
 api_router.include_router(conversas.router)

@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router";
+import { Icon } from "../components/Icon";
+import { OnboardingChecklist } from "../components/OnboardingChecklist";
+import { Alert, LoadingState, PageHeader, StatusBadge } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
 import type {
   Agendamento,
@@ -10,8 +13,6 @@ import type {
   Servico,
 } from "../types";
 import { formatDateTime, formatTime } from "../utils/format";
-import { Icon } from "../components/Icon";
-import { Alert, LoadingState, PageHeader, StatusBadge } from "../components/UI";
 
 const resumoVazio: DashboardResumo = {
   agendamentos_hoje: 0,
@@ -90,6 +91,8 @@ export function Dashboard() {
           </Link>
         }
       />
+
+      <OnboardingChecklist ativo={usuario.cargo === "ADMIN"} />
 
       {carregando && <LoadingState label="Carregando visão geral..." />}
       {erro && <Alert>{erro}</Alert>}
@@ -183,7 +186,9 @@ export function Dashboard() {
                 <span>Central de atenção</span>
                 <h2>Notificações recentes</h2>
               </div>
-              <strong className="number-pill">{resumo.notificacoes_nao_lidas}</strong>
+              <Link className="number-pill" to="/notificacoes">
+                {resumo.notificacoes_nao_lidas}
+              </Link>
             </div>
 
             {notificacoes.length === 0 ? (

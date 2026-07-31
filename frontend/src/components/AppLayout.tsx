@@ -31,6 +31,7 @@ const menu: MenuItem[] = [
   { to: "/veiculos", label: "Veículos", icon: "car" },
   { to: "/servicos", label: "Serviços", icon: "services" },
   { to: "/conversas", label: "Conversas", icon: "chat" },
+  { to: "/notificacoes", label: "Notificações", icon: "bell" },
   { to: "/equipe", label: "Equipe", icon: "team" },
   {
     to: "/atividades",
