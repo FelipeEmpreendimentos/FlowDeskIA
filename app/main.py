@@ -1,20 +1,30 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import PROJECT_ROOT, settings
+from app.middleware.observability import observability_middleware
 from app.middleware.plan_access import plan_access_middleware
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
     description=(
         "Backend do FlowDeskIA: autenticação, empresas, usuários, clientes, "
-        "veículos, serviços, agenda, conversas, planos e Super Admin."
+        "veículos, serviços, agenda, financeiro, relatórios, conversas, planos e Super Admin."
     ),
 )
 
+app.middleware("http")(observability_middleware)
 app.middleware("http")(plan_access_middleware)
 
 app.add_middleware(

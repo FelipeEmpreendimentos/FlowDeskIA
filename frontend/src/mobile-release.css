@@ -1,0 +1,293 @@
+@media (max-width: 900px) {
+  .app-content {
+    padding: 72px 18px 28px;
+  }
+
+  .page-header {
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .page-actions {
+    width: 100%;
+  }
+
+  .page-actions > .button,
+  .page-actions > a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dashboard-grid,
+  .settings-grid,
+  .conversation-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-shell {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .conversation-list-panel {
+    max-height: 390px;
+    overflow: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .conversation-list {
+    height: 270px;
+  }
+
+  .chat-panel {
+    min-height: 580px;
+  }
+
+  .message-bubble {
+    max-width: 86%;
+  }
+
+  .chat-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chat-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .chat-controls select,
+  .chat-controls .button {
+    flex: 1 1 150px;
+    width: auto;
+  }
+
+  .table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .modal-panel {
+    width: min(720px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+@media (max-width: 680px) {
+  .app-content {
+    padding: 68px 12px 22px;
+  }
+
+  .page {
+    min-width: 0;
+  }
+
+  .page-header {
+    display: grid;
+  }
+
+  .page-header h1 {
+    font-size: clamp(26px, 9vw, 34px);
+  }
+
+  .page-header p {
+    font-size: 13px;
+  }
+
+  .content-card {
+    padding: 16px;
+    border-radius: 15px;
+  }
+
+  .metrics-grid,
+  .mini-metrics,
+  .card-grid,
+  .service-grid,
+  .schedule-grid,
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .field-span-2 {
+    grid-column: auto;
+  }
+
+  .toolbar,
+  .agenda-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .toolbar > *,
+  .agenda-toolbar > *,
+  .compact-field,
+  .search-field,
+  .toolbar-search-group,
+  .search-filter {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .agenda-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .agenda-tab {
+    justify-content: center;
+  }
+
+  .agenda-date-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .timeline-item {
+    grid-template-columns: 48px 10px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .timeline-time {
+    justify-items: start;
+  }
+
+  .timeline-content {
+    padding: 12px;
+  }
+
+  .timeline-main,
+  .timeline-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .timeline-price {
+    justify-items: start;
+    margin-left: 0;
+  }
+
+  .timeline-footer .row-actions {
+    width: 100%;
+  }
+
+  .timeline-footer .row-actions .small-action {
+    flex: 1 1 90px;
+  }
+
+  .timeline-footer .row-actions .icon-button {
+    flex: 0 0 38px;
+  }
+
+  .appointment-price-card {
+    grid-template-columns: 1fr;
+  }
+
+  .slots button {
+    flex: 1 1 64px;
+    min-height: 42px;
+  }
+
+  .modal-panel {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 16px;
+  }
+
+  .modal-header,
+  .modal-body {
+    padding-inline: 16px;
+  }
+
+  .modal-actions,
+  .form-footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions .button,
+  .form-footer .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .conversation-list-panel {
+    max-height: 350px;
+  }
+
+  .conversation-list {
+    height: 235px;
+  }
+
+  .chat-panel {
+    min-height: 520px;
+  }
+
+  .messages-area {
+    padding: 14px 10px;
+  }
+
+  .message-bubble {
+    max-width: 92%;
+  }
+
+  .message-form {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+  }
+
+  .notification-preference-list > label {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+
+  .tabs {
+    margin-inline: -4px;
+    padding-inline: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .tabs button {
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 420px) {
+  .timeline-item {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-time {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding-top: 0;
+  }
+
+  .timeline-marker {
+    display: none;
+  }
+
+  .timeline-content {
+    margin-bottom: 8px;
+  }
+
+  .chat-controls select,
+  .chat-controls .button {
+    flex-basis: 100%;
+  }
+
+  .notification-preference-list > label {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .notification-preference-list .switch-control {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}

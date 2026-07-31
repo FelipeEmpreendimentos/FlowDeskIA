@@ -7,6 +7,7 @@ import "./permission-ui.css";
 import "./financeiro.css";
 import "./relatorios.css";
 import "./engagement.css";
+import "./mobile-release.css";
 import "./super-admin.css";
 
 createRoot(document.getElementById("root")!).render(
