@@ -12,6 +12,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Equipe } from "./pages/Equipe";
 import { Financeiro } from "./pages/Financeiro";
 import { Login } from "./pages/Login";
+import { Notificacoes } from "./pages/Notificacoes";
 import { PlanoConsumo } from "./pages/PlanoConsumo";
 import { RecuperarSenha } from "./pages/RecuperarSenha";
 import { RedefinirSenha } from "./pages/RedefinirSenha";
@@ -62,6 +63,7 @@ function App() {
         <Route path="/relatorios" element={<Relatorios />} />
         <Route path="/atividades" element={<Atividades />} />
         <Route path="/plano-consumo" element={<PlanoConsumo />} />
+        <Route path="/notificacoes" element={<Notificacoes />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/veiculos" element={<Veiculos />} />
         <Route path="/servicos" element={<Servicos />} />
