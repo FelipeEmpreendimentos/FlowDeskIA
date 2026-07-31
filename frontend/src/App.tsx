@@ -9,6 +9,7 @@ import { Configuracoes } from "./pages/Configuracoes";
 import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
 import { Equipe } from "./pages/Equipe";
+import { Financeiro } from "./pages/Financeiro";
 import { Login } from "./pages/Login";
 import { RecuperarSenha } from "./pages/RecuperarSenha";
 import { RedefinirSenha } from "./pages/RedefinirSenha";
@@ -54,6 +55,7 @@ function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/agenda" element={<Agenda />} />
+        <Route path="/financeiro" element={<Financeiro />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/veiculos" element={<Veiculos />} />
         <Route path="/servicos" element={<Servicos />} />
