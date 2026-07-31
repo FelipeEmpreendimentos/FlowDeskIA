@@ -35,6 +35,11 @@ jobs:
         run: python -m scripts.check_imports
 
       - name: Executar testes
+        env:
+          DB_NAME: flowdesk_ci
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          JWT_SECRET: flowdesk-ci-secret-with-more-than-thirty-two-characters
         run: python -m pytest -q
 
   frontend:

@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
 
+DEFAULT_JWT_SECRET = "ALTERE_ESTA_CHAVE_ANTES_DE_PUBLICAR_O_SISTEMA"
+PRODUCTION_ENVIRONMENTS = {"production", "prod"}
+
 
 def _required(name: str, default: str | None = None) -> str:
     value = os.getenv(name, default)
@@ -73,17 +76,14 @@ class Settings:
 
 settings = Settings(
     app_name=os.getenv("APP_NAME", "FlowDeskIA"),
-    environment=os.getenv("APP_ENV", "development"),
+    environment=os.getenv("APP_ENV", "development").strip().lower(),
     db_host=_required("DB_HOST", "localhost"),
     db_port=int(_required("DB_PORT", "5432")),
     db_name=_required("DB_NAME"),
     db_user=_required("DB_USER", "postgres"),
     db_password=_required("DB_PASSWORD"),
     sql_echo=_boolean("SQL_ECHO", False),
-    jwt_secret=_required(
-        "JWT_SECRET",
-        "ALTERE_ESTA_CHAVE_ANTES_DE_PUBLICAR_O_SISTEMA",
-    ),
+    jwt_secret=_required("JWT_SECRET", DEFAULT_JWT_SECRET),
     jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
     access_token_minutes=int(os.getenv("ACCESS_TOKEN_MINUTES", "480")),
     reset_token_minutes=int(os.getenv("RESET_TOKEN_MINUTES", "30")),
@@ -111,3 +111,17 @@ if settings.smtp_starttls and settings.smtp_use_ssl:
     raise RuntimeError(
         "SMTP_STARTTLS e SMTP_USE_SSL não podem estar ativos ao mesmo tempo."
     )
+
+if settings.environment in PRODUCTION_ENVIRONMENTS:
+    if settings.jwt_secret == DEFAULT_JWT_SECRET or len(settings.jwt_secret) < 32:
+        raise RuntimeError(
+            "JWT_SECRET inseguro para produção. Use uma chave exclusiva com pelo menos 32 caracteres."
+        )
+    if not settings.cors_origins or "*" in settings.cors_origins:
+        raise RuntimeError(
+            "CORS_ORIGINS precisa conter somente os domínios reais do frontend em produção."
+        )
+    if not settings.frontend_url.startswith("https://"):
+        raise RuntimeError(
+            "FRONTEND_URL precisa usar HTTPS em produção."
+        )
