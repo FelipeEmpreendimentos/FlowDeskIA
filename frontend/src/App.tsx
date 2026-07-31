@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SuperAdminLayout } from "./components/SuperAdminLayout";
 import { SuperAdminProtectedRoute } from "./components/SuperAdminProtectedRoute";
 import { Agenda } from "./pages/Agenda";
+import { Atividades } from "./pages/Atividades";
 import { Clientes } from "./pages/Clientes";
 import { Configuracoes } from "./pages/Configuracoes";
 import { Conversas } from "./pages/Conversas";
@@ -11,8 +12,10 @@ import { Dashboard } from "./pages/Dashboard";
 import { Equipe } from "./pages/Equipe";
 import { Financeiro } from "./pages/Financeiro";
 import { Login } from "./pages/Login";
+import { PlanoConsumo } from "./pages/PlanoConsumo";
 import { RecuperarSenha } from "./pages/RecuperarSenha";
 import { RedefinirSenha } from "./pages/RedefinirSenha";
+import { Relatorios } from "./pages/Relatorios";
 import { Servicos } from "./pages/Servicos";
 import { SuperAdminAuditoria } from "./pages/SuperAdminAuditoria";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
@@ -56,6 +59,9 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/agenda" element={<Agenda />} />
         <Route path="/financeiro" element={<Financeiro />} />
+        <Route path="/relatorios" element={<Relatorios />} />
+        <Route path="/atividades" element={<Atividades />} />
+        <Route path="/plano-consumo" element={<PlanoConsumo />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/veiculos" element={<Veiculos />} />
         <Route path="/servicos" element={<Servicos />} />

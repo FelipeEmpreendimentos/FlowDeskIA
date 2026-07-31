@@ -6,19 +6,44 @@ import {
   type AppToastEventDetail,
 } from "../services/api";
 import { clearSession } from "../services/auth";
-import type { AppOutletContext, UsuarioLogado } from "../types";
+import type { AppOutletContext, CargoUsuario, UsuarioLogado } from "../types";
 import { Icon, type IconName } from "./Icon";
 import { AppToast, LoadingState } from "./UI";
 
-const menu: Array<{ to: string; label: string; icon: IconName }> = [
+interface MenuItem {
+  to: string;
+  label: string;
+  icon: IconName;
+  cargos?: CargoUsuario[];
+}
+
+const menu: MenuItem[] = [
   { to: "/dashboard", label: "Visão geral", icon: "dashboard" },
   { to: "/agenda", label: "Agenda", icon: "calendar" },
   { to: "/financeiro", label: "Financeiro", icon: "finance" },
+  {
+    to: "/relatorios",
+    label: "Relatórios",
+    icon: "dashboard",
+    cargos: ["ADMIN", "GERENTE"],
+  },
   { to: "/clientes", label: "Clientes", icon: "users" },
   { to: "/veiculos", label: "Veículos", icon: "car" },
   { to: "/servicos", label: "Serviços", icon: "services" },
   { to: "/conversas", label: "Conversas", icon: "chat" },
   { to: "/equipe", label: "Equipe", icon: "team" },
+  {
+    to: "/atividades",
+    label: "Atividades",
+    icon: "clock",
+    cargos: ["ADMIN", "GERENTE"],
+  },
+  {
+    to: "/plano-consumo",
+    label: "Plano e consumo",
+    icon: "lock",
+    cargos: ["ADMIN"],
+  },
   { to: "/configuracoes", label: "Configurações", icon: "settings" },
 ];
 
@@ -95,6 +120,9 @@ export function AppLayout() {
   const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
   const roleClass = `role-${usuario.cargo.toLowerCase()}`;
   const routeClass = `route-${routeSection.replaceAll("_", "-")}`;
+  const menuDisponivel = menu.filter(
+    (item) => !item.cargos || item.cargos.includes(usuario.cargo),
+  );
 
   return (
     <>
@@ -135,7 +163,7 @@ export function AppLayout() {
           </div>
 
           <nav className="sidebar-nav" aria-label="Menu principal">
-            {menu.map((item) => (
+            {menuDisponivel.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

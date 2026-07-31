@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     administrativo,
     agenda,
+    atividades,
     auth,
     bloqueios,
     clientes,
@@ -12,6 +13,8 @@ from app.api.routes import (
     financeiro,
     horarios,
     notificacoes,
+    plano_empresa,
+    relatorios,
     servicos,
     super_admin,
     system,
@@ -31,6 +34,9 @@ api_router.include_router(veiculos.router)
 api_router.include_router(servicos.router)
 api_router.include_router(agenda.router)
 api_router.include_router(financeiro.router)
+api_router.include_router(relatorios.router)
+api_router.include_router(plano_empresa.router)
+api_router.include_router(atividades.router)
 api_router.include_router(horarios.router)
 api_router.include_router(bloqueios.router)
 api_router.include_router(conversas.router)
