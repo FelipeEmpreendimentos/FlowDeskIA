@@ -12,6 +12,7 @@ import "./navigation-chat.css";
 import "./navigation-toggle-fixes.css";
 import "./chat-workspace.css";
 import "./chat-workspace-refinement.css";
+import "./remember-session.css";
 import "./super-admin.css";
 
 createRoot(document.getElementById("root")!).render(
