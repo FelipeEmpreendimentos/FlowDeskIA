@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   APP_TOAST_EVENT,
@@ -85,9 +85,16 @@ const cargoLabel: Record<CargoUsuario, string> = {
   FUNCIONARIO: "Funcionário",
 };
 
+const rotasDetalheConfiguracoes = new Set([
+  "/configuracoes/dados",
+  "/atividades",
+  "/plano-consumo",
+]);
+
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const rotaAntesNotificacoes = useRef("/dashboard");
   const [usuario, setUsuario] = useState<UsuarioLogado | null>(null);
   const [erro, setErro] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
@@ -128,6 +135,12 @@ export function AppLayout() {
   useEffect(() => {
     void atualizarUsuario();
   }, [atualizarUsuario]);
+
+  useEffect(() => {
+    if (location.pathname !== "/notificacoes") {
+      rotaAntesNotificacoes.current = location.pathname;
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     function receberToast(event: Event) {
@@ -174,6 +187,25 @@ export function AppLayout() {
     navigate("/login", { replace: true });
   }
 
+  function alternarNotificacoes() {
+    if (location.pathname === "/notificacoes") {
+      navigate(rotaAntesNotificacoes.current || "/dashboard");
+      return;
+    }
+
+    rotaAntesNotificacoes.current = location.pathname;
+    navigate("/notificacoes");
+  }
+
+  function voltarDaTelaAtual() {
+    if (location.pathname === "/notificacoes") {
+      navigate(rotaAntesNotificacoes.current || "/dashboard");
+      return;
+    }
+
+    navigate("/configuracoes");
+  }
+
   if (!usuario && !erro) {
     return (
       <main className="app-loading">
@@ -213,6 +245,9 @@ export function AppLayout() {
     .filter((group) => group.items.length > 0);
   const configuracoesLabel =
     usuario.cargo === "FUNCIONARIO" ? "Minha conta" : "Configurações";
+  const notificacoesAbertas = location.pathname === "/notificacoes";
+  const detalheConfiguracoes = rotasDetalheConfiguracoes.has(location.pathname);
+  const exibirRetornoContextual = notificacoesAbertas || detalheConfiguracoes;
 
   return (
     <>
@@ -226,23 +261,27 @@ export function AppLayout() {
           <Icon name="menu" />
         </button>
 
-        <NavLink
-          to="/notificacoes"
-          className={({ isActive }) =>
-            `global-notification-button ${isActive ? "global-notification-button-active" : ""}`
-          }
+        <button
+          type="button"
+          className={`global-notification-button ${
+            notificacoesAbertas ? "global-notification-button-active" : ""
+          }`}
+          onClick={alternarNotificacoes}
+          aria-pressed={notificacoesAbertas}
           aria-label={
-            notificacoesNaoLidas
-              ? `${notificacoesNaoLidas} notificações não lidas`
-              : "Abrir notificações"
+            notificacoesAbertas
+              ? "Fechar notificações e voltar"
+              : notificacoesNaoLidas
+                ? `${notificacoesNaoLidas} notificações não lidas`
+                : "Abrir notificações"
           }
-          title="Notificações"
+          title={notificacoesAbertas ? "Fechar notificações" : "Notificações"}
         >
           <Icon name="bell" size={20} />
           {notificacoesNaoLidas > 0 && (
             <span>{notificacoesNaoLidas > 99 ? "99+" : notificacoesNaoLidas}</span>
           )}
-        </NavLink>
+        </button>
 
         {menuAberto && (
           <button
@@ -338,7 +377,25 @@ export function AppLayout() {
           </div>
         </aside>
 
-        <main className="app-content">
+        <main
+          className={`app-content ${
+            exibirRetornoContextual ? "app-content-with-context-back" : ""
+          }`}
+        >
+          {exibirRetornoContextual && (
+            <div className="context-back-bar">
+              <button
+                className="context-back-button"
+                type="button"
+                onClick={voltarDaTelaAtual}
+              >
+                <Icon name="arrow-left" size={18} />
+                <span>
+                  {notificacoesAbertas ? "Voltar" : "Voltar para configurações"}
+                </span>
+              </button>
+            </div>
+          )}
           <Outlet context={context} />
         </main>
       </div>
