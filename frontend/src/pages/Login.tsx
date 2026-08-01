@@ -155,17 +155,13 @@ export function Login() {
                 checked={manterConectado}
                 onChange={(event) => setManterConectado(event.target.checked)}
               />
-              <span>Manter conectado neste dispositivo</span>
+              <span>Lembre de mim</span>
             </label>
 
             <Link className="auth-link" to="/recuperar-senha">
               Esqueceu sua senha?
             </Link>
           </div>
-
-          <p className="remember-device-hint">
-            Não use esta opção em computadores compartilhados.
-          </p>
 
           {erro && <div className="alert alert-error">{erro}</div>}
 
