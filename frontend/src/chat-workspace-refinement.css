@@ -11,7 +11,7 @@
   margin: 0;
   padding: 24px 22px 20px;
   color: white;
-  background: linear-gradient(145deg, #3157d5, #2748ba);
+  background: var(--navy);
 }
 
 .team-chat-page-refined .team-chat-sidebar-header span,
