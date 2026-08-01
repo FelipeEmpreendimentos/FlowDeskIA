@@ -5,8 +5,10 @@ import { SuperAdminLayout } from "./components/SuperAdminLayout";
 import { SuperAdminProtectedRoute } from "./components/SuperAdminProtectedRoute";
 import { Agenda } from "./pages/Agenda";
 import { Atividades } from "./pages/Atividades";
+import { ChatInterno } from "./pages/ChatInterno";
 import { Clientes } from "./pages/Clientes";
 import { Configuracoes } from "./pages/Configuracoes";
+import { ConfiguracoesHub } from "./pages/ConfiguracoesHub";
 import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
 import { Equipe } from "./pages/Equipe";
@@ -59,6 +61,7 @@ function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/agenda" element={<Agenda />} />
+        <Route path="/chat-interno" element={<ChatInterno />} />
         <Route path="/financeiro" element={<Financeiro />} />
         <Route path="/relatorios" element={<Relatorios />} />
         <Route path="/atividades" element={<Atividades />} />
@@ -69,7 +72,8 @@ function App() {
         <Route path="/servicos" element={<Servicos />} />
         <Route path="/conversas" element={<Conversas />} />
         <Route path="/equipe" element={<Equipe />} />
-        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/configuracoes" element={<ConfiguracoesHub />} />
+        <Route path="/configuracoes/dados" element={<Configuracoes />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
