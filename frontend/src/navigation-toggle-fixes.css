@@ -1,0 +1,57 @@
+.global-notification-button {
+  appearance: none;
+  font: inherit;
+}
+
+.context-back-bar {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 22px 38px 0;
+}
+
+.context-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: #3d4a63;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(31, 45, 78, 0.05);
+  font-size: 13px;
+  font-weight: 800;
+  transition:
+    color 0.18s,
+    border-color 0.18s,
+    background 0.18s,
+    transform 0.18s;
+}
+
+.context-back-button:hover {
+  border-color: #aebde0;
+  color: var(--primary);
+  background: #fff;
+  transform: translateX(-2px);
+}
+
+.app-content-with-context-back .page {
+  padding-top: 18px;
+}
+
+@media (max-width: 900px) {
+  .context-back-bar {
+    padding: 74px 18px 0;
+  }
+
+  .app-content-with-context-back .page {
+    padding-top: 16px;
+  }
+
+  .context-back-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
