@@ -1,0 +1,129 @@
+.team-chat-page-refined {
+  background: var(--primary-soft);
+}
+
+.team-chat-page-refined .team-chat-sidebar {
+  background: #f7f9ff;
+  border-right-color: #cfd9f6;
+}
+
+.team-chat-page-refined .team-chat-sidebar-header {
+  margin: 0;
+  padding: 24px 22px 20px;
+  color: white;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.18), transparent 34%),
+    linear-gradient(145deg, #3157d5, #2748ba);
+}
+
+.team-chat-page-refined .team-chat-sidebar-header span,
+.team-chat-page-refined .team-chat-sidebar-header h1 {
+  color: white;
+}
+
+.team-chat-page-refined .team-chat-sidebar-header span {
+  opacity: 0.76;
+}
+
+.team-chat-page-refined .team-chat-create-button {
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #3157d5;
+  background: white;
+  box-shadow: 0 10px 24px rgba(15, 34, 92, 0.24);
+}
+
+.team-chat-page-refined .team-chat-create-button:hover {
+  background: #f3f6ff;
+}
+
+.team-chat-page-refined .team-chat-search {
+  margin-top: 16px;
+  border-color: #d4def5;
+  background: white;
+}
+
+.team-chat-page-refined .team-chat-tabs {
+  background: #e5ebfb;
+}
+
+.team-chat-page-refined .team-chat-tabs button:hover {
+  color: #2748ba;
+}
+
+.team-chat-page-refined .team-chat-tabs .team-chat-tab-active {
+  color: white;
+  background: linear-gradient(145deg, #3157d5, #2748ba);
+  box-shadow: 0 7px 18px rgba(49, 87, 213, 0.24);
+}
+
+.team-chat-page-refined .team-chat-channel-section-refined {
+  padding-top: 4px;
+}
+
+.team-chat-page-refined .team-chat-channel {
+  border-radius: 12px;
+}
+
+.team-chat-page-refined .team-chat-channel:hover {
+  border-color: #ccd8f5;
+  background: #f0f4ff;
+}
+
+.team-chat-page-refined .team-chat-channel-active {
+  border-color: #9fb2ed;
+  background: #e5ecff;
+  box-shadow: inset 4px 0 0 #3157d5;
+}
+
+.team-chat-page-refined .team-chat-channel-avatar-grupo,
+.team-chat-page-refined .team-chat-channel-avatar-geral {
+  color: white;
+  background: linear-gradient(145deg, #5474ff, #3157d5);
+}
+
+.team-chat-page-refined .team-chat-channel-copy b {
+  background: #3157d5;
+}
+
+.team-chat-page-refined .team-chat-conversation {
+  background:
+    radial-gradient(circle at 84% 8%, rgba(49, 87, 213, 0.1), transparent 30%),
+    linear-gradient(180deg, #f8faff, #f2f5fc);
+}
+
+.team-chat-page-refined .team-chat-conversation-header {
+  border-bottom-color: #d5def2;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.team-chat-page-refined .team-chat-welcome > span,
+.team-chat-page-refined .team-chat-message-empty > span {
+  color: white;
+  background: linear-gradient(145deg, #5474ff, #3157d5);
+  box-shadow: 0 18px 44px rgba(49, 87, 213, 0.2);
+}
+
+.team-chat-page-refined .team-chat-message-own .team-chat-bubble {
+  border-color: #3157d5;
+  background: linear-gradient(145deg, #3f63db, #3157d5);
+}
+
+.team-chat-page-refined .team-chat-composer {
+  border-top-color: #d5def2;
+  background: rgba(255, 255, 255, 0.97);
+}
+
+.team-chat-page-refined .team-chat-composer textarea:focus {
+  border-color: #7f98e8;
+  box-shadow: 0 0 0 3px rgba(49, 87, 213, 0.12);
+}
+
+.team-chat-page-refined .team-chat-send {
+  background: linear-gradient(145deg, #3157d5, #2748ba);
+}
+
+@media (max-width: 900px) {
+  .team-chat-page-refined .team-chat-sidebar-header {
+    padding-top: 72px;
+  }
+}
