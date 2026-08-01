@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
-import { apiRequest } from "../services/api";
-import { getCompanyId, getToken, saveSession } from "../services/auth";
 import { Icon } from "../components/Icon";
+import { LoadingState } from "../components/UI";
+import { apiRequest, restoreRememberedSession } from "../services/api";
+import { getCompanyId, getToken, saveSession } from "../services/auth";
 
 interface LoginResponse {
   access_token: string;
@@ -15,11 +16,37 @@ export function Login() {
   const [empresaId, setEmpresaId] = useState(getCompanyId());
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [manterConectado, setManterConectado] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [verificandoSessao, setVerificandoSessao] = useState(!getToken());
+  const [sessaoRestaurada, setSessaoRestaurada] = useState(Boolean(getToken()));
 
-  if (getToken()) {
+  useEffect(() => {
+    if (!verificandoSessao) return;
+
+    let ativo = true;
+    void restoreRememberedSession().then((restaurada) => {
+      if (!ativo) return;
+      setSessaoRestaurada(restaurada);
+      setVerificandoSessao(false);
+    });
+
+    return () => {
+      ativo = false;
+    };
+  }, [verificandoSessao]);
+
+  if (verificandoSessao) {
+    return (
+      <main className="app-loading">
+        <LoadingState label="Verificando sua sessão..." />
+      </main>
+    );
+  }
+
+  if (sessaoRestaurada || getToken()) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -35,6 +62,7 @@ export function Login() {
           empresa_id: Number(empresaId),
           email: email.trim(),
           senha,
+          manter_conectado: manterConectado,
         }),
       });
 
@@ -121,10 +149,23 @@ export function Login() {
           </label>
 
           <div className="login-options">
+            <label className="remember-device-option">
+              <input
+                type="checkbox"
+                checked={manterConectado}
+                onChange={(event) => setManterConectado(event.target.checked)}
+              />
+              <span>Manter conectado neste dispositivo</span>
+            </label>
+
             <Link className="auth-link" to="/recuperar-senha">
               Esqueceu sua senha?
             </Link>
           </div>
+
+          <p className="remember-device-hint">
+            Não use esta opção em computadores compartilhados.
+          </p>
 
           {erro && <div className="alert alert-error">{erro}</div>}
 
