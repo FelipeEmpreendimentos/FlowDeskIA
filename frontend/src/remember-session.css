@@ -6,6 +6,7 @@
 }
 
 .login-card .remember-device-option {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -17,53 +18,62 @@
   cursor: pointer;
 }
 
-.login-card .remember-device-option input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  display: grid;
-  width: 17px;
-  min-width: 17px;
-  height: 17px;
-  min-height: 17px;
-  flex: 0 0 17px;
-  place-content: center;
-  margin: 0;
-  padding: 0;
-  border: 1px solid #aebbd0;
-  border-radius: 4px;
-  outline: 0;
-  background: #ffffff;
-  box-shadow: none;
-  cursor: pointer;
+.login-card .remember-device-option .remember-device-input {
+  position: absolute !important;
+  width: 1px !important;
+  min-width: 1px !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  opacity: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none;
 }
 
-.login-card .remember-device-option input[type="checkbox"]::before {
+.remember-device-box {
+  position: relative;
+  display: inline-block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  border: 1px solid #aebbd0;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.remember-device-box::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
   width: 9px;
   height: 5px;
   border-bottom: 2px solid #ffffff;
   border-left: 2px solid #ffffff;
   content: "";
   opacity: 0;
-  transform: translateY(-1px) rotate(-45deg);
+  transform: rotate(-45deg);
 }
 
-.login-card .remember-device-option input[type="checkbox"]:checked {
+.remember-device-input:checked + .remember-device-box {
   border-color: var(--primary);
   background: var(--primary);
 }
 
-.login-card .remember-device-option input[type="checkbox"]:checked::before {
+.remember-device-input:checked + .remember-device-box::after {
   opacity: 1;
 }
 
-.login-card .remember-device-option input[type="checkbox"]:focus,
-.login-card .remember-device-option input[type="checkbox"]:focus-visible,
+.remember-device-input:focus + .remember-device-box,
+.remember-device-input:focus-visible + .remember-device-box,
 .login-card .remember-device-option:focus-within {
   outline: 0;
   box-shadow: none;
 }
 
-.remember-device-option span {
+.remember-device-option > span:last-child {
   line-height: 1;
 }
 
