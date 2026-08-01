@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import "../frontend-polish.css";
 import {
   APP_TOAST_EVENT,
   apiRequest,
@@ -7,6 +8,7 @@ import {
 } from "../services/api";
 import { clearSession } from "../services/auth";
 import type { AppOutletContext, CargoUsuario, UsuarioLogado } from "../types";
+import { FrontendPolish } from "./FrontendPolish";
 import { Icon, type IconName } from "./Icon";
 import { AppToast, LoadingState } from "./UI";
 
@@ -128,6 +130,8 @@ export function AppLayout() {
   return (
     <>
       <div className={`app-shell ${roleClass} ${routeClass}`}>
+        <FrontendPolish />
+
         <button
           className="mobile-menu-button"
           type="button"
