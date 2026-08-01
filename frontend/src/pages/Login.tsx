@@ -151,10 +151,12 @@ export function Login() {
           <div className="login-options">
             <label className="remember-device-option">
               <input
+                className="remember-device-input"
                 type="checkbox"
                 checked={manterConectado}
                 onChange={(event) => setManterConectado(event.target.checked)}
               />
+              <span className="remember-device-box" aria-hidden="true" />
               <span>Lembre de mim</span>
             </label>
 
