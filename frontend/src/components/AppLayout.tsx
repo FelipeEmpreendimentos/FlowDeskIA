@@ -6,47 +6,84 @@ import {
   type AppToastEventDetail,
 } from "../services/api";
 import { clearSession } from "../services/auth";
-import type { AppOutletContext, CargoUsuario, UsuarioLogado } from "../types";
+import type {
+  AppOutletContext,
+  CargoUsuario,
+  Notificacao,
+  UsuarioLogado,
+} from "../types";
+import type { ChatInternoResumo } from "../types/internal-chat";
 import { Icon, type IconName } from "./Icon";
 import { AppToast, LoadingState } from "./UI";
+
+const CHAT_UPDATE_EVENT = "flowdesk:chat-update";
 
 interface MenuItem {
   to: string;
   label: string;
+  labelFuncionario?: string;
   icon: IconName;
   cargos?: CargoUsuario[];
 }
 
-const menu: MenuItem[] = [
-  { to: "/dashboard", label: "Visão geral", icon: "dashboard" },
-  { to: "/agenda", label: "Agenda", icon: "calendar" },
-  { to: "/financeiro", label: "Financeiro", icon: "finance" },
+interface MenuGroup {
+  label: string;
+  items: MenuItem[];
+}
+
+const menuGroups: MenuGroup[] = [
   {
-    to: "/relatorios",
-    label: "Relatórios",
-    icon: "dashboard",
-    cargos: ["ADMIN", "GERENTE"],
-  },
-  { to: "/clientes", label: "Clientes", icon: "users" },
-  { to: "/veiculos", label: "Veículos", icon: "car" },
-  { to: "/servicos", label: "Serviços", icon: "services" },
-  { to: "/conversas", label: "Conversas", icon: "chat" },
-  { to: "/notificacoes", label: "Notificações", icon: "bell" },
-  { to: "/equipe", label: "Equipe", icon: "team" },
-  {
-    to: "/atividades",
-    label: "Atividades",
-    icon: "clock",
-    cargos: ["ADMIN", "GERENTE"],
+    label: "Principal",
+    items: [
+      { to: "/dashboard", label: "Visão geral", icon: "dashboard" },
+      {
+        to: "/agenda",
+        label: "Agenda",
+        labelFuncionario: "Minha agenda",
+        icon: "calendar",
+      },
+      { to: "/chat-interno", label: "Chat interno", icon: "chat" },
+    ],
   },
   {
-    to: "/plano-consumo",
-    label: "Plano e consumo",
-    icon: "lock",
-    cargos: ["ADMIN"],
+    label: "Atendimento",
+    items: [
+      { to: "/conversas", label: "Conversas", icon: "chat" },
+      { to: "/clientes", label: "Clientes", icon: "users" },
+      { to: "/veiculos", label: "Veículos", icon: "car" },
+      { to: "/servicos", label: "Serviços", icon: "services" },
+    ],
   },
-  { to: "/configuracoes", label: "Configurações", icon: "settings" },
+  {
+    label: "Gestão",
+    items: [
+      {
+        to: "/financeiro",
+        label: "Financeiro",
+        icon: "finance",
+        cargos: ["ADMIN", "GERENTE"],
+      },
+      {
+        to: "/relatorios",
+        label: "Relatórios",
+        icon: "dashboard",
+        cargos: ["ADMIN", "GERENTE"],
+      },
+      {
+        to: "/equipe",
+        label: "Equipe",
+        icon: "team",
+        cargos: ["ADMIN", "GERENTE"],
+      },
+    ],
+  },
 ];
+
+const cargoLabel: Record<CargoUsuario, string> = {
+  ADMIN: "Administrador",
+  GERENTE: "Gerente",
+  FUNCIONARIO: "Funcionário",
+};
 
 export function AppLayout() {
   const navigate = useNavigate();
@@ -55,6 +92,8 @@ export function AppLayout() {
   const [erro, setErro] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
   const [toast, setToast] = useState<AppToastEventDetail | null>(null);
+  const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
+  const [chatNaoLidas, setChatNaoLidas] = useState(0);
 
   const atualizarUsuario = useCallback(async () => {
     try {
@@ -62,9 +101,29 @@ export function AppLayout() {
       setUsuario(data);
       setErro("");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível carregar o usuário.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível carregar o usuário.",
+      );
     }
   }, []);
+
+  const atualizarIndicadores = useCallback(async () => {
+    if (!usuario) return;
+
+    const [notificacoesResult, chatResult] = await Promise.allSettled([
+      apiRequest<Notificacao[]>("/notificacoes?somente_nao_lidas=true"),
+      apiRequest<ChatInternoResumo>("/chat-interno/resumo"),
+    ]);
+
+    if (notificacoesResult.status === "fulfilled") {
+      setNotificacoesNaoLidas(notificacoesResult.value.length);
+    }
+    if (chatResult.status === "fulfilled") {
+      setChatNaoLidas(chatResult.value.nao_lidas);
+    }
+  }, [usuario]);
 
   useEffect(() => {
     void atualizarUsuario();
@@ -86,6 +145,29 @@ export function AppLayout() {
     const timer = window.setTimeout(() => setToast(null), 4500);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!usuario) return;
+
+    void atualizarIndicadores();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void atualizarIndicadores();
+      }
+    }, 15000);
+
+    const atualizarChat = () => void atualizarIndicadores();
+    window.addEventListener(CHAT_UPDATE_EVENT, atualizarChat);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(CHAT_UPDATE_EVENT, atualizarChat);
+    };
+  }, [usuario, atualizarIndicadores]);
+
+  useEffect(() => {
+    if (usuario) void atualizarIndicadores();
+  }, [location.pathname, usuario, atualizarIndicadores]);
 
   function sair() {
     clearSession();
@@ -121,9 +203,16 @@ export function AppLayout() {
   const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
   const roleClass = `role-${usuario.cargo.toLowerCase()}`;
   const routeClass = `route-${routeSection.replaceAll("_", "-")}`;
-  const menuDisponivel = menu.filter(
-    (item) => !item.cargos || item.cargos.includes(usuario.cargo),
-  );
+  const gruposDisponiveis = menuGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !item.cargos || item.cargos.includes(usuario.cargo),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+  const configuracoesLabel =
+    usuario.cargo === "FUNCIONARIO" ? "Minha conta" : "Configurações";
 
   return (
     <>
@@ -136,6 +225,24 @@ export function AppLayout() {
         >
           <Icon name="menu" />
         </button>
+
+        <NavLink
+          to="/notificacoes"
+          className={({ isActive }) =>
+            `global-notification-button ${isActive ? "global-notification-button-active" : ""}`
+          }
+          aria-label={
+            notificacoesNaoLidas
+              ? `${notificacoesNaoLidas} notificações não lidas`
+              : "Abrir notificações"
+          }
+          title="Notificações"
+        >
+          <Icon name="bell" size={20} />
+          {notificacoesNaoLidas > 0 && (
+            <span>{notificacoesNaoLidas > 99 ? "99+" : notificacoesNaoLidas}</span>
+          )}
+        </NavLink>
 
         {menuAberto && (
           <button
@@ -164,35 +271,71 @@ export function AppLayout() {
           </div>
 
           <nav className="sidebar-nav" aria-label="Menu principal">
-            {menuDisponivel.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => setMenuAberto(false)}
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? "nav-item-active" : ""}`
-                }
-              >
-                <Icon name={item.icon} size={19} />
-                <span>{item.label}</span>
-              </NavLink>
+            {gruposDisponiveis.map((group) => (
+              <div className="sidebar-nav-group" key={group.label}>
+                <span className="sidebar-nav-label">{group.label}</span>
+                <div className="sidebar-nav-items">
+                  {group.items.map((item) => {
+                    const label =
+                      usuario.cargo === "FUNCIONARIO" && item.labelFuncionario
+                        ? item.labelFuncionario
+                        : item.label;
+                    const badge = item.to === "/chat-interno" ? chatNaoLidas : 0;
+
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setMenuAberto(false)}
+                        className={({ isActive }) =>
+                          `nav-item ${isActive ? "nav-item-active" : ""}`
+                        }
+                      >
+                        <Icon name={item.icon} size={19} />
+                        <span>{label}</span>
+                        {badge > 0 && (
+                          <span className="nav-item-badge">
+                            {badge > 99 ? "99+" : badge}
+                          </span>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </nav>
 
-          <div className="sidebar-user">
-            <span className="sidebar-user-avatar">
-              {usuario.nome.charAt(0).toUpperCase()}
-            </span>
-            <div>
-              <strong>{usuario.nome}</strong>
-              <span>{usuario.cargo}</span>
-            </div>
-          </div>
+          <div className="sidebar-footer">
+            <NavLink
+              to="/configuracoes"
+              onClick={() => setMenuAberto(false)}
+              className={({ isActive }) =>
+                `nav-item sidebar-settings-link ${isActive ? "nav-item-active" : ""}`
+              }
+            >
+              <Icon
+                name={usuario.cargo === "FUNCIONARIO" ? "users" : "settings"}
+                size={19}
+              />
+              <span>{configuracoesLabel}</span>
+            </NavLink>
 
-          <button className="logout-button" type="button" onClick={sair}>
-            <Icon name="logout" size={18} />
-            Sair da conta
-          </button>
+            <div className="sidebar-user">
+              <span className="sidebar-user-avatar">
+                {usuario.nome.charAt(0).toUpperCase()}
+              </span>
+              <div>
+                <strong>{usuario.nome}</strong>
+                <span>{cargoLabel[usuario.cargo]}</span>
+              </div>
+            </div>
+
+            <button className="logout-button" type="button" onClick={sair}>
+              <Icon name="logout" size={18} />
+              Sair da conta
+            </button>
+          </div>
         </aside>
 
         <main className="app-content">
