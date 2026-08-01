@@ -8,6 +8,7 @@ import "./financeiro.css";
 import "./relatorios.css";
 import "./engagement.css";
 import "./mobile-release.css";
+import "./navigation-chat.css";
 import "./super-admin.css";
 
 createRoot(document.getElementById("root")!).render(
