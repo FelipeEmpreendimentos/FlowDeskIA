@@ -6,6 +6,7 @@ from app.api.routes import (
     atividades,
     auth,
     bloqueios,
+    chat_interno,
     clientes,
     configuracoes,
     conversas,
@@ -44,6 +45,7 @@ api_router.include_router(preferencias_notificacoes.router)
 api_router.include_router(horarios.router)
 api_router.include_router(bloqueios.router)
 api_router.include_router(conversas.router)
+api_router.include_router(chat_interno.router)
 api_router.include_router(configuracoes.router)
 api_router.include_router(notificacoes.router)
 api_router.include_router(administrativo.router)
