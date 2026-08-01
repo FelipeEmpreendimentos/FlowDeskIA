@@ -9,6 +9,7 @@ import "./relatorios.css";
 import "./engagement.css";
 import "./mobile-release.css";
 import "./navigation-chat.css";
+import "./navigation-toggle-fixes.css";
 import "./super-admin.css";
 
 createRoot(document.getElementById("root")!).render(
