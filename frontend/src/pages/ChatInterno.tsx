@@ -24,6 +24,11 @@ const CHAT_UPDATE_EVENT = "flowdesk:chat-update";
 
 type AbaChat = "CONVERSAS" | "GRUPOS";
 
+interface ConversaUsuario {
+  pessoa: ChatInternoUsuario;
+  canal: ChatInternoCanal | null;
+}
+
 const cargoLabel: Record<CargoUsuario, string> = {
   ADMIN: "Administrador",
   GERENTE: "Gerente",
@@ -65,25 +70,27 @@ function formatarData(valor: string): string {
   }).format(data);
 }
 
-function resumoMensagem(canal: ChatInternoCanal): string {
-  if (!canal.ultima_mensagem) {
-    return canal.tipo === "GRUPO"
-      ? "Grupo criado. Envie a primeira mensagem."
-      : "Inicie uma conversa.";
+function resumoMensagem(canal: ChatInternoCanal | null): string {
+  if (!canal?.ultima_mensagem) {
+    return canal?.tipo === "GRUPO" || canal?.tipo === "GERAL"
+      ? "Nenhuma mensagem ainda"
+      : "Conversa direta";
   }
 
   const texto = canal.ultima_mensagem.conteudo.replace(/\s+/g, " ").trim();
   return `${canal.ultima_mensagem.autor.nome}: ${texto}`;
 }
 
-function ordenarCanais(canais: ChatInternoCanal[]): ChatInternoCanal[] {
+function dataOrdenacao(canal: ChatInternoCanal | null): number {
+  if (!canal) return 0;
+  return new Date(canal.ultima_mensagem?.created_at ?? canal.created_at).getTime();
+}
+
+function ordenarGrupos(canais: ChatInternoCanal[]): ChatInternoCanal[] {
   return [...canais].sort((a, b) => {
     if (a.tipo === "GERAL" && b.tipo !== "GERAL") return -1;
     if (b.tipo === "GERAL" && a.tipo !== "GERAL") return 1;
-
-    const dataA = new Date(a.ultima_mensagem?.created_at ?? a.created_at).getTime();
-    const dataB = new Date(b.ultima_mensagem?.created_at ?? b.created_at).getTime();
-    return dataB - dataA;
+    return dataOrdenacao(b) - dataOrdenacao(a);
   });
 }
 
@@ -113,28 +120,49 @@ export function ChatInterno() {
     [canais, canalId],
   );
 
-  const canaisVisiveis = useMemo(() => {
-    const termo = busca.trim().toLocaleLowerCase("pt-BR");
-    return ordenarCanais(
-      canais.filter((canal) => {
-        const correspondeAba =
-          aba === "GRUPOS"
-            ? canal.tipo === "GRUPO"
-            : canal.tipo === "GERAL" || canal.tipo === "DIRETO";
-        if (!correspondeAba) return false;
-        if (!termo) return true;
-        return canal.nome.toLocaleLowerCase("pt-BR").includes(termo);
-      }),
-    );
-  }, [aba, busca, canais]);
+  const canaisDiretosPorUsuario = useMemo(() => {
+    const mapa = new Map<number, ChatInternoCanal>();
 
-  const usuariosVisiveis = useMemo(() => {
+    canais
+      .filter((canal) => canal.tipo === "DIRETO")
+      .forEach((canal) => {
+        const outraPessoa = canal.membros.find((membro) => membro.id !== usuario.id);
+        if (outraPessoa) mapa.set(outraPessoa.id, canal);
+      });
+
+    return mapa;
+  }, [canais, usuario.id]);
+
+  const conversasVisiveis = useMemo<ConversaUsuario[]>(() => {
     const termo = busca.trim().toLocaleLowerCase("pt-BR");
-    return usuarios.filter(
-      (item) =>
-        !termo || item.nome.toLocaleLowerCase("pt-BR").includes(termo),
+
+    return usuarios
+      .filter(
+        (pessoa) =>
+          !termo || pessoa.nome.toLocaleLowerCase("pt-BR").includes(termo),
+      )
+      .map((pessoa) => ({
+        pessoa,
+        canal: canaisDiretosPorUsuario.get(pessoa.id) ?? null,
+      }))
+      .sort((a, b) => {
+        const diferencaData = dataOrdenacao(b.canal) - dataOrdenacao(a.canal);
+        if (diferencaData !== 0) return diferencaData;
+        return a.pessoa.nome.localeCompare(b.pessoa.nome, "pt-BR");
+      });
+  }, [busca, canaisDiretosPorUsuario, usuarios]);
+
+  const gruposVisiveis = useMemo(() => {
+    const termo = busca.trim().toLocaleLowerCase("pt-BR");
+
+    return ordenarGrupos(
+      canais.filter(
+        (canal) =>
+          (canal.tipo === "GERAL" || canal.tipo === "GRUPO") &&
+          (!termo || canal.nome.toLocaleLowerCase("pt-BR").includes(termo)),
+      ),
     );
-  }, [busca, usuarios]);
+  }, [busca, canais]);
 
   const marcarComoLido = useCallback(async (id: number) => {
     try {
@@ -161,12 +189,12 @@ export function ChatInterno() {
         apiRequest<ChatInternoUsuario[]>("/chat-interno/usuarios"),
         apiRequest<ChatInternoCanal[]>("/chat-interno/canais"),
       ]);
-      const ordenados = ordenarCanais(novosCanais);
+
       setUsuarios(novosUsuarios);
-      setCanais(ordenados);
+      setCanais(novosCanais);
       setCanalId((atual) => {
-        if (atual && ordenados.some((canal) => canal.id === atual)) return atual;
-        return ordenados.find((canal) => canal.tipo === "GERAL")?.id ?? ordenados[0]?.id ?? null;
+        if (atual && novosCanais.some((canal) => canal.id === atual)) return atual;
+        return novosCanais.find((canal) => canal.tipo === "DIRETO")?.id ?? null;
       });
       setErro("");
     } catch (error) {
@@ -240,26 +268,42 @@ export function ChatInterno() {
     primeiraCargaRef.current = false;
   }, [mensagens]);
 
+  function mudarAba(novaAba: AbaChat) {
+    setAba(novaAba);
+    setBusca("");
+    setCanalId(null);
+    setMensagens([]);
+    setConteudo("");
+    setListaMobileAberta(true);
+  }
+
   function selecionarCanal(canal: ChatInternoCanal) {
     setCanalId(canal.id);
     setListaMobileAberta(false);
     setConteudo("");
   }
 
-  async function abrirConversaDireta(destino: ChatInternoUsuario) {
+  async function selecionarConversa(pessoa: ChatInternoUsuario) {
+    const existente = canaisDiretosPorUsuario.get(pessoa.id);
+    if (existente) {
+      selecionarCanal(existente);
+      return;
+    }
+
     setErro("");
     try {
       const canal = await apiRequest<ChatInternoCanal>(
         "/chat-interno/diretos",
         {
           method: "POST",
-          body: JSON.stringify({ usuario_id: destino.id }),
+          body: JSON.stringify({ usuario_id: pessoa.id }),
         },
       );
-      setCanais((atuais) => {
-        const semAtual = atuais.filter((item) => item.id !== canal.id);
-        return ordenarCanais([canal, ...semAtual]);
-      });
+
+      setCanais((atuais) => [
+        canal,
+        ...atuais.filter((item) => item.id !== canal.id),
+      ]);
       setCanalId(canal.id);
       setAba("CONVERSAS");
       setListaMobileAberta(false);
@@ -268,7 +312,7 @@ export function ChatInterno() {
       setErro(
         error instanceof Error
           ? error.message
-          : "Não foi possível abrir a conversa.",
+          : "Não foi possível acessar a conversa.",
       );
     }
   }
@@ -306,7 +350,8 @@ export function ChatInterno() {
           }),
         },
       );
-      setCanais((atuais) => ordenarCanais([canal, ...atuais]));
+
+      setCanais((atuais) => [canal, ...atuais]);
       setCanalId(canal.id);
       setAba("GRUPOS");
       setListaMobileAberta(false);
@@ -340,6 +385,7 @@ export function ChatInterno() {
           body: JSON.stringify({ conteudo: texto }),
         },
       );
+
       setMensagens((atuais) => {
         if (atuais.some((item) => item.id === novaMensagem.id)) return atuais;
         return [...atuais, novaMensagem];
@@ -366,10 +412,24 @@ export function ChatInterno() {
     }
   }
 
+  function avatarCanal(canal: ChatInternoCanal) {
+    if (canal.tipo === "GERAL") return <Icon name="building" size={20} />;
+    if (canal.tipo === "GRUPO") return <Icon name="team" size={20} />;
+
+    const outraPessoa = canal.membros.find((membro) => membro.id !== usuario.id);
+    if (outraPessoa?.foto_perfil) {
+      return <img src={outraPessoa.foto_perfil} alt="" />;
+    }
+    return iniciais(outraPessoa?.nome ?? canal.nome);
+  }
+
   let dataAnterior = "";
+  const outraPessoaSelecionada = canalSelecionado?.membros.find(
+    (membro) => membro.id !== usuario.id,
+  );
 
   return (
-    <div className="team-chat-page">
+    <div className="team-chat-page team-chat-page-refined">
       {erro && (
         <div className="team-chat-alert">
           <Alert>{erro}</Alert>
@@ -402,7 +462,11 @@ export function ChatInterno() {
             <input
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
-              placeholder="Buscar pessoa ou grupo..."
+              placeholder={
+                aba === "CONVERSAS"
+                  ? "Buscar conversa..."
+                  : "Buscar grupo..."
+              }
             />
           </label>
 
@@ -410,7 +474,7 @@ export function ChatInterno() {
             <button
               className={aba === "CONVERSAS" ? "team-chat-tab-active" : ""}
               type="button"
-              onClick={() => setAba("CONVERSAS")}
+              onClick={() => mudarAba("CONVERSAS")}
               role="tab"
               aria-selected={aba === "CONVERSAS"}
             >
@@ -419,7 +483,7 @@ export function ChatInterno() {
             <button
               className={aba === "GRUPOS" ? "team-chat-tab-active" : ""}
               type="button"
-              onClick={() => setAba("GRUPOS")}
+              onClick={() => mudarAba("GRUPOS")}
               role="tab"
               aria-selected={aba === "GRUPOS"}
             >
@@ -430,112 +494,121 @@ export function ChatInterno() {
           {carregandoEstrutura ? (
             <LoadingState label="Carregando equipe..." />
           ) : (
-            <>
-              {aba === "CONVERSAS" && (
-                <section className="team-chat-people-section">
-                  <div className="team-chat-section-title">
-                    <strong>Pessoas da empresa</strong>
-                    <span>{usuarios.length}</span>
-                  </div>
-                  <div className="team-chat-people-strip">
-                    {usuariosVisiveis.length === 0 ? (
-                      <p className="team-chat-small-empty">Nenhuma pessoa encontrada.</p>
-                    ) : (
-                      usuariosVisiveis.map((pessoa) => (
-                        <button
-                          className="team-chat-person"
-                          type="button"
-                          key={pessoa.id}
-                          onClick={() => void abrirConversaDireta(pessoa)}
-                          title={`Conversar com ${pessoa.nome}`}
-                        >
-                          <span className={`team-chat-avatar avatar-${pessoa.cargo.toLowerCase()}`}>
-                            {pessoa.foto_perfil ? (
-                              <img src={pessoa.foto_perfil} alt="" />
-                            ) : (
-                              iniciais(pessoa.nome)
-                            )}
-                          </span>
-                          <strong>{pessoa.nome.split(" ")[0]}</strong>
-                          <small>{cargoLabel[pessoa.cargo]}</small>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </section>
-              )}
+            <section className="team-chat-channel-section team-chat-channel-section-refined">
+              <div className="team-chat-section-title">
+                <strong>
+                  {aba === "CONVERSAS" ? "Todas as conversas" : "Grupos da empresa"}
+                </strong>
+                <span>
+                  {aba === "CONVERSAS"
+                    ? conversasVisiveis.length
+                    : gruposVisiveis.length}
+                </span>
+              </div>
 
-              <section className="team-chat-channel-section">
-                <div className="team-chat-section-title">
-                  <strong>{aba === "GRUPOS" ? "Seus grupos" : "Conversas recentes"}</strong>
-                  <span>{canaisVisiveis.length}</span>
-                </div>
-
-                <div className="team-chat-channel-list">
-                  {canaisVisiveis.length === 0 ? (
+              <div className="team-chat-channel-list">
+                {aba === "CONVERSAS" ? (
+                  conversasVisiveis.length === 0 ? (
                     <div className="team-chat-list-empty">
-                      <Icon name={aba === "GRUPOS" ? "team" : "chat"} size={26} />
-                      <strong>{aba === "GRUPOS" ? "Nenhum grupo ainda" : "Nenhuma conversa encontrada"}</strong>
-                      <p>
-                        {aba === "GRUPOS"
-                          ? "Crie um grupo para conversar com várias pessoas."
-                          : "Escolha uma pessoa da empresa para começar."}
-                      </p>
+                      <Icon name="chat" size={26} />
+                      <strong>Nenhum usuário encontrado</strong>
+                      <p>Não há outra pessoa ativa disponível nesta empresa.</p>
                     </div>
                   ) : (
-                    canaisVisiveis.map((canal) => {
-                      const outro = canal.membros.find((item) => item.id !== usuario.id);
-                      const avatarCargo = outro?.cargo ?? usuario.cargo;
-                      return (
-                        <button
-                          className={`team-chat-channel ${canal.id === canalId ? "team-chat-channel-active" : ""}`}
-                          type="button"
-                          key={canal.id}
-                          onClick={() => selecionarCanal(canal)}
+                    conversasVisiveis.map(({ pessoa, canal }) => (
+                      <button
+                        className={`team-chat-channel ${canal?.id === canalId ? "team-chat-channel-active" : ""}`}
+                        type="button"
+                        key={pessoa.id}
+                        onClick={() => void selecionarConversa(pessoa)}
+                      >
+                        <span
+                          className={`team-chat-channel-avatar avatar-${pessoa.cargo.toLowerCase()}`}
                         >
-                          <span className={`team-chat-channel-avatar team-chat-channel-avatar-${canal.tipo.toLowerCase()} avatar-${avatarCargo.toLowerCase()}`}>
-                            {canal.tipo === "GRUPO" ? (
-                              <Icon name="team" size={20} />
-                            ) : canal.tipo === "GERAL" ? (
-                              <Icon name="building" size={20} />
-                            ) : outro?.foto_perfil ? (
-                              <img src={outro.foto_perfil} alt="" />
-                            ) : (
-                              iniciais(canal.nome)
+                          {pessoa.foto_perfil ? (
+                            <img src={pessoa.foto_perfil} alt="" />
+                          ) : (
+                            iniciais(pessoa.nome)
+                          )}
+                        </span>
+                        <span className="team-chat-channel-copy">
+                          <span>
+                            <strong>{pessoa.nome}</strong>
+                            {canal?.ultima_mensagem && (
+                              <time dateTime={canal.ultima_mensagem.created_at}>
+                                {formatarHorario(canal.ultima_mensagem.created_at)}
+                              </time>
                             )}
                           </span>
-                          <span className="team-chat-channel-copy">
-                            <span>
-                              <strong>{canal.nome}</strong>
-                              {canal.ultima_mensagem && (
-                                <time dateTime={canal.ultima_mensagem.created_at}>
-                                  {formatarHorario(canal.ultima_mensagem.created_at)}
-                                </time>
-                              )}
-                            </span>
-                            <span>
-                              <small>{resumoMensagem(canal)}</small>
-                              {canal.nao_lidas > 0 && (
-                                <b>{canal.nao_lidas > 99 ? "99+" : canal.nao_lidas}</b>
-                              )}
-                            </span>
+                          <span>
+                            <small>{resumoMensagem(canal)}</small>
+                            {canal && canal.nao_lidas > 0 && (
+                              <b>{canal.nao_lidas > 99 ? "99+" : canal.nao_lidas}</b>
+                            )}
                           </span>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </section>
-            </>
+                        </span>
+                      </button>
+                    ))
+                  )
+                ) : gruposVisiveis.length === 0 ? (
+                  <div className="team-chat-list-empty">
+                    <Icon name="team" size={26} />
+                    <strong>Nenhum grupo encontrado</strong>
+                    <p>Use o botão + para criar um grupo com a equipe.</p>
+                  </div>
+                ) : (
+                  gruposVisiveis.map((canal) => (
+                    <button
+                      className={`team-chat-channel ${canal.id === canalId ? "team-chat-channel-active" : ""}`}
+                      type="button"
+                      key={canal.id}
+                      onClick={() => selecionarCanal(canal)}
+                    >
+                      <span
+                        className={`team-chat-channel-avatar team-chat-channel-avatar-${canal.tipo.toLowerCase()}`}
+                      >
+                        {avatarCanal(canal)}
+                      </span>
+                      <span className="team-chat-channel-copy">
+                        <span>
+                          <strong>{canal.nome}</strong>
+                          {canal.ultima_mensagem && (
+                            <time dateTime={canal.ultima_mensagem.created_at}>
+                              {formatarHorario(canal.ultima_mensagem.created_at)}
+                            </time>
+                          )}
+                        </span>
+                        <span>
+                          <small>{resumoMensagem(canal)}</small>
+                          {canal.nao_lidas > 0 && (
+                            <b>{canal.nao_lidas > 99 ? "99+" : canal.nao_lidas}</b>
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </section>
           )}
         </aside>
 
         <main className="team-chat-conversation">
           {!canalSelecionado ? (
             <div className="team-chat-welcome">
-              <span><Icon name="chat" size={34} /></span>
-              <h2>Escolha uma conversa</h2>
-              <p>Fale individualmente com alguém da empresa ou abra um dos grupos.</p>
+              <span>
+                <Icon name={aba === "CONVERSAS" ? "chat" : "team"} size={34} />
+              </span>
+              <h2>
+                {aba === "CONVERSAS"
+                  ? "Escolha uma conversa"
+                  : "Escolha um grupo"}
+              </h2>
+              <p>
+                {aba === "CONVERSAS"
+                  ? "Selecione qualquer usuário da empresa para conversar."
+                  : "Abra o Geral da empresa ou um dos grupos criados."}
+              </p>
             </div>
           ) : (
             <>
@@ -548,17 +621,16 @@ export function ChatInterno() {
                 >
                   <Icon name="arrow-left" size={20} />
                 </button>
-                <span className={`team-chat-channel-avatar team-chat-channel-avatar-${canalSelecionado.tipo.toLowerCase()}`}>
-                  <Icon
-                    name={canalSelecionado.tipo === "GRUPO" ? "team" : canalSelecionado.tipo === "GERAL" ? "building" : "chat"}
-                    size={21}
-                  />
+                <span
+                  className={`team-chat-channel-avatar team-chat-channel-avatar-${canalSelecionado.tipo.toLowerCase()} ${outraPessoaSelecionada ? `avatar-${outraPessoaSelecionada.cargo.toLowerCase()}` : ""}`}
+                >
+                  {avatarCanal(canalSelecionado)}
                 </span>
                 <div>
                   <strong>{canalSelecionado.nome}</strong>
                   <span>
                     {canalSelecionado.tipo === "DIRETO"
-                      ? "Conversa privada"
+                      ? cargoLabel[outraPessoaSelecionada?.cargo ?? "FUNCIONARIO"]
                       : `${canalSelecionado.membros.length} participantes`}
                   </span>
                 </div>
@@ -572,9 +644,11 @@ export function ChatInterno() {
                   <LoadingState label="Carregando mensagens..." />
                 ) : mensagens.length === 0 ? (
                   <div className="team-chat-message-empty">
-                    <span><Icon name="chat" size={30} /></span>
-                    <strong>Comece esta conversa</strong>
-                    <p>Envie a primeira mensagem para {canalSelecionado.nome}.</p>
+                    <span>
+                      <Icon name="chat" size={30} />
+                    </span>
+                    <strong>Nenhuma mensagem ainda</strong>
+                    <p>Escreva abaixo para conversar com {canalSelecionado.nome}.</p>
                   </div>
                 ) : (
                   mensagens.map((mensagem) => {
@@ -586,10 +660,16 @@ export function ChatInterno() {
                     return (
                       <div key={mensagem.id}>
                         {mostrarData && (
-                          <div className="team-chat-date"><span>{dataAtual}</span></div>
+                          <div className="team-chat-date">
+                            <span>{dataAtual}</span>
+                          </div>
                         )}
-                        <article className={`team-chat-message ${propria ? "team-chat-message-own" : ""}`}>
-                          <span className={`team-chat-avatar avatar-${mensagem.autor.cargo.toLowerCase()}`}>
+                        <article
+                          className={`team-chat-message ${propria ? "team-chat-message-own" : ""}`}
+                        >
+                          <span
+                            className={`team-chat-avatar avatar-${mensagem.autor.cargo.toLowerCase()}`}
+                          >
                             {mensagem.autor.foto_perfil ? (
                               <img src={mensagem.autor.foto_perfil} alt="" />
                             ) : (
@@ -599,10 +679,14 @@ export function ChatInterno() {
                           <div className="team-chat-bubble">
                             <div className="team-chat-message-meta">
                               <strong>{propria ? "Você" : mensagem.autor.nome}</strong>
-                              <span className={`team-chat-role role-badge-${mensagem.autor.cargo.toLowerCase()}`}>
+                              <span
+                                className={`team-chat-role role-badge-${mensagem.autor.cargo.toLowerCase()}`}
+                              >
                                 {cargoLabel[mensagem.autor.cargo]}
                               </span>
-                              <time dateTime={mensagem.created_at}>{formatarHorario(mensagem.created_at)}</time>
+                              <time dateTime={mensagem.created_at}>
+                                {formatarHorario(mensagem.created_at)}
+                              </time>
                             </div>
                             <p>{mensagem.conteudo}</p>
                           </div>
@@ -675,7 +759,9 @@ export function ChatInterno() {
                     checked={participantesGrupo.includes(pessoa.id)}
                     onChange={() => alternarParticipante(pessoa.id)}
                   />
-                  <span className={`team-chat-avatar avatar-${pessoa.cargo.toLowerCase()}`}>
+                  <span
+                    className={`team-chat-avatar avatar-${pessoa.cargo.toLowerCase()}`}
+                  >
                     {pessoa.foto_perfil ? (
                       <img src={pessoa.foto_perfil} alt="" />
                     ) : (
@@ -692,13 +778,22 @@ export function ChatInterno() {
           </div>
 
           <div className="modal-actions">
-            <button className="button button-secondary" type="button" onClick={fecharModalGrupo} disabled={criandoGrupo}>
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={fecharModalGrupo}
+              disabled={criandoGrupo}
+            >
               Cancelar
             </button>
             <button
               className="button button-primary"
               type="submit"
-              disabled={!nomeGrupo.trim() || participantesGrupo.length === 0 || criandoGrupo}
+              disabled={
+                !nomeGrupo.trim() ||
+                participantesGrupo.length === 0 ||
+                criandoGrupo
+              }
             >
               <Icon name="team" size={18} />
               {criandoGrupo ? "Criando..." : "Criar grupo"}
