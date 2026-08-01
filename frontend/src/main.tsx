@@ -10,6 +10,7 @@ import "./engagement.css";
 import "./mobile-release.css";
 import "./navigation-chat.css";
 import "./navigation-toggle-fixes.css";
+import "./chat-workspace.css";
 import "./super-admin.css";
 
 createRoot(document.getElementById("root")!).render(
