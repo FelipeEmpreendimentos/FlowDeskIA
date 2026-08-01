@@ -11,9 +11,7 @@
   margin: 0;
   padding: 24px 22px 20px;
   color: white;
-  background:
-    radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.18), transparent 34%),
-    linear-gradient(145deg, #3157d5, #2748ba);
+  background: linear-gradient(145deg, #3157d5, #2748ba);
 }
 
 .team-chat-page-refined .team-chat-sidebar-header span,
@@ -81,6 +79,12 @@
   background: linear-gradient(145deg, #5474ff, #3157d5);
 }
 
+.team-chat-page-refined .team-chat-avatar.avatar-funcionario,
+.team-chat-page-refined .team-chat-channel-avatar.avatar-funcionario {
+  color: white;
+  background: linear-gradient(145deg, #7fa3ff, #5474ff);
+}
+
 .team-chat-page-refined .team-chat-channel-copy b {
   background: #3157d5;
 }
@@ -94,6 +98,10 @@
 .team-chat-page-refined .team-chat-conversation-header {
   border-bottom-color: #d5def2;
   background: rgba(255, 255, 255, 0.96);
+}
+
+.team-chat-page-refined .team-chat-live-status {
+  margin-right: 76px;
 }
 
 .team-chat-page-refined .team-chat-welcome > span,
@@ -120,6 +128,12 @@
 
 .team-chat-page-refined .team-chat-send {
   background: linear-gradient(145deg, #3157d5, #2748ba);
+}
+
+@media (max-width: 1050px) {
+  .team-chat-page-refined .team-chat-live-status {
+    margin-right: 0;
+  }
 }
 
 @media (max-width: 900px) {
