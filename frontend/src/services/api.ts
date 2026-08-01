@@ -1,7 +1,11 @@
-import { clearSession, getToken } from "./auth";
+import {
+  clearSession,
+  getToken,
+  saveAccessToken,
+} from "./auth";
 
 const API_URL =
-  import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000/api/v1";
+  import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
 export const APP_TOAST_EVENT = "flowdesk:toast";
 
@@ -13,6 +17,12 @@ export interface AppToastEventDetail {
   message: string;
 }
 
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -22,6 +32,16 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
+
+const publicAuthEndpoints = [
+  "/auth/login",
+  "/auth/refresh",
+  "/auth/logout",
+  "/auth/recuperar-senha",
+  "/auth/redefinir-senha",
+];
+
+let refreshPromise: Promise<boolean> | null = null;
 
 function emitAppToast(detail: AppToastEventDetail): void {
   window.dispatchEvent(
@@ -44,11 +64,11 @@ export function buildQuery(
   return serialized ? `?${serialized}` : "";
 }
 
-export async function apiRequest<T>(
+async function fetchApi(
   endpoint: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const token = getToken();
+  options: RequestInit,
+  token: string | null,
+): Promise<Response> {
   const headers = new Headers(options.headers);
 
   if (options.body && !(options.body instanceof FormData)) {
@@ -57,15 +77,83 @@ export async function apiRequest<T>(
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
+  } else {
+    headers.delete("Authorization");
   }
 
+  return fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    credentials: options.credentials ?? "include",
+    headers,
+  });
+}
+
+async function renovarAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) return false;
+
+      const data = (await response.json()) as TokenResponse;
+      saveAccessToken(data.access_token);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+export async function restoreRememberedSession(): Promise<boolean> {
+  if (getToken()) return true;
+  return renovarAccessToken();
+}
+
+async function mensagemErro(response: Response): Promise<string> {
+  let message = "Não foi possível concluir a solicitação.";
+
+  try {
+    const error = (await response.json()) as {
+      detail?: string | Array<{ msg?: string }>;
+    };
+
+    if (typeof error.detail === "string") {
+      message = error.detail;
+    } else if (Array.isArray(error.detail) && error.detail[0]?.msg) {
+      message = error.detail[0].msg;
+    }
+  } catch {
+    // Mantém a mensagem padrão quando a API não retorna JSON.
+  }
+
+  return message;
+}
+
+export async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    response = await fetchApi(endpoint, options, getToken());
+
+    const podeRenovar =
+      response.status === 401 &&
+      !publicAuthEndpoints.includes(endpoint);
+
+    if (podeRenovar && (await renovarAccessToken())) {
+      response = await fetchApi(endpoint, options, getToken());
+    }
   } catch {
     throw new ApiError(
       "Não foi possível conectar ao servidor. Confirme se o backend está ligado.",
@@ -74,34 +162,13 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    let message = "Não foi possível concluir a solicitação.";
-
-    try {
-      const error = (await response.json()) as {
-        detail?: string | Array<{ msg?: string }>;
-      };
-
-      if (typeof error.detail === "string") {
-        message = error.detail;
-      } else if (Array.isArray(error.detail) && error.detail[0]?.msg) {
-        message = error.detail[0].msg;
-      }
-    } catch {
-      // Mantém a mensagem padrão quando a API não retorna JSON.
-    }
-
-    const publicAuthEndpoints = [
-      "/auth/login",
-      "/auth/recuperar-senha",
-      "/auth/redefinir-senha",
-    ];
+    const message = await mensagemErro(response);
 
     if (
       response.status === 401 &&
-      getToken() &&
       !publicAuthEndpoints.includes(endpoint)
     ) {
-      clearSession();
+      clearSession({ keepCompanyId: true });
       window.location.assign("/login");
     }
 
