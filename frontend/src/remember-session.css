@@ -17,27 +17,49 @@
   cursor: pointer;
 }
 
-.login-card .remember-device-option input {
+.login-card .remember-device-option input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
   width: 17px;
   min-width: 17px;
   height: 17px;
   min-height: 17px;
   flex: 0 0 17px;
+  place-content: center;
   margin: 0;
   padding: 0;
-  border: 0;
+  border: 1px solid #aebbd0;
   border-radius: 4px;
   outline: 0;
-  background: transparent;
+  background: #ffffff;
   box-shadow: none;
-  accent-color: var(--primary);
+  cursor: pointer;
 }
 
-.login-card .remember-device-option input:focus,
-.login-card .remember-device-option input:focus-visible {
-  border: 0;
+.login-card .remember-device-option input[type="checkbox"]::before {
+  width: 9px;
+  height: 5px;
+  border-bottom: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  content: "";
+  opacity: 0;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.login-card .remember-device-option input[type="checkbox"]:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.login-card .remember-device-option input[type="checkbox"]:checked::before {
+  opacity: 1;
+}
+
+.login-card .remember-device-option input[type="checkbox"]:focus,
+.login-card .remember-device-option input[type="checkbox"]:focus-visible,
+.login-card .remember-device-option:focus-within {
   outline: 0;
-  background: transparent;
   box-shadow: none;
 }
 
