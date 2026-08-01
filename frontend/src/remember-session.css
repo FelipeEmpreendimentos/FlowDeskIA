@@ -17,18 +17,28 @@
   cursor: pointer;
 }
 
-.remember-device-option input {
+.login-card .remember-device-option input {
   width: 17px;
+  min-width: 17px;
   height: 17px;
-  flex: 0 0 auto;
+  min-height: 17px;
+  flex: 0 0 17px;
   margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: 4px;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
   accent-color: var(--primary);
 }
 
-.remember-device-option input:focus-visible {
+.login-card .remember-device-option input:focus,
+.login-card .remember-device-option input:focus-visible {
+  border: 0;
   outline: 0;
-  box-shadow: 0 0 0 2px rgba(49, 87, 213, 0.16);
+  background: transparent;
+  box-shadow: none;
 }
 
 .remember-device-option span {
