@@ -1,5 +1,7 @@
 const TOKEN_KEY = "flowdesk_token";
 const COMPANY_KEY = "flowdesk_empresa_id";
+const API_URL =
+  import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
 export function getToken(): string | null {
   const sessionToken = sessionStorage.getItem(TOKEN_KEY);
@@ -37,4 +39,12 @@ export function clearSession(options: { keepCompanyId?: boolean } = {}): void {
   if (!options.keepCompanyId) {
     localStorage.removeItem(COMPANY_KEY);
   }
+
+  // O cookie é HttpOnly e só pode ser removido pelo backend.
+  void fetch(`${API_URL}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  }).catch(() => {
+    // A sessão local já foi removida mesmo quando o servidor está indisponível.
+  });
 }
