@@ -14,6 +14,7 @@ import "./chat-workspace.css";
 import "./chat-workspace-refinement.css";
 import "./remember-session.css";
 import "./super-admin.css";
+import "./review-polish.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
