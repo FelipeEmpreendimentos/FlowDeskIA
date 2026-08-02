@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
@@ -14,6 +14,13 @@ from app.models.platform import EmpresaPlataforma
 from app.services.access_control import user_module_access
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+ROLE_PERMISSION_PATHS = {
+    "/api/v1/relatorios": "RELATORIOS",
+    "/api/v1/usuarios": "EQUIPE",
+    "/api/v1/horarios": "EQUIPE",
+    "/api/v1/bloqueios-agenda": "EQUIPE",
+}
 
 
 def get_current_user(
@@ -81,18 +88,33 @@ def get_current_user(
     return user
 
 
+def _module_for_request(request: Request) -> str | None:
+    path = request.url.path.rstrip("/") or "/"
+    for prefix, module in ROLE_PERMISSION_PATHS.items():
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return module
+    return None
+
+
 def require_roles(
     *roles: CargoUsuario,
 ) -> Callable[[Usuario], Usuario]:
     def dependency(
+        request: Request,
         current_user: Usuario = Depends(get_current_user),
+        db: Session = Depends(get_db),
     ) -> Usuario:
-        if current_user.cargo not in roles:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "Você não possui permissão para esta operação.",
-            )
-        return current_user
+        if current_user.cargo in roles:
+            return current_user
+
+        module = _module_for_request(request)
+        if module and user_module_access(db, current_user, module):
+            return current_user
+
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Você não possui permissão para esta operação.",
+        )
 
     return dependency
 
