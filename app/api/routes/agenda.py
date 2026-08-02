@@ -10,13 +10,19 @@ from app.core.permissions import is_management, validate_employee_appointment_up
 from app.database.database import get_db
 from app.models.enums import CargoUsuario, StatusAgendamento
 from app.models.models import Agendamento, Servico, Usuario, Veiculo
+from app.schemas.agenda_availability import SlotDisponivelDetalhado
 from app.schemas.entities import (
     AgendamentoCreate,
     AgendamentoOut,
     AgendamentoUpdate,
-    SlotDisponivel,
 )
-from app.services.agenda import add_minutes, available_slots, ensure_available
+from app.services.agenda import (
+    add_minutes,
+    available_slots,
+    available_slots_for_any_employee,
+    choose_available_employee,
+    ensure_available,
+)
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
 from app.services.notifications import notify_management, notify_user
@@ -116,7 +122,6 @@ def listar_agendamentos(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[Agendamento]:
-    # Todos os cargos visualizam toda a agenda da empresa.
     query = select(Agendamento).where(
         Agendamento.empresa_id == current_user.empresa_id
     )
@@ -134,26 +139,62 @@ def listar_agendamentos(
     return list(db.scalars(query.offset(offset).limit(limit)))
 
 
-@router.get("/disponibilidade", response_model=list[SlotDisponivel])
+@router.get("/disponibilidade", response_model=list[SlotDisponivelDetalhado])
 def consultar_disponibilidade(
     data: date,
     servico_id: int,
-    funcionario_id: int,
+    funcionario_id: int | None = None,
     intervalo_minutos: int = Query(30, ge=5, le=240),
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[SlotDisponivel]:
+) -> list[SlotDisponivelDetalhado]:
     servico = require_service(db, current_user.empresa_id, servico_id)
-    require_user(db, current_user.empresa_id, funcionario_id)
-    slots = available_slots(
+
+    if funcionario_id is not None:
+        funcionario = require_user(db, current_user.empresa_id, funcionario_id)
+        slots = available_slots(
+            db,
+            empresa_id=current_user.empresa_id,
+            target_date=data,
+            funcionario_id=funcionario_id,
+            service=servico,
+            interval_minutes=intervalo_minutos,
+        )
+        return [
+            SlotDisponivelDetalhado(
+                hora_inicio=start,
+                hora_fim=end,
+                funcionario_id=funcionario.id,
+                funcionario_nome=funcionario.nome,
+            )
+            for start, end in slots
+        ]
+
+    slots_gerais = available_slots_for_any_employee(
         db,
         empresa_id=current_user.empresa_id,
         target_date=data,
-        funcionario_id=funcionario_id,
         service=servico,
         interval_minutes=intervalo_minutos,
     )
-    return [SlotDisponivel(hora_inicio=start, hora_fim=end) for start, end in slots]
+    nomes = {
+        item.id: item.nome
+        for item in db.scalars(
+            select(Usuario).where(
+                Usuario.empresa_id == current_user.empresa_id,
+                Usuario.ativo.is_(True),
+            )
+        )
+    }
+    return [
+        SlotDisponivelDetalhado(
+            hora_inicio=start,
+            hora_fim=end,
+            funcionario_id=employee_id,
+            funcionario_nome=nomes.get(employee_id, f"Usuário #{employee_id}"),
+        )
+        for start, end, employee_id in slots_gerais
+    ]
 
 
 @router.post("", response_model=AgendamentoOut, status_code=status.HTTP_201_CREATED)
@@ -162,6 +203,12 @@ def criar_agendamento(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Agendamento:
+    if data.status == StatusAgendamento.CANCELADO:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Um novo agendamento não pode ser criado como cancelado.",
+        )
+
     cliente = require_client(db, current_user.empresa_id, data.cliente_id)
     servico = require_service(db, current_user.empresa_id, data.servico_id)
 
@@ -174,15 +221,24 @@ def criar_agendamento(
                 "O veículo não pertence ao cliente informado.",
             )
 
-    if data.funcionario_id:
-        require_user(db, current_user.empresa_id, data.funcionario_id)
-
     tipo_veiculo = _resolve_tipo_veiculo(veiculo, data.tipo_veiculo)
     valor_base, valor_adicional, valor_final = _calcular_preco(
         servico,
         tipo_veiculo,
     )
     end = data.hora_fim or add_minutes(data.hora_inicio, servico.duracao_minutos)
+
+    funcionario_id = data.funcionario_id
+    if funcionario_id is not None:
+        require_user(db, current_user.empresa_id, funcionario_id)
+    else:
+        funcionario_id = choose_available_employee(
+            db,
+            empresa_id=current_user.empresa_id,
+            target_date=data.data,
+            start=data.hora_inicio,
+            end=end,
+        )
 
     try:
         ensure_available(
@@ -191,7 +247,7 @@ def criar_agendamento(
             target_date=data.data,
             start=data.hora_inicio,
             end=end,
-            funcionario_id=data.funcionario_id,
+            funcionario_id=funcionario_id,
         )
     except HTTPException as exc:
         if exc.status_code == status.HTTP_409_CONFLICT:
@@ -205,10 +261,11 @@ def criar_agendamento(
         raise
 
     values = data.model_dump(
-        exclude={"hora_fim", "valor_final", "tipo_veiculo"}
+        exclude={"hora_fim", "valor_final", "tipo_veiculo", "funcionario_id"}
     )
     appointment = Agendamento(
         empresa_id=current_user.empresa_id,
+        funcionario_id=funcionario_id,
         hora_fim=end,
         valor_base=valor_base,
         valor_adicional=valor_adicional,
@@ -247,6 +304,8 @@ def criar_agendamento(
             "valor_adicional": str(valor_adicional),
             "valor_final": str(valor_final),
             "tipo_veiculo": tipo_veiculo,
+            "funcionario_atribuido": funcionario_id,
+            "atribuicao_automatica": data.funcionario_id is None,
         },
     )
     return commit_or_conflict(db, appointment)
@@ -305,6 +364,16 @@ def atualizar_agendamento(
     target_employee = values.get("funcionario_id", appointment.funcionario_id)
     if not is_management(current_user) and target_employee is None:
         target_employee = current_user.id
+    elif target_employee is None:
+        target_employee = choose_available_employee(
+            db,
+            empresa_id=current_user.empresa_id,
+            target_date=target_date,
+            start=start,
+            end=end,
+            ignore_id=appointment.id,
+        )
+        values["funcionario_id"] = target_employee
 
     try:
         ensure_available(
