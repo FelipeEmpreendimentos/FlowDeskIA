@@ -28,6 +28,36 @@ export interface SuperAdminDashboard {
   alertas: Array<{ tipo: string; titulo: string; mensagem: string }>;
 }
 
+export interface SuperAdminFinancialDashboard {
+  start_date: string;
+  end_date: string;
+  companies_total: number;
+  companies_active: number;
+  companies_trial: number;
+  companies_suspended: number;
+  companies_overdue: number;
+  new_companies_period: number;
+  active_users: number;
+  appointments_period: number;
+  conversations_period: number;
+  active_plans: number;
+  active_ai_addons: number;
+  estimated_mrr: string | number;
+  estimated_arr: string | number;
+  new_contracts_period: number;
+  new_contracts_monthly_value: string | number;
+  audit_events_period: number;
+  companies_by_plan: Array<{ plano: string; empresas: number }>;
+  alerts: Array<{ type: string; title: string; message: string }>;
+  recent_audit: Array<{
+    id: number;
+    action: string;
+    entity: string | null;
+    company_id: number | null;
+    created_at: string;
+  }>;
+}
+
 export interface PlanoSuperAdmin {
   id: number;
   codigo: string;
