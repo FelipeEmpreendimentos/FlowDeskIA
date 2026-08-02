@@ -54,14 +54,50 @@
 }
 
 .activity-search {
+  display: flex;
   width: 100%;
   min-width: 0;
   min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 13px;
+}
+
+.activity-search > svg {
+  position: static;
+  flex: 0 0 auto;
+  align-self: center;
+  transform: none;
 }
 
 .activity-search input {
   width: 100%;
   min-width: 0;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.super-admin-company-toolbar label {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+}
+
+.super-admin-company-toolbar label svg {
+  top: 50%;
+  z-index: 1;
+  flex: 0 0 auto;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.super-admin-company-toolbar label input {
+  height: 42px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .team-chat-composer {
