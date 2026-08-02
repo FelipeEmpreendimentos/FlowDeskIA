@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    acessos,
     administrativo,
     agenda,
     atividades,
@@ -32,6 +33,7 @@ api_router.include_router(system.router)
 api_router.include_router(auth.router)
 api_router.include_router(super_admin.router)
 api_router.include_router(empresas.router)
+api_router.include_router(acessos.router)
 api_router.include_router(usuarios.router)
 api_router.include_router(clientes.router)
 api_router.include_router(veiculos.router)
