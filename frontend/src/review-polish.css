@@ -25,6 +25,10 @@
   max-width: 420px;
 }
 
+.employee-schedule-actions > .button {
+  display: none;
+}
+
 .quick-period-filters {
   display: flex;
   align-items: center;
