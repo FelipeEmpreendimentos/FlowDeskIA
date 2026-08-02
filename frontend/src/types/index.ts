@@ -230,5 +230,6 @@ export interface DashboardResumo {
 
 export interface AppOutletContext {
   usuario: UsuarioLogado;
+  modulos: Partial<Record<string, boolean>>;
   atualizarUsuario: () => Promise<void>;
 }
