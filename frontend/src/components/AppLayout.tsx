@@ -12,6 +12,7 @@ import type {
   Notificacao,
   UsuarioLogado,
 } from "../types";
+import type { CurrentAccess, ModuleCode } from "../types/accessControl";
 import type { ChatInternoResumo } from "../types/internal-chat";
 import { Icon, type IconName } from "./Icon";
 import { AppToast, LoadingState } from "./UI";
@@ -23,7 +24,7 @@ interface MenuItem {
   label: string;
   labelFuncionario?: string;
   icon: IconName;
-  cargos?: CargoUsuario[];
+  module?: ModuleCode;
 }
 
 interface MenuGroup {
@@ -41,17 +42,43 @@ const menuGroups: MenuGroup[] = [
         label: "Agenda",
         labelFuncionario: "Minha agenda",
         icon: "calendar",
+        module: "AGENDA",
       },
-      { to: "/chat-interno", label: "Chat interno", icon: "chat" },
+      {
+        to: "/chat-interno",
+        label: "Chat interno",
+        icon: "chat",
+        module: "CHAT_INTERNO",
+      },
     ],
   },
   {
     label: "Atendimento",
     items: [
-      { to: "/conversas", label: "Conversas", icon: "chat" },
-      { to: "/clientes", label: "Clientes", icon: "users" },
-      { to: "/veiculos", label: "Veículos", icon: "car" },
-      { to: "/servicos", label: "Serviços", icon: "services" },
+      {
+        to: "/conversas",
+        label: "Conversas",
+        icon: "chat",
+        module: "CONVERSAS",
+      },
+      {
+        to: "/clientes",
+        label: "Clientes",
+        icon: "users",
+        module: "CLIENTES",
+      },
+      {
+        to: "/veiculos",
+        label: "Veículos",
+        icon: "car",
+        module: "VEICULOS",
+      },
+      {
+        to: "/servicos",
+        label: "Serviços",
+        icon: "services",
+        module: "SERVICOS",
+      },
     ],
   },
   {
@@ -61,19 +88,19 @@ const menuGroups: MenuGroup[] = [
         to: "/financeiro",
         label: "Financeiro",
         icon: "finance",
-        cargos: ["ADMIN", "GERENTE"],
+        module: "FINANCEIRO",
       },
       {
         to: "/relatorios",
         label: "Relatórios",
         icon: "dashboard",
-        cargos: ["ADMIN", "GERENTE"],
+        module: "RELATORIOS",
       },
       {
         to: "/equipe",
         label: "Equipe",
         icon: "team",
-        cargos: ["ADMIN", "GERENTE"],
+        module: "EQUIPE",
       },
     ],
   },
@@ -87,6 +114,8 @@ const cargoLabel: Record<CargoUsuario, string> = {
 
 const rotasDetalheConfiguracoes = new Set([
   "/configuracoes/dados",
+  "/configuracoes/agenda",
+  "/configuracoes/acessos",
   "/atividades",
   "/plano-consumo",
 ]);
@@ -96,6 +125,7 @@ export function AppLayout() {
   const location = useLocation();
   const rotaAntesNotificacoes = useRef("/dashboard");
   const [usuario, setUsuario] = useState<UsuarioLogado | null>(null);
+  const [modulos, setModulos] = useState<Partial<Record<ModuleCode, boolean>>>({});
   const [erro, setErro] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
   const [toast, setToast] = useState<AppToastEventDetail | null>(null);
@@ -104,8 +134,12 @@ export function AppLayout() {
 
   const atualizarUsuario = useCallback(async () => {
     try {
-      const data = await apiRequest<UsuarioLogado>("/auth/me");
-      setUsuario(data);
+      const [dadosUsuario, dadosAcesso] = await Promise.all([
+        apiRequest<UsuarioLogado>("/auth/me"),
+        apiRequest<CurrentAccess>("/acessos/me"),
+      ]);
+      setUsuario(dadosUsuario);
+      setModulos(dadosAcesso.modules);
       setErro("");
     } catch (error) {
       setErro(
@@ -119,10 +153,16 @@ export function AppLayout() {
   const atualizarIndicadores = useCallback(async () => {
     if (!usuario) return;
 
-    const [notificacoesResult, chatResult] = await Promise.allSettled([
+    const requisicoes: PromiseSettledResult<unknown>[] = await Promise.allSettled([
       apiRequest<Notificacao[]>("/notificacoes?somente_nao_lidas=true"),
-      apiRequest<ChatInternoResumo>("/chat-interno/resumo"),
+      modulos.CHAT_INTERNO
+        ? apiRequest<ChatInternoResumo>("/chat-interno/resumo")
+        : Promise.resolve({ nao_lidas: 0 }),
     ]);
+    const [notificacoesResult, chatResult] = requisicoes as [
+      PromiseSettledResult<Notificacao[]>,
+      PromiseSettledResult<ChatInternoResumo>,
+    ];
 
     if (notificacoesResult.status === "fulfilled") {
       setNotificacoesNaoLidas(notificacoesResult.value.length);
@@ -130,7 +170,7 @@ export function AppLayout() {
     if (chatResult.status === "fulfilled") {
       setChatNaoLidas(chatResult.value.nao_lidas);
     }
-  }, [usuario]);
+  }, [modulos.CHAT_INTERNO, usuario]);
 
   useEffect(() => {
     void atualizarUsuario();
@@ -239,7 +279,7 @@ export function AppLayout() {
     .map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => !item.cargos || item.cargos.includes(usuario.cargo),
+        (item) => !item.module || Boolean(modulos[item.module]),
       ),
     }))
     .filter((group) => group.items.length > 0);
