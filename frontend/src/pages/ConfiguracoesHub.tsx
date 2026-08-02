@@ -22,6 +22,14 @@ const cards: ConfiguracaoCard[] = [
     cargos: ["ADMIN", "GERENTE", "FUNCIONARIO"],
   },
   {
+    to: "/configuracoes/agenda",
+    title: "Agenda",
+    description:
+      "Defina o intervalo usado para oferecer os horários disponíveis aos clientes.",
+    icon: "calendar",
+    cargos: ["ADMIN", "GERENTE"],
+  },
+  {
     to: "/notificacoes",
     title: "Notificações",
     description:
