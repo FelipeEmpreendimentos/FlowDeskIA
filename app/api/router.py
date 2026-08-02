@@ -22,6 +22,7 @@ from app.api.routes import (
     relatorios,
     servicos,
     super_admin,
+    super_admin_dashboard,
     system,
     usuarios,
     veiculos,
@@ -32,6 +33,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(system.router)
 api_router.include_router(auth.router)
 api_router.include_router(super_admin.router)
+api_router.include_router(super_admin_dashboard.router)
 api_router.include_router(empresas.router)
 api_router.include_router(acessos.router)
 api_router.include_router(usuarios.router)
