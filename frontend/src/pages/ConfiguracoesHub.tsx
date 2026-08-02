@@ -30,6 +30,15 @@ const cards: ConfiguracaoCard[] = [
     cargos: ["ADMIN", "GERENTE"],
   },
   {
+    to: "/configuracoes/acessos",
+    title: "Módulos e permissões",
+    description:
+      "Ative áreas da empresa e libere acessos específicos para cada usuário.",
+    icon: "lock",
+    cargos: ["ADMIN"],
+    badge: "Administrador",
+  },
+  {
     to: "/notificacoes",
     title: "Notificações",
     description:
