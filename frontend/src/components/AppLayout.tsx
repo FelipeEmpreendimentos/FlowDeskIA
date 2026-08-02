@@ -153,16 +153,15 @@ export function AppLayout() {
   const atualizarIndicadores = useCallback(async () => {
     if (!usuario) return;
 
-    const requisicoes: PromiseSettledResult<unknown>[] = await Promise.allSettled([
+    const [notificacoesResult, chatResult] = await Promise.allSettled([
       apiRequest<Notificacao[]>("/notificacoes?somente_nao_lidas=true"),
       modulos.CHAT_INTERNO
         ? apiRequest<ChatInternoResumo>("/chat-interno/resumo")
-        : Promise.resolve({ nao_lidas: 0 }),
+        : Promise.resolve<ChatInternoResumo>({
+            nao_lidas: 0,
+            ultima_mensagem_id: null,
+          }),
     ]);
-    const [notificacoesResult, chatResult] = requisicoes as [
-      PromiseSettledResult<Notificacao[]>,
-      PromiseSettledResult<ChatInternoResumo>,
-    ];
 
     if (notificacoesResult.status === "fulfilled") {
       setNotificacoesNaoLidas(notificacoesResult.value.length);
@@ -270,6 +269,7 @@ export function AppLayout() {
 
   const context: AppOutletContext = {
     usuario,
+    modulos,
     atualizarUsuario,
   };
   const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
