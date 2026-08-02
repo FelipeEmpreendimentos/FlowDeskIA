@@ -8,6 +8,7 @@ from app.api.routes import (
     bloqueios,
     chat_interno,
     clientes,
+    configuracao_agenda,
     configuracoes,
     conversas,
     empresas,
@@ -36,6 +37,7 @@ api_router.include_router(clientes.router)
 api_router.include_router(veiculos.router)
 api_router.include_router(servicos.router)
 api_router.include_router(agenda.router)
+api_router.include_router(configuracao_agenda.router)
 api_router.include_router(financeiro.router)
 api_router.include_router(relatorios.router)
 api_router.include_router(plano_empresa.router)
