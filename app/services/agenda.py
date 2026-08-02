@@ -1,11 +1,22 @@
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.models.agenda_settings import ConfiguracaoAgenda
 from app.models.enums import StatusAgendamento
-from app.models.models import Agendamento, BloqueioAgenda, Horario, Servico
+from app.models.models import (
+    Agendamento,
+    BloqueioAgenda,
+    Empresa,
+    Horario,
+    Servico,
+)
+
+
+INTERVALOS_PERMITIDOS = {15, 30, 60}
 
 
 def add_minutes(value: time, minutes: int) -> time:
@@ -28,6 +39,28 @@ def _employee_block_filter(funcionario_id: int | None):
         BloqueioAgenda.funcionario_id.is_(None),
         BloqueioAgenda.funcionario_id == funcionario_id,
     )
+
+
+def _company_now(db: Session, empresa_id: int) -> datetime:
+    empresa = db.get(Empresa, empresa_id)
+    timezone_name = empresa.timezone if empresa and empresa.timezone else "America/Sao_Paulo"
+
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        timezone = ZoneInfo("America/Sao_Paulo")
+
+    return datetime.now(timezone)
+
+
+def _configured_interval(
+    db: Session,
+    empresa_id: int,
+    fallback: int,
+) -> int:
+    configuracao = db.get(ConfiguracaoAgenda, empresa_id)
+    intervalo = configuracao.intervalo_minutos if configuracao else fallback
+    return intervalo if intervalo in INTERVALOS_PERMITIDOS else 30
 
 
 def is_day_fully_blocked(
@@ -197,6 +230,21 @@ def available_slots(
     service: Servico,
     interval_minutes: int,
 ) -> list[tuple[time, time]]:
+    now_local = _company_now(db, empresa_id)
+    if target_date < now_local.date():
+        return []
+
+    minimum_start = (
+        now_local.time().replace(tzinfo=None)
+        if target_date == now_local.date()
+        else None
+    )
+    interval_minutes = _configured_interval(
+        db,
+        empresa_id,
+        interval_minutes,
+    )
+
     weekday = (target_date.weekday() + 1) % 7
     schedules = db.scalars(
         select(Horario).where(
@@ -224,8 +272,10 @@ def available_slots(
             if end > schedule.hora_fim or end <= cursor:
                 break
 
+            horario_passado = minimum_start is not None and cursor < minimum_start
             indisponivel = (
-                _overlaps_pause(schedule, cursor, end)
+                horario_passado
+                or _overlaps_pause(schedule, cursor, end)
                 or has_blockage_conflict(
                     db,
                     empresa_id=empresa_id,
