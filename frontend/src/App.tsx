@@ -7,6 +7,7 @@ import { Agenda } from "./pages/Agenda";
 import { Atividades } from "./pages/Atividades";
 import { ChatInterno } from "./pages/ChatInterno";
 import { Clientes } from "./pages/Clientes";
+import { ConfiguracaoAgenda } from "./pages/ConfiguracaoAgenda";
 import { Configuracoes } from "./pages/Configuracoes";
 import { ConfiguracoesHub } from "./pages/ConfiguracoesHub";
 import { Conversas } from "./pages/Conversas";
@@ -74,6 +75,7 @@ function App() {
         <Route path="/equipe" element={<Equipe />} />
         <Route path="/configuracoes" element={<ConfiguracoesHub />} />
         <Route path="/configuracoes/dados" element={<Configuracoes />} />
+        <Route path="/configuracoes/agenda" element={<ConfiguracaoAgenda />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
