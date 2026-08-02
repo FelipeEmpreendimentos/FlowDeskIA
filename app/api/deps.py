@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.security import decode_access_token
 from app.database.database import get_db
@@ -16,6 +17,7 @@ from app.services.access_control import user_module_access
 bearer_scheme = HTTPBearer(auto_error=False)
 
 ROLE_PERMISSION_PATHS = {
+    "/api/v1/financeiro": "FINANCEIRO",
     "/api/v1/relatorios": "RELATORIOS",
     "/api/v1/usuarios": "EQUIPE",
     "/api/v1/horarios": "EQUIPE",
@@ -23,7 +25,16 @@ ROLE_PERMISSION_PATHS = {
 }
 
 
+def _module_for_request(request: Request) -> str | None:
+    path = request.url.path.rstrip("/") or "/"
+    for prefix, module in ROLE_PERMISSION_PATHS.items():
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return module
+    return None
+
+
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Usuario:
@@ -85,15 +96,16 @@ def get_current_user(
             "O acesso da empresa está suspenso. Entre em contato com o suporte.",
         )
 
+    module = _module_for_request(request)
+    if (
+        module
+        and user.cargo == CargoUsuario.FUNCIONARIO
+        and user_module_access(db, user, module)
+    ):
+        # Elevação apenas durante a requisição e sem marcar o cargo como alterado no banco.
+        set_committed_value(user, "cargo", CargoUsuario.GERENTE)
+
     return user
-
-
-def _module_for_request(request: Request) -> str | None:
-    path = request.url.path.rstrip("/") or "/"
-    for prefix, module in ROLE_PERMISSION_PATHS.items():
-        if path == prefix or path.startswith(f"{prefix}/"):
-            return module
-    return None
 
 
 def require_roles(
