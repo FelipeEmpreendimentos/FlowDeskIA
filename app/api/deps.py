@@ -11,6 +11,7 @@ from app.database.database import get_db
 from app.models.enums import CargoUsuario
 from app.models.models import Empresa, Usuario
 from app.models.platform import EmpresaPlataforma
+from app.services.access_control import user_module_access
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -68,7 +69,6 @@ def get_current_user(
     try:
         plataforma = db.get(EmpresaPlataforma, empresa_id)
     except ProgrammingError:
-        # Mantém compatibilidade até a migração do Super Admin ser executada.
         db.rollback()
         plataforma = None
 
@@ -93,5 +93,23 @@ def require_roles(
                 "Você não possui permissão para esta operação.",
             )
         return current_user
+
+    return dependency
+
+
+def require_roles_or_module(
+    module: str,
+    *roles: CargoUsuario,
+) -> Callable[[Usuario], Usuario]:
+    def dependency(
+        current_user: Usuario = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> Usuario:
+        if current_user.cargo in roles or user_module_access(db, current_user, module):
+            return current_user
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Você não possui permissão para acessar este módulo.",
+        )
 
     return dependency
