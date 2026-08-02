@@ -1,0 +1,143 @@
+.confirmation-icon-danger,
+.confirmation-icon-primary {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 16px;
+}
+
+.confirmation-icon-danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.confirmation-icon-primary {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.agenda-settings-card {
+  max-width: 760px;
+}
+
+.agenda-interval-field {
+  max-width: 420px;
+}
+
+.quick-period-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quick-period-filters .button {
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
+.finance-filters .finance-refresh,
+.report-filters .report-refresh {
+  margin-left: auto;
+}
+
+.activity-filters {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) repeat(4, minmax(150px, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.activity-search {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.activity-search input {
+  width: 100%;
+  min-width: 0;
+}
+
+.team-chat-composer {
+  grid-template-areas:
+    "message send"
+    "information information";
+  align-items: start;
+}
+
+.team-chat-composer textarea {
+  grid-area: message;
+  padding: 13px 16px;
+}
+
+.team-chat-composer-info {
+  position: static;
+  grid-area: information;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+  color: #8b96a8;
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.team-chat-send {
+  grid-area: send;
+  min-height: 48px;
+}
+
+@media (max-width: 1180px) {
+  .activity-filters {
+    grid-template-columns: minmax(260px, 2fr) repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .finance-filters .finance-refresh,
+  .report-filters .report-refresh {
+    margin-left: 0;
+  }
+
+  .activity-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .activity-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .quick-period-filters {
+    grid-column: 1 / -1;
+  }
+
+  .quick-period-filters .button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 540px) {
+  .activity-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-search {
+    grid-column: auto;
+  }
+
+  .team-chat-composer {
+    grid-template-areas:
+      "message send"
+      "information information";
+  }
+
+  .team-chat-composer-info span:first-child {
+    display: inline;
+  }
+}
