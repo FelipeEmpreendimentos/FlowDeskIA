@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useOutletContext } from "react-router";
 import { Icon } from "../components/Icon";
 import { Alert, LoadingState, PageHeader } from "../components/UI";
 import { apiRequest } from "../services/api";
 import { showAppToast } from "../services/feedback";
+import type { AppOutletContext } from "../types";
 import type {
   AccessConfiguration,
   CompanyModule,
@@ -20,6 +22,7 @@ const roleLabels = {
 } as const;
 
 export function ConfiguracaoAcessos() {
+  const { usuario, atualizarUsuario } = useOutletContext<AppOutletContext>();
   const [tab, setTab] = useState<Tab>("modules");
   const [configuration, setConfiguration] = useState<AccessConfiguration | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -59,28 +62,6 @@ export function ConfiguracaoAcessos() {
     [configuration, selectedUserId],
   );
 
-  function updateModuleLocally(updated: CompanyModule) {
-    setConfiguration((current) =>
-      current
-        ? {
-            ...current,
-            modules: current.modules.map((item) =>
-              item.code === updated.code ? updated : item,
-            ),
-            users: current.users.map((user) => ({
-              ...user,
-              permissions: {
-                ...user.permissions,
-                [updated.code]: updated.enabled
-                  ? user.overrides[updated.code] ?? user.permissions[updated.code]
-                  : false,
-              },
-            })),
-          }
-        : current,
-    );
-  }
-
   async function toggleModule(module: CompanyModule) {
     const key = `module-${module.code}`;
     setSavingKey(key);
@@ -93,8 +74,7 @@ export function ConfiguracaoAcessos() {
           body: JSON.stringify({ enabled: !module.enabled }),
         },
       );
-      updateModuleLocally(updated);
-      await load();
+      await Promise.all([load(), atualizarUsuario()]);
       showAppToast(
         updated.enabled
           ? `${updated.name} ativado para a empresa.`
@@ -133,8 +113,7 @@ export function ConfiguracaoAcessos() {
         {
           method: "PATCH",
           body: JSON.stringify({
-            allowed:
-              choice === "DEFAULT" ? null : choice === "ALLOW",
+            allowed: choice === "DEFAULT" ? null : choice === "ALLOW",
           }),
         },
       );
@@ -148,6 +127,9 @@ export function ConfiguracaoAcessos() {
             }
           : current,
       );
+      if (user.user_id === usuario.id) {
+        await atualizarUsuario();
+      }
       showAppToast(`Permissão de ${user.name} atualizada.`);
     } catch (saveError) {
       setError(
@@ -207,7 +189,10 @@ export function ConfiguracaoAcessos() {
             {configuration.modules.map((module) => (
               <article key={module.code}>
                 <span className="access-module-icon">
-                  <Icon name={module.code === "FINANCEIRO" ? "finance" : "settings"} size={19} />
+                  <Icon
+                    name={module.code === "FINANCEIRO" ? "finance" : "settings"}
+                    size={19}
+                  />
                 </span>
                 <div>
                   <strong>{module.name}</strong>
@@ -248,7 +233,9 @@ export function ConfiguracaoAcessos() {
                 <span>{selectedUser.name.charAt(0).toUpperCase()}</span>
                 <div>
                   <strong>{selectedUser.name}</strong>
-                  <small>{selectedUser.email} · {roleLabels[selectedUser.role]}</small>
+                  <small>
+                    {selectedUser.email} · {roleLabels[selectedUser.role]}
+                  </small>
                 </div>
               </div>
             )}
@@ -264,7 +251,10 @@ export function ConfiguracaoAcessos() {
               {configuration.modules.map((module) => {
                 const choice = permissionChoice(selectedUser, module.code);
                 return (
-                  <article key={module.code} className={!module.enabled ? "disabled" : ""}>
+                  <article
+                    key={module.code}
+                    className={!module.enabled ? "disabled" : ""}
+                  >
                     <div>
                       <strong>{module.name}</strong>
                       <small>
@@ -286,7 +276,8 @@ export function ConfiguracaoAcessos() {
                       }
                       disabled={
                         !module.enabled ||
-                        savingKey === `permission-${selectedUser.user_id}-${module.code}`
+                        savingKey ===
+                          `permission-${selectedUser.user_id}-${module.code}`
                       }
                       aria-label={`Permissão de ${selectedUser.name} para ${module.name}`}
                     >
