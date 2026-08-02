@@ -69,7 +69,11 @@ export function Login() {
       saveSession(response.access_token, empresaId);
       navigate("/dashboard", { replace: true });
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível realizar o login.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível realizar o login.",
+      );
     } finally {
       setCarregando(false);
     }
@@ -95,7 +99,12 @@ export function Login() {
       </section>
 
       <section className="login-form-area">
-        <form className="login-card" onSubmit={handleSubmit}>
+        <form
+          className="login-card"
+          onSubmit={handleSubmit}
+          autoComplete="on"
+          method="post"
+        >
           <header>
             <span className="login-label">Acesso ao sistema</span>
             <h2>Bem-vindo de volta</h2>
@@ -106,6 +115,8 @@ export function Login() {
             Empresa ID
             <input
               type="number"
+              name="organization"
+              autoComplete="organization"
               min="1"
               inputMode="numeric"
               value={empresaId}
@@ -118,7 +129,8 @@ export function Login() {
             E-mail
             <input
               type="email"
-              autoComplete="email"
+              name="username"
+              autoComplete="username"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="seuemail@exemplo.com"
@@ -131,6 +143,7 @@ export function Login() {
             <div className="password-field">
               <input
                 type={mostrarSenha ? "text" : "password"}
+                name="password"
                 autoComplete="current-password"
                 value={senha}
                 onChange={(event) => setSenha(event.target.value)}
@@ -167,7 +180,11 @@ export function Login() {
 
           {erro && <div className="alert alert-error">{erro}</div>}
 
-          <button className="button button-primary button-full" type="submit" disabled={carregando}>
+          <button
+            className="button button-primary button-full"
+            type="submit"
+            disabled={carregando}
+          >
             {carregando ? "Entrando..." : "Entrar"}
           </button>
         </form>
