@@ -1,3 +1,4 @@
+from scripts.setup_access_control import aplicar_estrutura as aplicar_access_control
 from scripts.setup_agenda_settings import aplicar_estrutura as aplicar_agenda_settings
 from scripts.setup_chat_interno import aplicar_estrutura as aplicar_chat_interno
 from scripts.setup_engagement import aplicar_estrutura as aplicar_engagement
@@ -17,10 +18,11 @@ def main() -> None:
     aplicar_engagement()
     aplicar_chat_interno()
     aplicar_agenda_settings()
+    aplicar_access_control()
 
     print("Estrutura da versão de lançamento preparada com sucesso.")
     print(
-        "Módulos: Super Admin, planos, financeiro, onboarding, notificações, chat interno e configurações da agenda."
+        "Módulos: Super Admin, planos, financeiro, onboarding, notificações, chat interno, agenda e permissões."
     )
 
 
