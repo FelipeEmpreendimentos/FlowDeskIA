@@ -86,6 +86,15 @@
   pointer-events: none;
 }
 
+.team-chat-composer-info span:first-child {
+  font-size: 0;
+}
+
+.team-chat-composer-info span:first-child::after {
+  content: "Shift + Enter quebra linha";
+  font-size: 9px;
+}
+
 .team-chat-send {
   grid-area: send;
   min-height: 48px;
