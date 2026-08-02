@@ -110,6 +110,8 @@ export interface Agendamento {
 export interface SlotDisponivel {
   hora_inicio: string;
   hora_fim: string;
+  funcionario_id: number;
+  funcionario_nome: string;
 }
 
 export interface Horario {
