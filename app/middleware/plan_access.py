@@ -1,11 +1,14 @@
 from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app.core.security import decode_access_token
 from app.database.database import SessionLocal
+from app.models.models import Usuario
+from app.services.access_control import require_module_access
 from app.services.plans import enforce_limit, require_feature
 
 FEATURE_PATHS = {
@@ -17,6 +20,17 @@ FEATURE_PATHS = {
     "/api/v1/notificacoes": "NOTIFICACOES",
 }
 
+MODULE_PATHS = {
+    "/api/v1/agendamentos": "AGENDA",
+    "/api/v1/chat-interno": "CHAT_INTERNO",
+    "/api/v1/conversas": "CONVERSAS",
+    "/api/v1/clientes": "CLIENTES",
+    "/api/v1/veiculos": "VEICULOS",
+    "/api/v1/servicos": "SERVICOS",
+    "/api/v1/financeiro": "FINANCEIRO",
+    "/api/v1/relatorios": "RELATORIOS",
+}
+
 CREATE_LIMITS = {
     "/api/v1/agendamentos": "agendamentos_mes",
     "/api/v1/conversas": "conversas_mes",
@@ -24,7 +38,7 @@ CREATE_LIMITS = {
 }
 
 
-def _company_id_from_request(request: Request) -> int | None:
+def _identity_from_request(request: Request) -> tuple[int, int] | None:
     authorization = request.headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:
@@ -34,15 +48,15 @@ def _company_id_from_request(request: Request) -> int | None:
         payload = decode_access_token(token)
         if payload.get("kind", "company_user") != "company_user":
             return None
-        return int(payload["empresa_id"])
+        return int(payload["sub"]), int(payload["empresa_id"])
     except (ValueError, KeyError, TypeError):
         return None
 
 
-def _feature_for_path(path: str) -> str | None:
-    for prefix, feature in FEATURE_PATHS.items():
+def _value_for_path(path: str, mapping: dict[str, str]) -> str | None:
+    for prefix, value in mapping.items():
         if path == prefix or path.startswith(f"{prefix}/"):
-            return feature
+            return value
     return None
 
 
@@ -50,19 +64,30 @@ async def plan_access_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    empresa_id = _company_id_from_request(request)
-    if empresa_id is None:
+    identity = _identity_from_request(request)
+    if identity is None:
         return await call_next(request)
 
+    user_id, empresa_id = identity
     path = request.url.path.rstrip("/") or "/"
-    feature = _feature_for_path(path)
+    feature = _value_for_path(path, FEATURE_PATHS)
+    module = _value_for_path(path, MODULE_PATHS)
     limit_key = CREATE_LIMITS.get(path) if request.method == "POST" else None
 
-    if feature is None and limit_key is None:
+    if feature is None and module is None and limit_key is None:
         return await call_next(request)
 
     db = SessionLocal()
     try:
+        user = db.scalar(
+            select(Usuario).where(
+                Usuario.id == user_id,
+                Usuario.empresa_id == empresa_id,
+                Usuario.ativo.is_(True),
+            )
+        )
+        if user is not None and module:
+            require_module_access(db, user, module)
         if feature:
             require_feature(db, empresa_id, feature)
         if limit_key:
