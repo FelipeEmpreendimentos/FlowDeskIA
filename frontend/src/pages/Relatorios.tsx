@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../components/Icon";
+import { PeriodShortcuts } from "../components/PeriodShortcuts";
 import { Alert, EmptyState, LoadingState, PageHeader } from "../components/UI";
 import { ApiError, apiRequest, buildQuery } from "../services/api";
 import { formatCurrency, formatDateTime, todayISO } from "../utils/format";
@@ -147,6 +148,11 @@ export function Relatorios() {
     [avaliacoes.notas],
   );
 
+  function alterarPeriodo(inicio: string, fim: string) {
+    setDataInicio(inicio);
+    setDataFim(fim);
+  }
+
   return (
     <div className="page">
       <PageHeader
@@ -177,8 +183,9 @@ export function Relatorios() {
               onChange={(event) => setDataFim(event.target.value)}
             />
           </label>
+          <PeriodShortcuts onChange={alterarPeriodo} />
           <button
-            className="button button-secondary"
+            className="button button-secondary report-refresh"
             type="button"
             onClick={() => void carregar()}
           >
