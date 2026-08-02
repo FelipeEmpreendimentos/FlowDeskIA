@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import { Alert, EmptyState, LoadingState, PageHeader, StatusBadge } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type {
   Agendamento,
   Cliente,
@@ -114,6 +116,12 @@ function primeiroDiaDoMes(): string {
   return `${hoje.slice(0, 7)}-01`;
 }
 
+const mensagensStatus: Partial<Record<StatusAgendamento, string>> = {
+  CONFIRMADO: "Agendamento confirmado com sucesso.",
+  EM_ANDAMENTO: "Atendimento iniciado com sucesso.",
+  FINALIZADO: "Atendimento finalizado com sucesso.",
+};
+
 export function Agenda() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [modo, setModo] = useState<AgendaModo>("agenda");
@@ -134,9 +142,10 @@ export function Agenda() {
   const [slots, setSlots] = useState<SlotDisponivel[]>([]);
   const [buscandoSlots, setBuscandoSlots] = useState(false);
   const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
   const [avisoDisponibilidade, setAvisoDisponibilidade] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [cancelamento, setCancelamento] = useState<Agendamento | null>(null);
+  const [cancelando, setCancelando] = useState(false);
 
   async function carregarApoio() {
     const [dadosClientes, dadosServicos, dadosUsuarios, dadosVeiculos] = await Promise.all([
@@ -215,7 +224,6 @@ export function Agenda() {
     funcionarioFiltro,
   ]);
 
-
   useEffect(() => {
     if (!avisoDisponibilidade) return;
 
@@ -241,14 +249,12 @@ export function Agenda() {
     return itens.sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
   }, [agendamentos, modo]);
 
-  const opcoesStatus =
-    modo === "agenda" ? statusAgenda : statusHistorico;
+  const opcoesStatus = modo === "agenda" ? statusAgenda : statusHistorico;
 
   function trocarModo(novoModo: AgendaModo) {
     setModo(novoModo);
     setStatusFiltro("");
     setErro("");
-    setSucesso("");
   }
 
   const veiculosCliente = useMemo(
@@ -303,14 +309,9 @@ export function Agenda() {
       (slot) => formatTime(slot.hora_inicio) === form.hora_inicio,
     );
 
-    if (encontrado) {
-      return encontrado;
-    }
+    if (encontrado) return encontrado;
 
-    if (
-      editando &&
-      form.hora_inicio === formatTime(editando.hora_inicio)
-    ) {
+    if (editando && form.hora_inicio === formatTime(editando.hora_inicio)) {
       return {
         hora_inicio: editando.hora_inicio,
         hora_fim: editando.hora_fim,
@@ -336,10 +337,7 @@ export function Agenda() {
 
   function abrirNovo() {
     setEditando(null);
-    setForm({
-      ...formVazio,
-      data: dataFiltro,
-    });
+    setForm({ ...formVazio, data: dataFiltro });
     setSlots([]);
     setErro("");
     setAvisoDisponibilidade("");
@@ -364,12 +362,7 @@ export function Agenda() {
       observacoes: item.observacoes ?? "",
     });
     setAvisoDisponibilidade("");
-    setSlots([
-      {
-        hora_inicio: item.hora_inicio,
-        hora_fim: item.hora_fim,
-      },
-    ]);
+    setSlots([{ hora_inicio: item.hora_inicio, hora_fim: item.hora_fim }]);
     setErro("");
     setModalAberto(true);
   }
@@ -383,12 +376,7 @@ export function Agenda() {
 
   function selecionarServico(id: string) {
     const calculo = calcularPreco(id, form.veiculo_id, form.tipo_veiculo);
-    setForm({
-      ...form,
-      servico_id: id,
-      hora_inicio: "",
-      ...calculo,
-    });
+    setForm({ ...form, servico_id: id, hora_inicio: "", ...calculo });
     setSlots([]);
   }
 
@@ -396,21 +384,12 @@ export function Agenda() {
     const veiculo = veiculos.find((item) => item.id === Number(id));
     const tipo = veiculo?.tipo_veiculo ?? "";
     const calculo = calcularPreco(form.servico_id, id, tipo);
-    setForm({
-      ...form,
-      veiculo_id: id,
-      tipo_veiculo: tipo,
-      ...calculo,
-    });
+    setForm({ ...form, veiculo_id: id, tipo_veiculo: tipo, ...calculo });
   }
 
   function selecionarTipoVeiculo(tipo: TipoVeiculo | "") {
     const calculo = calcularPreco(form.servico_id, form.veiculo_id, tipo);
-    setForm({
-      ...form,
-      tipo_veiculo: tipo,
-      ...calculo,
-    });
+    setForm({ ...form, tipo_veiculo: tipo, ...calculo });
   }
 
   async function consultarDisponibilidade() {
@@ -428,7 +407,6 @@ export function Agenda() {
           data: form.data,
           servico_id: form.servico_id,
           funcionario_id: form.funcionario_id,
-          intervalo_minutos: 30,
         })}`,
       );
       const horarioAtualPodeContinuar =
@@ -438,13 +416,7 @@ export function Agenda() {
         Number(form.funcionario_id) === editando.funcionario_id;
 
       const opcoes = horarioAtualPodeContinuar
-        ? [
-            {
-              hora_inicio: editando.hora_inicio,
-              hora_fim: editando.hora_fim,
-            },
-            ...data,
-          ]
+        ? [{ hora_inicio: editando.hora_inicio, hora_fim: editando.hora_fim }, ...data]
         : data;
 
       const slotsUnicos = Array.from(
@@ -459,9 +431,7 @@ export function Agenda() {
       setSlots(slotsUnicos);
 
       if (slotsUnicos.length === 0) {
-        setAvisoDisponibilidade(
-          "Não há horários disponíveis para atendimento.",
-        );
+        setAvisoDisponibilidade("Não há horários disponíveis para atendimento.");
       }
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível consultar a disponibilidade.");
@@ -485,9 +455,7 @@ export function Agenda() {
     }
 
     if (!form.hora_inicio || !slotSelecionado) {
-      setErro(
-        "Clique em “Buscar horários disponíveis” e selecione um horário antes de salvar.",
-      );
+      setErro("Clique em “Buscar horários disponíveis” e selecione um horário antes de salvar.");
       return;
     }
 
@@ -511,7 +479,7 @@ export function Agenda() {
           method: "PATCH",
           body: JSON.stringify(common),
         });
-        setSucesso("Agendamento atualizado.");
+        showAppToast("Agendamento atualizado com sucesso.");
       } else {
         await apiRequest<Agendamento>("/agendamentos", {
           method: "POST",
@@ -521,7 +489,7 @@ export function Agenda() {
             ...common,
           }),
         });
-        setSucesso("Agendamento criado.");
+        showAppToast("Agendamento criado com sucesso.");
       }
 
       fecharModal();
@@ -540,26 +508,42 @@ export function Agenda() {
         method: "PATCH",
         body: JSON.stringify({ status }),
       });
-      setSucesso(`Agendamento alterado para ${status.toLowerCase().replaceAll("_", " ")}.`);
+      showAppToast(
+        mensagensStatus[status] ?? "Status do agendamento atualizado com sucesso.",
+      );
       await carregarAgenda();
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível alterar o agendamento.");
     }
   }
 
-  async function cancelar(item: Agendamento) {
-    const confirmado = window.confirm(
-      `Cancelar o agendamento de ${clienteNome(item.cliente_id)}?\n\n` +
-        "O horário será liberado e o registro continuará salvo no Histórico.",
-    );
+  function solicitarCancelamento(item: Agendamento) {
+    setErro("");
+    setCancelamento(item);
+  }
 
-    if (!confirmado) return;
+  function fecharCancelamento() {
+    if (cancelando) return;
+    setCancelamento(null);
+    setErro("");
+  }
+
+  async function confirmarCancelamento() {
+    if (!cancelamento) return;
+
+    setCancelando(true);
+    setErro("");
     try {
-      await apiRequest<void>(`/agendamentos/${item.id}`, { method: "DELETE" });
-      setSucesso("Agendamento cancelado.");
+      await apiRequest<void>(`/agendamentos/${cancelamento.id}`, {
+        method: "DELETE",
+      });
+      setCancelamento(null);
+      showAppToast("Agendamento cancelado com sucesso.");
       await carregarAgenda();
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível cancelar o agendamento.");
+    } finally {
+      setCancelando(false);
     }
   }
 
@@ -599,8 +583,7 @@ export function Agenda() {
         </div>
       )}
 
-      {sucesso && <Alert type="success">{sucesso}</Alert>}
-      {erro && !modalAberto && <Alert>{erro}</Alert>}
+      {erro && !modalAberto && !cancelamento && <Alert>{erro}</Alert>}
 
       <section className="content-card">
         <div className="agenda-tabs" role="tablist" aria-label="Visualização dos agendamentos">
@@ -764,11 +747,7 @@ export function Agenda() {
 
         {carregando ? (
           <LoadingState
-            label={
-              modo === "agenda"
-                ? "Carregando agenda..."
-                : "Carregando histórico..."
-            }
+            label={modo === "agenda" ? "Carregando agenda..." : "Carregando histórico..."}
           />
         ) : ordenados.length === 0 ? (
           <EmptyState
@@ -806,9 +785,8 @@ export function Agenda() {
                   className="timeline-marker"
                   style={{
                     background:
-                      servicos.find(
-                        (servico) => servico.id === item.servico_id,
-                      )?.cor_agenda ?? "#3157D5",
+                      servicos.find((servico) => servico.id === item.servico_id)
+                        ?.cor_agenda ?? "#3157D5",
                   }}
                 />
 
@@ -817,8 +795,7 @@ export function Agenda() {
                     <div>
                       <h3>{clienteNome(item.cliente_id)}</h3>
                       <p>
-                        {servicoNome(item.servico_id)} ·{" "}
-                        {veiculoNome(item.veiculo_id)}
+                        {servicoNome(item.servico_id)} · {veiculoNome(item.veiculo_id)}
                       </p>
                     </div>
                     <StatusBadge value={item.status} />
@@ -826,8 +803,7 @@ export function Agenda() {
 
                   <div className="timeline-footer">
                     <span>
-                      <Icon name="team" size={15} />{" "}
-                      {usuarioNome(item.funcionario_id)}
+                      <Icon name="team" size={15} /> {usuarioNome(item.funcionario_id)}
                     </span>
                     <div className="timeline-price">
                       <strong>{formatCurrency(item.valor_final)}</strong>
@@ -842,9 +818,7 @@ export function Agenda() {
                       {modo === "agenda" && item.status === "PENDENTE" && (
                         <button
                           className="small-action success"
-                          onClick={() =>
-                            void mudarStatus(item, "CONFIRMADO")
-                          }
+                          onClick={() => void mudarStatus(item, "CONFIRMADO")}
                         >
                           Confirmar
                         </button>
@@ -853,9 +827,7 @@ export function Agenda() {
                       {modo === "agenda" && item.status === "CONFIRMADO" && (
                         <button
                           className="small-action"
-                          onClick={() =>
-                            void mudarStatus(item, "EM_ANDAMENTO")
-                          }
+                          onClick={() => void mudarStatus(item, "EM_ANDAMENTO")}
                         >
                           Iniciar
                         </button>
@@ -864,9 +836,7 @@ export function Agenda() {
                       {modo === "agenda" && item.status === "EM_ANDAMENTO" && (
                         <button
                           className="small-action success"
-                          onClick={() =>
-                            void mudarStatus(item, "FINALIZADO")
-                          }
+                          onClick={() => void mudarStatus(item, "FINALIZADO")}
                         >
                           Finalizar
                         </button>
@@ -886,7 +856,7 @@ export function Agenda() {
                           <button
                             className="icon-button danger"
                             type="button"
-                            onClick={() => void cancelar(item)}
+                            onClick={() => solicitarCancelamento(item)}
                             title="Cancelar agendamento"
                           >
                             <Icon name="close" size={17} />
@@ -966,11 +936,7 @@ export function Agenda() {
                 Tipo do veículo para este atendimento
                 <select
                   value={tipoVeiculoEfetivo ?? ""}
-                  onChange={(event) =>
-                    selecionarTipoVeiculo(
-                      event.target.value as TipoVeiculo | "",
-                    )
-                  }
+                  onChange={(event) => selecionarTipoVeiculo(event.target.value as TipoVeiculo | "")}
                   disabled={Boolean(veiculoSelecionado?.tipo_veiculo)}
                   required
                 >
@@ -983,9 +949,7 @@ export function Agenda() {
                 </select>
                 <small>
                   {veiculoSelecionado?.tipo_veiculo
-                    ? `Tipo identificado no cadastro: ${tipoVeiculoLabel(
-                        veiculoSelecionado.tipo_veiculo,
-                      )}.`
+                    ? `Tipo identificado no cadastro: ${tipoVeiculoLabel(veiculoSelecionado.tipo_veiculo)}.`
                     : "Obrigatório para calcular o adicional deste serviço."}
                 </small>
               </label>
@@ -995,11 +959,7 @@ export function Agenda() {
               <select
                 value={form.funcionario_id}
                 onChange={(event) => {
-                  setForm({
-                    ...form,
-                    funcionario_id: event.target.value,
-                    hora_inicio: "",
-                  });
+                  setForm({ ...form, funcionario_id: event.target.value, hora_inicio: "" });
                   setSlots([]);
                 }}
                 required
@@ -1014,11 +974,7 @@ export function Agenda() {
                 type="date"
                 value={form.data}
                 onChange={(event) => {
-                  setForm({
-                    ...form,
-                    data: event.target.value,
-                    hora_inicio: "",
-                  });
+                  setForm({ ...form, data: event.target.value, hora_inicio: "" });
                   setSlots([]);
                 }}
                 required
@@ -1026,7 +982,6 @@ export function Agenda() {
             </label>
             <div className="field field-span-2 schedule-picker">
               <span>Horário do agendamento</span>
-
               <button
                 className="button button-secondary schedule-search-button"
                 type="button"
@@ -1039,14 +994,9 @@ export function Agenda() {
                 }
               >
                 <Icon name="clock" size={17} />
-                {buscandoSlots
-                  ? "Buscando horários..."
-                  : "Buscar horários disponíveis"}
+                {buscandoSlots ? "Buscando horários..." : "Buscar horários disponíveis"}
               </button>
-
-              <small>
-                Escolha primeiro o serviço, o funcionário e a data.
-              </small>
+              <small>Escolha primeiro o serviço, o funcionário e a data.</small>
             </div>
 
             {slots.length > 0 && (
@@ -1055,17 +1005,8 @@ export function Agenda() {
                   <button
                     key={`${slot.hora_inicio}-${slot.hora_fim}`}
                     type="button"
-                    className={
-                      formatTime(slot.hora_inicio) === form.hora_inicio
-                        ? "slot-active"
-                        : ""
-                    }
-                    onClick={() =>
-                      setForm({
-                        ...form,
-                        hora_inicio: formatTime(slot.hora_inicio),
-                      })
-                    }
+                    className={formatTime(slot.hora_inicio) === form.hora_inicio ? "slot-active" : ""}
+                    onClick={() => setForm({ ...form, hora_inicio: formatTime(slot.hora_inicio) })}
                   >
                     {formatTime(slot.hora_inicio)}
                   </button>
@@ -1079,8 +1020,7 @@ export function Agenda() {
                 <div>
                   <span>Horário selecionado</span>
                   <strong>
-                    {formatTime(slotSelecionado.hora_inicio)} às{" "}
-                    {formatTime(slotSelecionado.hora_fim)}
+                    {formatTime(slotSelecionado.hora_inicio)} às {formatTime(slotSelecionado.hora_fim)}
                   </strong>
                 </div>
               </div>
@@ -1098,10 +1038,7 @@ export function Agenda() {
               </div>
               <div>
                 <span>
-                  Adicional
-                  {tipoVeiculoEfetivo
-                    ? ` — ${tipoVeiculoLabel(tipoVeiculoEfetivo)}`
-                    : ""}
+                  Adicional{tipoVeiculoEfetivo ? ` — ${tipoVeiculoLabel(tipoVeiculoEfetivo)}` : ""}
                 </span>
                 <strong>{form.valor_adicional ? formatCurrency(form.valor_adicional) : "—"}</strong>
               </div>
@@ -1134,6 +1071,22 @@ export function Agenda() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmationModal
+        open={Boolean(cancelamento)}
+        title="Cancelar agendamento"
+        heading={`Cancelar o agendamento de ${
+          cancelamento ? clienteNome(cancelamento.cliente_id) : "este cliente"
+        }?`}
+        description="O horário será liberado e o registro continuará disponível no Histórico."
+        confirmLabel="Cancelar agendamento"
+        onClose={fecharCancelamento}
+        onConfirm={() => void confirmarCancelamento()}
+        loading={cancelando}
+        error={erro}
+        tone="danger"
+        icon="calendar"
+      />
     </div>
   );
 }
