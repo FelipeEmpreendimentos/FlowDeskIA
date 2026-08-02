@@ -267,12 +267,20 @@ export function AppLayout() {
     );
   }
 
+  const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
+  const permissaoGestaoDaRota =
+    (routeSection === "financeiro" && Boolean(modulos.FINANCEIRO)) ||
+    (routeSection === "relatorios" && Boolean(modulos.RELATORIOS)) ||
+    (routeSection === "equipe" && Boolean(modulos.EQUIPE));
+  const usuarioDaTela: UsuarioLogado =
+    usuario.cargo === "FUNCIONARIO" && permissaoGestaoDaRota
+      ? { ...usuario, cargo: "GERENTE" }
+      : usuario;
   const context: AppOutletContext = {
-    usuario,
+    usuario: usuarioDaTela,
     modulos,
     atualizarUsuario,
   };
-  const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
   const roleClass = `role-${usuario.cargo.toLowerCase()}`;
   const routeClass = `route-${routeSection.replaceAll("_", "-")}`;
   const gruposDisponiveis = menuGroups
