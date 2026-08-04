@@ -13,6 +13,7 @@ export type ModuleCode =
 
 export interface CurrentAccess {
   modules: Record<ModuleCode, boolean>;
+  management: Record<ModuleCode, boolean>;
 }
 
 export interface CompanyModule {
@@ -29,7 +30,9 @@ export interface UserModulePermissions {
   role: CargoUsuario;
   active: boolean;
   permissions: Record<ModuleCode, boolean>;
+  management_permissions: Record<ModuleCode, boolean>;
   overrides: Partial<Record<ModuleCode, boolean>>;
+  management_overrides: Partial<Record<ModuleCode, boolean>>;
 }
 
 export interface AccessConfiguration {
