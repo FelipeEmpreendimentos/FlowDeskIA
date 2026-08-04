@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useOutletContext } from "react-router";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import {
@@ -10,6 +11,7 @@ import {
 } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
 import type {
+  AppOutletContext,
   Cliente,
   Conversa,
   Mensagem,
@@ -20,6 +22,7 @@ import type {
 import { formatDateTime } from "../utils/format";
 
 type VisualizacaoConversa = "ATUAIS" | "HISTORICO";
+type EscopoAtendimento = "MEUS" | "IA" | "GERAL";
 type FiltroAvaliacao = "TODAS" | "RESPONDIDA" | "PENDENTE" | "SEM_AVALIACAO";
 
 interface NovaConversaForm {
@@ -45,6 +48,7 @@ const finalizacaoVazia: FinalizacaoForm = {
 };
 
 export function Conversas() {
+  const { usuario } = useOutletContext<AppOutletContext>();
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -52,6 +56,8 @@ export function Conversas() {
   const [selecionada, setSelecionada] = useState<Conversa | null>(null);
   const [visualizacao, setVisualizacao] =
     useState<VisualizacaoConversa>("ATUAIS");
+  const [escopoAtendimento, setEscopoAtendimento] =
+    useState<EscopoAtendimento>("MEUS");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroAvaliacao, setFiltroAvaliacao] =
     useState<FiltroAvaliacao>("TODAS");
@@ -83,8 +89,7 @@ export function Conversas() {
         apiRequest<Conversa[]>(
           `/conversas${buildQuery({
             grupo,
-            status_conversa:
-              grupo === "ATUAIS" ? filtroStatus : undefined,
+            status_conversa: grupo === "ATUAIS" ? filtroStatus : undefined,
             limit: 100,
           })}`,
         ),
@@ -173,6 +178,15 @@ export function Conversas() {
     return () => window.clearTimeout(timer);
   }, [sucesso]);
 
+  const totaisAtendimento = useMemo(
+    () => ({
+      MEUS: conversas.filter((item) => item.responsavel_id === usuario.id).length,
+      IA: conversas.filter((item) => item.ia_ativa).length,
+      GERAL: conversas.length,
+    }),
+    [conversas, usuario.id],
+  );
+
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
@@ -191,7 +205,16 @@ export function Conversas() {
         String(conversa.id).includes(termo);
 
       if (!correspondeBusca) return false;
-      if (visualizacao !== "HISTORICO") return true;
+
+      if (visualizacao === "ATUAIS") {
+        if (escopoAtendimento === "MEUS") {
+          return conversa.responsavel_id === usuario.id;
+        }
+        if (escopoAtendimento === "IA") {
+          return conversa.ia_ativa;
+        }
+        return true;
+      }
 
       if (filtroAvaliacao === "RESPONDIDA") {
         return conversa.avaliacao_nota !== null;
@@ -208,10 +231,23 @@ export function Conversas() {
     busca,
     clientes,
     conversas,
+    escopoAtendimento,
     filtroAvaliacao,
+    usuario.id,
     usuarios,
     visualizacao,
   ]);
+
+  useEffect(() => {
+    if (carregando) return;
+    const proxima =
+      filtradas.find((item) => item.id === selecionada?.id) ??
+      filtradas[0] ??
+      null;
+    if (proxima?.id !== selecionada?.id) {
+      setSelecionada(proxima);
+    }
+  }, [carregando, filtradas, selecionada?.id]);
 
   const clienteNome = (id: number) =>
     clientes.find((item) => item.id === id)?.nome ?? `Cliente #${id}`;
@@ -253,6 +289,13 @@ export function Conversas() {
       setNovaConversa(novaConversaVazia);
       setSucesso("Conversa criada com sucesso.");
       setVisualizacao("ATUAIS");
+      setEscopoAtendimento(
+        criada.responsavel_id === usuario.id
+          ? "MEUS"
+          : criada.ia_ativa
+            ? "IA"
+            : "GERAL",
+      );
       await carregarConversas(criada.id, "ATUAIS");
     } catch (error) {
       setErro(
@@ -315,6 +358,11 @@ export function Conversas() {
       );
       setSelecionada(atualizada);
       setSucesso("Conversa atualizada com sucesso.");
+      if (atualizada.responsavel_id === usuario.id) {
+        setEscopoAtendimento("MEUS");
+      } else if (atualizada.ia_ativa) {
+        setEscopoAtendimento("IA");
+      }
       await carregarConversas(atualizada.id, "ATUAIS");
     } catch (error) {
       setErro(
@@ -388,6 +436,7 @@ export function Conversas() {
       setModalReabertura(false);
       setSucesso("Conversa reaberta e colocada em atendimento.");
       setVisualizacao("ATUAIS");
+      setEscopoAtendimento("MEUS");
       setFiltroStatus("EM_ATENDIMENTO");
       await carregarConversas(reaberta.id, "ATUAIS");
     } catch (error) {
@@ -459,7 +508,7 @@ export function Conversas() {
           }}
         >
           <Icon name="chat" size={17} />
-          Em atendimento
+          Atendimentos
         </button>
         <button
           className={visualizacao === "HISTORICO" ? "conversation-view-tab-active" : ""}
@@ -473,6 +522,30 @@ export function Conversas() {
           Histórico
         </button>
       </div>
+
+      {visualizacao === "ATUAIS" && (
+        <div className="conversation-scope-switch" aria-label="Tipo de atendimento">
+          {(
+            [
+              ["MEUS", "Meus", "team"],
+              ["IA", "IA", "bot"],
+              ["GERAL", "Geral", "chat"],
+            ] as const
+          ).map(([value, label, icon]) => (
+            <button
+              className={escopoAtendimento === value ? "active" : ""}
+              type="button"
+              key={value}
+              onClick={() => setEscopoAtendimento(value)}
+              aria-pressed={escopoAtendimento === value}
+            >
+              <Icon name={icon} size={16} />
+              <span>{label}</span>
+              <strong>{totaisAtendimento[value]}</strong>
+            </button>
+          ))}
+        </div>
+      )}
 
       <section className="conversation-shell">
         <aside className="conversation-list-panel">
@@ -517,12 +590,12 @@ export function Conversas() {
               icon={visualizacao === "ATUAIS" ? "chat" : "clock"}
               title={
                 visualizacao === "ATUAIS"
-                  ? "Nenhuma conversa atual"
+                  ? "Nenhuma conversa neste grupo"
                   : "Nenhuma conversa no histórico"
               }
               description={
                 visualizacao === "ATUAIS"
-                  ? "Conversas abertas e em atendimento aparecerão aqui."
+                  ? "Troque entre Meus, IA e Geral ou ajuste os filtros."
                   : "Conversas finalizadas serão organizadas nesta aba."
               }
             />
