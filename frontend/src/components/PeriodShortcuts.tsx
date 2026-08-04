@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { todayISO } from "../utils/format";
+
+type PeriodoRapido = "HOJE" | "SEMANA" | "MES";
 
 function deslocarData(dataIso: string, dias: number): string {
   const [ano, mes, dia] = dataIso.split("-").map(Number);
@@ -26,27 +29,36 @@ export function PeriodShortcuts({
   onChange: (dataInicio: string, dataFim: string) => void;
 }) {
   const hoje = todayISO();
+  const [selecionado, setSelecionado] = useState<PeriodoRapido>("MES");
+
+  function aplicar(periodo: PeriodoRapido, inicio: string, fim: string) {
+    setSelecionado(periodo);
+    onChange(inicio, fim);
+  }
 
   return (
     <div className="quick-period-filters" aria-label="Atalhos de período">
       <button
-        className="button button-ghost"
+        className={`button button-ghost ${selecionado === "HOJE" ? "quick-period-active" : ""}`}
         type="button"
-        onClick={() => onChange(hoje, hoje)}
+        onClick={() => aplicar("HOJE", hoje, hoje)}
+        aria-pressed={selecionado === "HOJE"}
       >
         Hoje
       </button>
       <button
-        className="button button-ghost"
+        className={`button button-ghost ${selecionado === "SEMANA" ? "quick-period-active" : ""}`}
         type="button"
-        onClick={() => onChange(primeiroDiaDaSemana(), hoje)}
+        onClick={() => aplicar("SEMANA", primeiroDiaDaSemana(), hoje)}
+        aria-pressed={selecionado === "SEMANA"}
       >
         Esta semana
       </button>
       <button
-        className="button button-ghost"
+        className={`button button-ghost ${selecionado === "MES" ? "quick-period-active" : ""}`}
         type="button"
-        onClick={() => onChange(primeiroDiaDoMes(), hoje)}
+        onClick={() => aplicar("MES", primeiroDiaDoMes(), hoje)}
+        aria-pressed={selecionado === "MES"}
       >
         Este mês
       </button>
