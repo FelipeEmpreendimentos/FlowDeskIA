@@ -34,13 +34,48 @@ const opcoes: Array<{
   descricao: string;
   icon: "calendar" | "finance" | "chat" | "check" | "settings" | "lock" | "bell";
 }> = [
-  { chave: "agendamentos", titulo: "Agendamentos", descricao: "Criações, alterações, cancelamentos e atendimentos atribuídos.", icon: "calendar" },
-  { chave: "financeiro", titulo: "Financeiro", descricao: "Pagamentos pendentes, recebimentos e ajustes importantes.", icon: "finance" },
-  { chave: "conversas", titulo: "Conversas", descricao: "Clientes aguardando, transferências e novas mensagens.", icon: "chat" },
-  { chave: "avaliacoes", titulo: "Avaliações", descricao: "Novas avaliações e alertas de notas baixas.", icon: "check" },
-  { chave: "integracoes", titulo: "Integrações", descricao: "Falhas ou desconexões do WhatsApp e outros canais.", icon: "settings" },
-  { chave: "planos_limites", titulo: "Plano e limites", descricao: "Consumo próximo do limite, teste e assinatura.", icon: "lock" },
-  { chave: "sistema", titulo: "Sistema", descricao: "Avisos gerais de segurança e operação.", icon: "bell" },
+  {
+    chave: "agendamentos",
+    titulo: "Agendamentos",
+    descricao: "Criações, alterações, cancelamentos e atendimentos atribuídos.",
+    icon: "calendar",
+  },
+  {
+    chave: "financeiro",
+    titulo: "Financeiro",
+    descricao: "Pagamentos pendentes, recebimentos e ajustes importantes.",
+    icon: "finance",
+  },
+  {
+    chave: "conversas",
+    titulo: "Conversas",
+    descricao: "Clientes aguardando, transferências e novas mensagens.",
+    icon: "chat",
+  },
+  {
+    chave: "avaliacoes",
+    titulo: "Avaliações",
+    descricao: "Novas avaliações e alertas de notas baixas.",
+    icon: "check",
+  },
+  {
+    chave: "integracoes",
+    titulo: "Integrações",
+    descricao: "Falhas ou desconexões do WhatsApp e outros canais.",
+    icon: "settings",
+  },
+  {
+    chave: "planos_limites",
+    titulo: "Plano e limites",
+    descricao: "Consumo próximo do limite, teste e assinatura.",
+    icon: "lock",
+  },
+  {
+    chave: "sistema",
+    titulo: "Sistema",
+    descricao: "Avisos gerais de segurança e operação.",
+    icon: "bell",
+  },
 ];
 
 export function Notificacoes() {
@@ -50,6 +85,10 @@ export function Notificacoes() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
+
+  const todasDesativadas = preferencias
+    ? opcoes.every((item) => !preferencias[item.chave])
+    : true;
 
   async function carregar() {
     setCarregando(true);
@@ -94,7 +133,11 @@ export function Notificacoes() {
         ),
       );
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível marcar a notificação.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível marcar a notificação.",
+      );
     }
   }
 
@@ -103,10 +146,45 @@ export function Notificacoes() {
       await apiRequest<{ mensagem: string }>("/notificacoes/marcar-todas-lidas", {
         method: "PATCH",
       });
-      setNotificacoes((atuais) => atuais.map((item) => ({ ...item, lida: true })));
+      setNotificacoes((atuais) =>
+        atuais.map((item) => ({ ...item, lida: true })),
+      );
       setSucesso("Todas as notificações foram marcadas como lidas.");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível atualizar as notificações.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar as notificações.",
+      );
+    }
+  }
+
+  async function atualizarPreferencias(payload: Record<ChavePreferencia, boolean>) {
+    return apiRequest<Preferencias>("/preferencias-notificacoes", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async function desativarTodas() {
+    if (!preferencias || todasDesativadas) return;
+
+    setSalvando(true);
+    setErro("");
+    try {
+      const payload = Object.fromEntries(
+        opcoes.map((item) => [item.chave, false]),
+      ) as Record<ChavePreferencia, boolean>;
+      setPreferencias(await atualizarPreferencias(payload));
+      setSucesso("Todas as categorias de notificação foram desativadas.");
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível desativar as notificações.",
+      );
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -118,16 +196,15 @@ export function Notificacoes() {
     try {
       const payload = Object.fromEntries(
         opcoes.map((item) => [item.chave, preferencias[item.chave]]),
-      );
-      setPreferencias(
-        await apiRequest<Preferencias>("/preferencias-notificacoes", {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        }),
-      );
+      ) as Record<ChavePreferencia, boolean>;
+      setPreferencias(await atualizarPreferencias(payload));
       setSucesso("Preferências salvas com sucesso.");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível salvar as preferências.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar as preferências.",
+      );
     } finally {
       setSalvando(false);
     }
@@ -207,11 +284,20 @@ export function Notificacoes() {
           </section>
 
           <aside className="content-card notification-preferences-card">
-            <div className="card-heading">
+            <div className="card-heading notification-preferences-heading">
               <div>
                 <span>Preferências pessoais</span>
                 <h2>O que deseja receber</h2>
               </div>
+              <button
+                className="button button-small button-secondary notification-disable-all"
+                type="button"
+                onClick={() => void desativarTodas()}
+                disabled={salvando || todasDesativadas}
+              >
+                <Icon name="bell" size={15} />
+                {todasDesativadas ? "Tudo desativado" : "Desativar todas"}
+              </button>
             </div>
             {preferencias && (
               <form onSubmit={salvarPreferencias}>
@@ -229,6 +315,7 @@ export function Notificacoes() {
                         <input
                           type="checkbox"
                           checked={preferencias[item.chave]}
+                          disabled={salvando}
                           onChange={(event) =>
                             setPreferencias({
                               ...preferencias,
@@ -242,7 +329,11 @@ export function Notificacoes() {
                   ))}
                 </div>
                 <div className="form-footer">
-                  <button className="button button-primary" type="submit" disabled={salvando}>
+                  <button
+                    className="button button-primary"
+                    type="submit"
+                    disabled={salvando}
+                  >
                     {salvando ? "Salvando..." : "Salvar preferências"}
                   </button>
                 </div>
