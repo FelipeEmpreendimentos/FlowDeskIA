@@ -12,7 +12,7 @@ from app.database.database import get_db
 from app.models.enums import CargoUsuario
 from app.models.models import Empresa, Usuario
 from app.models.platform import EmpresaPlataforma
-from app.services.access_control import user_module_access
+from app.services.access_control import user_module_access, user_module_manage
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -23,6 +23,8 @@ ROLE_PERMISSION_PATHS = {
     "/api/v1/horarios": "EQUIPE",
     "/api/v1/bloqueios-agenda": "EQUIPE",
 }
+
+READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 def _module_for_request(request: Request) -> str | None:
@@ -100,9 +102,9 @@ def get_current_user(
     if (
         module
         and user.cargo == CargoUsuario.FUNCIONARIO
-        and user_module_access(db, user, module)
+        and user_module_manage(db, user, module)
     ):
-        # Elevação apenas durante a requisição e sem marcar o cargo como alterado no banco.
+        # Elevação apenas durante a requisição para operações autorizadas.
         set_committed_value(user, "cargo", CargoUsuario.GERENTE)
 
     return user
@@ -120,8 +122,13 @@ def require_roles(
             return current_user
 
         module = _module_for_request(request)
-        if module and user_module_access(db, current_user, module):
-            return current_user
+        if module:
+            if request.method in READ_METHODS and user_module_access(
+                db, current_user, module
+            ):
+                return current_user
+            if user_module_manage(db, current_user, module):
+                return current_user
 
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
@@ -136,10 +143,17 @@ def require_roles_or_module(
     *roles: CargoUsuario,
 ) -> Callable[[Usuario], Usuario]:
     def dependency(
+        request: Request,
         current_user: Usuario = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> Usuario:
-        if current_user.cargo in roles or user_module_access(db, current_user, module):
+        if current_user.cargo in roles:
+            return current_user
+        if request.method in READ_METHODS and user_module_access(
+            db, current_user, module
+        ):
+            return current_user
+        if user_module_manage(db, current_user, module):
             return current_user
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
