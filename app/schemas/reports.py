@@ -19,6 +19,14 @@ class RelatorioResumoOut(BaseModel):
     clientes_recorrentes: int
 
 
+class RelatorioEvolucaoItem(BaseModel):
+    data: date
+    atendimentos: int
+    faturamento: Decimal
+    recebido: Decimal
+    pendente: Decimal
+
+
 class RelatorioServicoItem(BaseModel):
     servico_id: int
     servico_nome: str
