@@ -19,8 +19,7 @@ from app.schemas.access_control import (
 )
 from app.services.access_control import (
     MODULES,
-    company_module_enabled,
-    default_access,
+    effective_management_permissions,
     effective_permissions,
     validate_module,
 )
@@ -42,12 +41,48 @@ def _company_user(db: Session, empresa_id: int, user_id: int) -> Usuario:
     return user
 
 
+def _user_permissions_out(
+    db: Session,
+    user: Usuario,
+) -> UserModulePermissionsOut:
+    rows = list(
+        db.scalars(
+            select(UsuarioPermissaoModulo).where(
+                UsuarioPermissaoModulo.empresa_id == user.empresa_id,
+                UsuarioPermissaoModulo.usuario_id == user.id,
+            )
+        )
+    )
+    return UserModulePermissionsOut(
+        user_id=user.id,
+        name=user.nome,
+        email=user.email,
+        role=user.cargo,
+        active=user.ativo,
+        permissions=effective_permissions(db, user),
+        management_permissions=effective_management_permissions(db, user),
+        overrides={
+            item.modulo: item.permitido
+            for item in rows
+            if item.permitido is not None
+        },
+        management_overrides={
+            item.modulo: item.pode_gerenciar
+            for item in rows
+            if item.pode_gerenciar is not None
+        },
+    )
+
+
 @router.get("/me", response_model=CurrentAccessOut)
 def current_access(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CurrentAccessOut:
-    return CurrentAccessOut(modules=effective_permissions(db, current_user))
+    return CurrentAccessOut(
+        modules=effective_permissions(db, current_user),
+        management=effective_management_permissions(db, current_user),
+    )
 
 
 @router.get("/configuracao", response_model=AccessConfigurationOut)
@@ -63,17 +98,6 @@ def access_configuration(
             )
         )
     }
-    override_rows = list(
-        db.scalars(
-            select(UsuarioPermissaoModulo).where(
-                UsuarioPermissaoModulo.empresa_id == current_user.empresa_id
-            )
-        )
-    )
-    overrides_by_user: dict[int, dict[str, bool]] = {}
-    for row in override_rows:
-        overrides_by_user.setdefault(row.usuario_id, {})[row.modulo] = row.permitido
-
     users = list(
         db.scalars(
             select(Usuario)
@@ -96,18 +120,7 @@ def access_configuration(
             )
             for definition in MODULES
         ],
-        users=[
-            UserModulePermissionsOut(
-                user_id=user.id,
-                name=user.nome,
-                email=user.email,
-                role=user.cargo,
-                active=user.ativo,
-                permissions=effective_permissions(db, user),
-                overrides=overrides_by_user.get(user.id, {}),
-            )
-            for user in users
-        ],
+        users=[_user_permissions_out(db, user) for user in users],
     )
 
 
@@ -134,6 +147,7 @@ def update_company_module(
             ativo=data.enabled,
         )
         db.add(row)
+        db.flush()
     else:
         row.ativo = data.enabled
         row.updated_at = datetime.now(timezone.utc)
@@ -168,6 +182,13 @@ def update_user_module_permission(
     db: Session = Depends(get_db),
 ) -> UserModulePermissionsOut:
     module = validate_module(module)
+    fields = data.model_fields_set
+    if not fields.intersection({"view_allowed", "manage_allowed"}):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Informe a permissão de visualização ou gerenciamento.",
+        )
+
     user = _company_user(db, current_user.empresa_id, user_id)
     row = db.scalar(
         select(UsuarioPermissaoModulo).where(
@@ -177,52 +198,50 @@ def update_user_module_permission(
         )
     )
 
-    previous = row.permitido if row is not None else None
-    if data.allowed is None:
-        if row is not None:
-            db.delete(row)
-    elif row is None:
+    previous_view = row.permitido if row is not None else None
+    previous_manage = row.pode_gerenciar if row is not None else None
+
+    if row is None:
         row = UsuarioPermissaoModulo(
             empresa_id=current_user.empresa_id,
             usuario_id=user.id,
             modulo=module,
-            permitido=data.allowed,
+            permitido=data.view_allowed if "view_allowed" in fields else None,
+            pode_gerenciar=(
+                data.manage_allowed if "manage_allowed" in fields else None
+            ),
         )
         db.add(row)
+        db.flush()
     else:
-        row.permitido = data.allowed
+        if "view_allowed" in fields:
+            row.permitido = data.view_allowed
+        if "manage_allowed" in fields:
+            row.pode_gerenciar = data.manage_allowed
         row.updated_at = datetime.now(timezone.utc)
+
+    row_id = row.id
+    if row.permitido is None and row.pode_gerenciar is None:
+        db.delete(row)
 
     add_audit_log(
         db,
         user=current_user,
         action="ATUALIZOU_PERMISSAO_MODULO",
         entity="usuario_permissoes_modulo",
-        entity_id=row.id if row is not None else None,
+        entity_id=row_id,
         details={
             "usuario_id": user.id,
             "modulo": module,
-            "anterior": previous,
-            "novo": data.allowed,
+            "visualizacao_anterior": previous_view,
+            "visualizacao_nova": (
+                data.view_allowed if "view_allowed" in fields else previous_view
+            ),
+            "gerenciamento_anterior": previous_manage,
+            "gerenciamento_novo": (
+                data.manage_allowed if "manage_allowed" in fields else previous_manage
+            ),
         },
     )
     db.commit()
-
-    current_overrides = {
-        item.modulo: item.permitido
-        for item in db.scalars(
-            select(UsuarioPermissaoModulo).where(
-                UsuarioPermissaoModulo.empresa_id == current_user.empresa_id,
-                UsuarioPermissaoModulo.usuario_id == user.id,
-            )
-        )
-    }
-    return UserModulePermissionsOut(
-        user_id=user.id,
-        name=user.nome,
-        email=user.email,
-        role=user.cargo,
-        active=user.ativo,
-        permissions=effective_permissions(db, user),
-        overrides=current_overrides,
-    )
+    return _user_permissions_out(db, user)
