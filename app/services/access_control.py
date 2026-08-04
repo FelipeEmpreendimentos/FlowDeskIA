@@ -56,6 +56,11 @@ def default_access(cargo: CargoUsuario, module: str) -> bool:
     return module in EMPLOYEE_DEFAULTS
 
 
+def default_manage(cargo: CargoUsuario, module: str) -> bool:
+    del module
+    return cargo in {CargoUsuario.ADMIN, CargoUsuario.GERENTE}
+
+
 def company_module_enabled(db: Session, empresa_id: int, module: str) -> bool:
     module = validate_module(module)
     try:
@@ -71,13 +76,13 @@ def company_module_enabled(db: Session, empresa_id: int, module: str) -> bool:
     return True if row is None else row.ativo
 
 
-def user_module_access(db: Session, user: Usuario, module: str) -> bool:
-    module = validate_module(module)
-    if not company_module_enabled(db, user.empresa_id, module):
-        return False
-
+def _user_override(
+    db: Session,
+    user: Usuario,
+    module: str,
+) -> UsuarioPermissaoModulo | None:
     try:
-        override = db.scalar(
+        return db.scalar(
             select(UsuarioPermissaoModulo).where(
                 UsuarioPermissaoModulo.empresa_id == user.empresa_id,
                 UsuarioPermissaoModulo.usuario_id == user.id,
@@ -86,15 +91,37 @@ def user_module_access(db: Session, user: Usuario, module: str) -> bool:
         )
     except ProgrammingError:
         db.rollback()
-        override = None
+        return None
 
-    if override is not None:
+
+def user_module_access(db: Session, user: Usuario, module: str) -> bool:
+    module = validate_module(module)
+    if not company_module_enabled(db, user.empresa_id, module):
+        return False
+
+    override = _user_override(db, user, module)
+    if override is not None and override.permitido is not None:
         return override.permitido
     return default_access(user.cargo, module)
 
 
+def user_module_manage(db: Session, user: Usuario, module: str) -> bool:
+    module = validate_module(module)
+    if not user_module_access(db, user, module):
+        return False
+
+    override = _user_override(db, user, module)
+    if override is not None and override.pode_gerenciar is not None:
+        return override.pode_gerenciar
+    return default_manage(user.cargo, module)
+
+
 def effective_permissions(db: Session, user: Usuario) -> dict[str, bool]:
     return {item.code: user_module_access(db, user, item.code) for item in MODULES}
+
+
+def effective_management_permissions(db: Session, user: Usuario) -> dict[str, bool]:
+    return {item.code: user_module_manage(db, user, item.code) for item in MODULES}
 
 
 def require_module_access(db: Session, user: Usuario, module: str) -> None:
@@ -102,4 +129,12 @@ def require_module_access(db: Session, user: Usuario, module: str) -> None:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "Este módulo está desativado ou não foi liberado para o seu usuário.",
+        )
+
+
+def require_module_manage(db: Session, user: Usuario, module: str) -> None:
+    if not user_module_manage(db, user, module):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Você pode visualizar este módulo, mas não possui permissão para gerenciá-lo.",
         )
