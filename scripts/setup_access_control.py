@@ -30,10 +30,16 @@ CREATE TABLE IF NOT EXISTS usuario_permissoes_modulo (
     empresa_id BIGINT NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
     usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     modulo VARCHAR(40) NOT NULL,
-    permitido BOOLEAN NOT NULL,
+    permitido BOOLEAN,
+    pode_gerenciar BOOLEAN,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_usuario_permissao_modulo UNIQUE (usuario_id, modulo)
 );
+
+ALTER TABLE usuario_permissoes_modulo
+    ALTER COLUMN permitido DROP NOT NULL;
+ALTER TABLE usuario_permissoes_modulo
+    ADD COLUMN IF NOT EXISTS pode_gerenciar BOOLEAN;
 
 CREATE INDEX IF NOT EXISTS idx_empresa_modulos_empresa
     ON empresa_modulos (empresa_id, modulo);
