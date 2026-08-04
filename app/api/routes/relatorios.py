@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import case, func, select
@@ -12,6 +12,7 @@ from app.models.models import Agendamento, Cliente, Conversa, Servico, Usuario
 from app.schemas.reports import (
     AvaliacaoComentarioItem,
     RelatorioAvaliacoesOut,
+    RelatorioEvolucaoItem,
     RelatorioFuncionarioItem,
     RelatorioResumoOut,
     RelatorioServicoItem,
@@ -122,6 +123,68 @@ def resumo(
         clientes_novos=int(clientes_novos),
         clientes_recorrentes=int(clientes_recorrentes),
     )
+
+
+@router.get("/evolucao", response_model=list[RelatorioEvolucaoItem])
+def relatorio_evolucao(
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
+    db: Session = Depends(get_db),
+) -> list[RelatorioEvolucaoItem]:
+    inicio, fim = _periodo(data_inicio, data_fim)
+    rows = db.execute(
+        select(
+            Agendamento.data,
+            func.count(FechamentoFinanceiro.id),
+            func.coalesce(func.sum(FechamentoFinanceiro.valor_final), 0),
+            func.coalesce(func.sum(FechamentoFinanceiro.valor_recebido), 0),
+            func.coalesce(func.sum(FechamentoFinanceiro.valor_pendente), 0),
+        )
+        .join(
+            FechamentoFinanceiro,
+            FechamentoFinanceiro.agendamento_id == Agendamento.id,
+        )
+        .where(
+            Agendamento.empresa_id == current_user.empresa_id,
+            Agendamento.data >= inicio,
+            Agendamento.data <= fim,
+            FechamentoFinanceiro.status != "ESTORNADO",
+        )
+        .group_by(Agendamento.data)
+        .order_by(Agendamento.data)
+    ).all()
+
+    por_data = {
+        row[0]: RelatorioEvolucaoItem(
+            data=row[0],
+            atendimentos=int(row[1] or 0),
+            faturamento=dinheiro(row[2]),
+            recebido=dinheiro(row[3]),
+            pendente=dinheiro(row[4]),
+        )
+        for row in rows
+    }
+
+    resultado: list[RelatorioEvolucaoItem] = []
+    cursor = inicio
+    while cursor <= fim:
+        resultado.append(
+            por_data.get(
+                cursor,
+                RelatorioEvolucaoItem(
+                    data=cursor,
+                    atendimentos=0,
+                    faturamento=dinheiro(0),
+                    recebido=dinheiro(0),
+                    pendente=dinheiro(0),
+                ),
+            )
+        )
+        cursor += timedelta(days=1)
+    return resultado
 
 
 @router.get("/servicos", response_model=list[RelatorioServicoItem])
