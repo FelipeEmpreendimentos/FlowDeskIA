@@ -25,11 +25,14 @@ function primeiroDiaDoMes(): string {
 
 export function PeriodShortcuts({
   onChange,
+  initialPeriod = "MES",
 }: {
   onChange: (dataInicio: string, dataFim: string) => void;
+  initialPeriod?: PeriodoRapido;
 }) {
   const hoje = todayISO();
-  const [selecionado, setSelecionado] = useState<PeriodoRapido>("MES");
+  const [selecionado, setSelecionado] =
+    useState<PeriodoRapido>(initialPeriod);
 
   function aplicar(periodo: PeriodoRapido, inicio: string, fim: string) {
     setSelecionado(periodo);
