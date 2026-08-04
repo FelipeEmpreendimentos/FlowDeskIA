@@ -43,7 +43,8 @@ class UsuarioPermissaoModulo(Base):
         nullable=False,
     )
     modulo: Mapped[str] = mapped_column(String(40), nullable=False)
-    permitido: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    permitido: Mapped[bool | None] = mapped_column(Boolean)
+    pode_gerenciar: Mapped[bool | None] = mapped_column(Boolean)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("NOW()")
     )
