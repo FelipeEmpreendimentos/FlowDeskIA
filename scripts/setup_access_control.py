@@ -41,6 +41,11 @@ ALTER TABLE usuario_permissoes_modulo
 ALTER TABLE usuario_permissoes_modulo
     ADD COLUMN IF NOT EXISTS pode_gerenciar BOOLEAN;
 
+UPDATE usuario_permissoes_modulo
+SET pode_gerenciar = permitido
+WHERE pode_gerenciar IS NULL
+  AND permitido IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_empresa_modulos_empresa
     ON empresa_modulos (empresa_id, modulo);
 CREATE INDEX IF NOT EXISTS idx_usuario_permissoes_empresa
