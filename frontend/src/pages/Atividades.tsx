@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../components/Icon";
+import { PeriodShortcuts } from "../components/PeriodShortcuts";
 import { Alert, EmptyState, LoadingState, PageHeader } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
 import type { Usuario } from "../types";
@@ -18,14 +19,10 @@ interface Atividade {
   created_at: string;
 }
 
-function primeiroDiaDoMes() {
-  return `${todayISO().slice(0, 7)}-01`;
-}
-
 export function Atividades() {
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [dataInicio, setDataInicio] = useState(primeiroDiaDoMes());
+  const [dataInicio, setDataInicio] = useState(todayISO());
   const [dataFim, setDataFim] = useState(todayISO());
   const [usuarioId, setUsuarioId] = useState("");
   const [entidade, setEntidade] = useState("");
@@ -79,6 +76,11 @@ export function Atividades() {
     });
   }
 
+  function alterarPeriodo(inicio: string, fim: string) {
+    setDataInicio(inicio);
+    setDataFim(fim);
+  }
+
   return (
     <div className="page">
       <PageHeader
@@ -91,13 +93,16 @@ export function Atividades() {
 
       <section className="content-card activity-filter-card">
         <div className="activity-filters">
-          <label className="search-field activity-search">
-            <Icon name="search" size={18} />
-            <input
-              value={busca}
-              onChange={(event) => setBusca(event.target.value)}
-              placeholder="Buscar ação, usuário ou entidade"
-            />
+          <label className="field activity-search-field">
+            Buscar
+            <span className="search-field activity-search">
+              <Icon name="search" size={18} />
+              <input
+                value={busca}
+                onChange={(event) => setBusca(event.target.value)}
+                placeholder="Ação, usuário ou área"
+              />
+            </span>
           </label>
           <label className="field compact-field">
             Data inicial
@@ -142,6 +147,7 @@ export function Atividades() {
               <option value="conversas">Conversas</option>
             </select>
           </label>
+          <PeriodShortcuts onChange={alterarPeriodo} initialPeriod="HOJE" />
         </div>
       </section>
 
@@ -159,7 +165,15 @@ export function Atividades() {
             {atividades.map((item) => (
               <article className="activity-item" key={item.id}>
                 <span className="activity-icon">
-                  <Icon name={item.entidade?.includes("pagamento") || item.entidade?.includes("financeiro") ? "finance" : "clock"} size={18} />
+                  <Icon
+                    name={
+                      item.entidade?.includes("pagamento") ||
+                      item.entidade?.includes("financeiro")
+                        ? "finance"
+                        : "clock"
+                    }
+                    size={18}
+                  />
                 </span>
                 <div className="activity-copy">
                   <strong>{item.descricao}</strong>
