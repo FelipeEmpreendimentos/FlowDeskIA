@@ -14,6 +14,7 @@ class ModuleAccessOut(BaseModel):
 
 class CurrentAccessOut(BaseModel):
     modules: dict[str, bool]
+    management: dict[str, bool]
 
 
 class CompanyModuleOut(BaseModel):
@@ -34,11 +35,14 @@ class UserModulePermissionsOut(BaseModel):
     role: CargoUsuario
     active: bool
     permissions: dict[str, bool]
+    management_permissions: dict[str, bool]
     overrides: dict[str, bool]
+    management_overrides: dict[str, bool]
 
 
 class UserModulePermissionUpdate(BaseModel):
-    allowed: bool | None
+    view_allowed: bool | None = None
+    manage_allowed: bool | None = None
 
 
 class AccessConfigurationOut(BaseModel):
