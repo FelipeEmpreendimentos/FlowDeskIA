@@ -15,6 +15,7 @@ import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
 import { Equipe } from "./pages/Equipe";
 import { Financeiro } from "./pages/Financeiro";
+import { HistoricoConversas } from "./pages/HistoricoConversas";
 import { Login } from "./pages/Login";
 import { Notificacoes } from "./pages/Notificacoes";
 import { PlanoConsumo } from "./pages/PlanoConsumo";
@@ -73,6 +74,7 @@ function App() {
         <Route path="/veiculos" element={<Veiculos />} />
         <Route path="/servicos" element={<Servicos />} />
         <Route path="/conversas" element={<Conversas />} />
+        <Route path="/historico-conversas" element={<HistoricoConversas />} />
         <Route path="/equipe" element={<Equipe />} />
         <Route path="/configuracoes" element={<ConfiguracoesHub />} />
         <Route path="/configuracoes/dados" element={<Configuracoes />} />
