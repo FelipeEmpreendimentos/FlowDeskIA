@@ -14,12 +14,25 @@ import type {
 
 type Tab = "modules" | "permissions";
 type PermissionChoice = "DEFAULT" | "ALLOW" | "DENY";
+type PermissionLevel = "view" | "manage";
 
 const roleLabels = {
   ADMIN: "Administrador",
   GERENTE: "Gerente",
   FUNCIONARIO: "Funcionário",
 } as const;
+
+const moduleIcons: Partial<Record<ModuleCode, "finance" | "team" | "calendar" | "chat" | "users" | "car" | "services" | "dashboard">> = {
+  AGENDA: "calendar",
+  CHAT_INTERNO: "chat",
+  CONVERSAS: "chat",
+  CLIENTES: "users",
+  VEICULOS: "car",
+  SERVICOS: "services",
+  FINANCEIRO: "finance",
+  RELATORIOS: "dashboard",
+  EQUIPE: "team",
+};
 
 export function ConfiguracaoAcessos() {
   const { usuario, atualizarUsuario } = useOutletContext<AppOutletContext>();
@@ -94,27 +107,35 @@ export function ConfiguracaoAcessos() {
   function permissionChoice(
     user: UserModulePermissions,
     module: ModuleCode,
+    level: PermissionLevel,
   ): PermissionChoice {
-    if (!(module in user.overrides)) return "DEFAULT";
-    return user.overrides[module] ? "ALLOW" : "DENY";
+    const overrides =
+      level === "view" ? user.overrides : user.management_overrides;
+    if (!(module in overrides)) return "DEFAULT";
+    return overrides[module] ? "ALLOW" : "DENY";
   }
 
   async function updatePermission(
     user: UserModulePermissions,
     module: CompanyModule,
+    level: PermissionLevel,
     choice: PermissionChoice,
   ) {
-    const key = `permission-${user.user_id}-${module.code}`;
+    const key = `permission-${user.user_id}-${module.code}-${level}`;
     setSavingKey(key);
     setError("");
+    const value = choice === "DEFAULT" ? null : choice === "ALLOW";
+
     try {
       const updated = await apiRequest<UserModulePermissions>(
         `/acessos/usuarios/${user.user_id}/modulos/${module.code}`,
         {
           method: "PATCH",
-          body: JSON.stringify({
-            allowed: choice === "DEFAULT" ? null : choice === "ALLOW",
-          }),
+          body: JSON.stringify(
+            level === "view"
+              ? { view_allowed: value }
+              : { manage_allowed: value },
+          ),
         },
       );
       setConfiguration((current) =>
@@ -130,7 +151,9 @@ export function ConfiguracaoAcessos() {
       if (user.user_id === usuario.id) {
         await atualizarUsuario();
       }
-      showAppToast(`Permissão de ${user.name} atualizada.`);
+      showAppToast(
+        `${level === "view" ? "Visualização" : "Gerenciamento"} de ${module.name} atualizado para ${user.name}.`,
+      );
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -142,70 +165,90 @@ export function ConfiguracaoAcessos() {
     }
   }
 
+  function PermissionSelector({
+    user,
+    module,
+    level,
+  }: {
+    user: UserModulePermissions;
+    module: CompanyModule;
+    level: PermissionLevel;
+  }) {
+    const choice = permissionChoice(user, module.code, level);
+    const effective =
+      level === "view"
+        ? user.permissions[module.code]
+        : user.management_permissions[module.code];
+    const key = `permission-${user.user_id}-${module.code}-${level}`;
+
+    return (
+      <section className="access-level-control">
+        <div className="access-level-copy">
+          <strong>{level === "view" ? "Visualizar" : "Gerenciar"}</strong>
+          <small>
+            {level === "view"
+              ? "Permite abrir a área e consultar suas informações."
+              : "Permite executar ações administrativas e alterações do módulo."}
+          </small>
+        </div>
+        <div className="access-choice-group" role="group" aria-label={`${level === "view" ? "Visualização" : "Gerenciamento"} de ${module.name}`}>
+          {(
+            [
+              ["DEFAULT", "Padrão"],
+              ["ALLOW", "Liberar"],
+              ["DENY", "Bloquear"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              className={`${choice === value ? "active" : ""} choice-${value.toLowerCase()}`}
+              type="button"
+              key={value}
+              onClick={() => void updatePermission(user, module, level, value)}
+              disabled={!module.enabled || savingKey === key}
+              aria-pressed={choice === value}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className={`access-effective-state ${effective ? "allowed" : "blocked"}`}>
+          <Icon name={effective ? "check" : "lock"} size={13} />
+          {effective ? "Atualmente liberado" : "Atualmente bloqueado"}
+        </span>
+      </section>
+    );
+  }
+
   return (
     <div className="page access-settings-page">
       <PageHeader
         eyebrow="Personalização da empresa"
         title="Módulos e permissões"
-        description="Escolha quais áreas aparecem no sistema e libere acessos específicos para cada pessoa."
+        description="Escolha quais áreas aparecem no sistema e defina quem pode apenas visualizar ou também gerenciar."
       />
 
       {error && <Alert>{error}</Alert>}
 
       <div className="tabs access-settings-tabs" role="tablist">
-        <button
-          className={tab === "modules" ? "tab-active" : ""}
-          type="button"
-          onClick={() => setTab("modules")}
-        >
-          Módulos
-        </button>
-        <button
-          className={tab === "permissions" ? "tab-active" : ""}
-          type="button"
-          onClick={() => setTab("permissions")}
-        >
-          Permissões por usuário
-        </button>
+        <button className={tab === "modules" ? "tab-active" : ""} type="button" onClick={() => setTab("modules")}>Módulos</button>
+        <button className={tab === "permissions" ? "tab-active" : ""} type="button" onClick={() => setTab("permissions")}>Permissões por usuário</button>
       </div>
 
       {loading || !configuration ? (
-        <section className="content-card">
-          <LoadingState label="Carregando acessos..." />
-        </section>
+        <section className="content-card"><LoadingState label="Carregando acessos..." /></section>
       ) : tab === "modules" ? (
         <section className="content-card access-module-card">
-          <div className="card-heading">
-            <div>
-              <span>Menu da empresa</span>
-              <h2>Áreas ativas</h2>
-            </div>
-          </div>
+          <div className="card-heading"><div><span>Menu da empresa</span><h2>Áreas ativas</h2></div></div>
           <p className="access-settings-help">
-            Ao desativar um módulo, ele some do menu para todos e suas rotas ficam bloqueadas.
-            Os dados existentes não são apagados.
+            Ao desativar um módulo, ele some do menu para todos e suas rotas ficam bloqueadas. Os dados existentes não são apagados.
           </p>
           <div className="access-module-list">
             {configuration.modules.map((module) => (
               <article key={module.code}>
-                <span className="access-module-icon">
-                  <Icon
-                    name={module.code === "FINANCEIRO" ? "finance" : "settings"}
-                    size={19}
-                  />
-                </span>
-                <div>
-                  <strong>{module.name}</strong>
-                  <p>{module.description}</p>
-                </div>
+                <span className="access-module-icon"><Icon name={moduleIcons[module.code] ?? "settings"} size={19} /></span>
+                <div><strong>{module.name}</strong><p>{module.description}</p></div>
                 <label className="access-switch">
-                  <input
-                    type="checkbox"
-                    checked={module.enabled}
-                    onChange={() => void toggleModule(module)}
-                    disabled={savingKey === `module-${module.code}`}
-                    aria-label={`${module.enabled ? "Desativar" : "Ativar"} ${module.name}`}
-                  />
+                  <input type="checkbox" checked={module.enabled} onChange={() => void toggleModule(module)} disabled={savingKey === `module-${module.code}`} aria-label={`${module.enabled ? "Desativar" : "Ativar"} ${module.name}`} />
                   <span aria-hidden="true" />
                 </label>
               </article>
@@ -217,77 +260,39 @@ export function ConfiguracaoAcessos() {
           <div className="access-user-selector">
             <label className="field">
               Usuário
-              <select
-                value={selectedUserId ?? ""}
-                onChange={(event) => setSelectedUserId(Number(event.target.value))}
-              >
-                {configuration.users.map((user) => (
-                  <option key={user.user_id} value={user.user_id}>
-                    {user.name} — {roleLabels[user.role]}
-                  </option>
-                ))}
+              <select value={selectedUserId ?? ""} onChange={(event) => setSelectedUserId(Number(event.target.value))}>
+                {configuration.users.map((user) => <option key={user.user_id} value={user.user_id}>{user.name} — {roleLabels[user.role]}</option>)}
               </select>
             </label>
             {selectedUser && (
               <div className="access-selected-user">
                 <span>{selectedUser.name.charAt(0).toUpperCase()}</span>
-                <div>
-                  <strong>{selectedUser.name}</strong>
-                  <small>
-                    {selectedUser.email} · {roleLabels[selectedUser.role]}
-                  </small>
-                </div>
+                <div><strong>{selectedUser.name}</strong><small>{selectedUser.email} · {roleLabels[selectedUser.role]}</small></div>
               </div>
             )}
           </div>
 
           <p className="access-settings-help">
-            “Padrão do cargo” mantém o acesso normal. Use “Liberar” ou “Bloquear” somente
-            para exceções individuais.
+            O padrão do cargo continua sendo a base. Use as liberações individuais para pessoas de confiança. A permissão Gerenciar só tem efeito quando Visualizar também estiver liberado.
           </p>
 
           {selectedUser && (
-            <div className="access-permission-list">
-              {configuration.modules.map((module) => {
-                const choice = permissionChoice(selectedUser, module.code);
-                return (
-                  <article
-                    key={module.code}
-                    className={!module.enabled ? "disabled" : ""}
-                  >
+            <div className="access-permission-list access-permission-level-list">
+              {configuration.modules.map((module) => (
+                <article key={module.code} className={`access-permission-module ${!module.enabled ? "disabled" : ""}`}>
+                  <header>
+                    <span className="access-module-icon"><Icon name={moduleIcons[module.code] ?? "settings"} size={18} /></span>
                     <div>
                       <strong>{module.name}</strong>
-                      <small>
-                        {!module.enabled
-                          ? "Módulo desativado para a empresa"
-                          : selectedUser.permissions[module.code]
-                            ? "Acesso atual: liberado"
-                            : "Acesso atual: bloqueado"}
-                      </small>
+                      <small>{!module.enabled ? "Módulo desativado para a empresa" : module.description}</small>
                     </div>
-                    <select
-                      value={choice}
-                      onChange={(event) =>
-                        void updatePermission(
-                          selectedUser,
-                          module,
-                          event.target.value as PermissionChoice,
-                        )
-                      }
-                      disabled={
-                        !module.enabled ||
-                        savingKey ===
-                          `permission-${selectedUser.user_id}-${module.code}`
-                      }
-                      aria-label={`Permissão de ${selectedUser.name} para ${module.name}`}
-                    >
-                      <option value="DEFAULT">Padrão do cargo</option>
-                      <option value="ALLOW">Liberar</option>
-                      <option value="DENY">Bloquear</option>
-                    </select>
-                  </article>
-                );
-              })}
+                  </header>
+                  <div className="access-level-grid">
+                    <PermissionSelector user={selectedUser} module={module} level="view" />
+                    <PermissionSelector user={selectedUser} module={module} level="manage" />
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </section>
