@@ -62,6 +62,12 @@ const menuGroups: MenuGroup[] = [
         module: "CONVERSAS",
       },
       {
+        to: "/historico-conversas",
+        label: "Histórico",
+        icon: "clock",
+        module: "CONVERSAS",
+      },
+      {
         to: "/clientes",
         label: "Clientes",
         icon: "users",
