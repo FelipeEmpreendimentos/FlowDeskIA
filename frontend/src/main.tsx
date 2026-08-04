@@ -17,6 +17,7 @@ import "./super-admin.css";
 import "./super-admin-enhancements.css";
 import "./review-polish.css";
 import "./access-settings.css";
+import "./base-version-refinements.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
