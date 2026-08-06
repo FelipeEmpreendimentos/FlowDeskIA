@@ -19,6 +19,7 @@ from app.schemas.access_control import (
 )
 from app.services.access_control import (
     MODULES,
+    VIEW_ONLY_MODULES,
     effective_management_permissions,
     effective_permissions,
     validate_module,
@@ -70,6 +71,7 @@ def _user_permissions_out(
             item.modulo: item.pode_gerenciar
             for item in rows
             if item.pode_gerenciar is not None
+            and item.modulo not in VIEW_ONLY_MODULES
         },
     )
 
@@ -187,6 +189,11 @@ def update_user_module_permission(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "Informe a permissão de visualização ou gerenciamento.",
+        )
+    if module in VIEW_ONLY_MODULES and "manage_allowed" in fields:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Este módulo possui somente permissão de visualização.",
         )
 
     user = _company_user(db, current_user.empresa_id, user_id)
