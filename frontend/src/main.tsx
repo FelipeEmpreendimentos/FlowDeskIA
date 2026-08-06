@@ -19,6 +19,7 @@ import "./review-polish.css";
 import "./access-settings.css";
 import "./base-version-refinements.css";
 import "./fine-tuning.css";
+import "./final-visual-adjustments.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
