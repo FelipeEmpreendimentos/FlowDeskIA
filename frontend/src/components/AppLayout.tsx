@@ -126,12 +126,27 @@ const rotasDetalheConfiguracoes = new Set([
   "/plano-consumo",
 ]);
 
+const managementContextRoutes: Partial<Record<string, ModuleCode>> = {
+  clientes: "CLIENTES",
+  veiculos: "VEICULOS",
+  servicos: "SERVICOS",
+  financeiro: "FINANCEIRO",
+  equipe: "EQUIPE",
+};
+
+function managementClass(module: ModuleCode): string {
+  return `can-manage-${module.toLowerCase().replaceAll("_", "-")}`;
+}
+
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const rotaAntesNotificacoes = useRef("/dashboard");
   const [usuario, setUsuario] = useState<UsuarioLogado | null>(null);
   const [modulos, setModulos] = useState<Partial<Record<ModuleCode, boolean>>>({});
+  const [gerenciamento, setGerenciamento] = useState<
+    Partial<Record<ModuleCode, boolean>>
+  >({});
   const [erro, setErro] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
   const [toast, setToast] = useState<AppToastEventDetail | null>(null);
@@ -146,6 +161,7 @@ export function AppLayout() {
       ]);
       setUsuario(dadosUsuario);
       setModulos(dadosAcesso.modules);
+      setGerenciamento(dadosAcesso.management);
       setErro("");
     } catch (error) {
       setErro(
@@ -274,12 +290,11 @@ export function AppLayout() {
   }
 
   const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
-  const permissaoGestaoDaRota =
-    (routeSection === "financeiro" && Boolean(modulos.FINANCEIRO)) ||
-    (routeSection === "relatorios" && Boolean(modulos.RELATORIOS)) ||
-    (routeSection === "equipe" && Boolean(modulos.EQUIPE));
+  const moduloGestaoDaRota = managementContextRoutes[routeSection];
   const usuarioDaTela: UsuarioLogado =
-    usuario.cargo === "FUNCIONARIO" && permissaoGestaoDaRota
+    usuario.cargo === "FUNCIONARIO" &&
+    moduloGestaoDaRota &&
+    Boolean(gerenciamento[moduloGestaoDaRota])
       ? { ...usuario, cargo: "GERENTE" }
       : usuario;
   const context: AppOutletContext = {
@@ -289,6 +304,10 @@ export function AppLayout() {
   };
   const roleClass = `role-${usuario.cargo.toLowerCase()}`;
   const routeClass = `route-${routeSection.replaceAll("_", "-")}`;
+  const managementClasses = (Object.keys(gerenciamento) as ModuleCode[])
+    .filter((module) => Boolean(gerenciamento[module]))
+    .map(managementClass)
+    .join(" ");
   const gruposDisponiveis = menuGroups
     .map((group) => ({
       ...group,
@@ -305,7 +324,9 @@ export function AppLayout() {
 
   return (
     <>
-      <div className={`app-shell ${roleClass} ${routeClass}`}>
+      <div
+        className={`app-shell ${roleClass} ${routeClass} ${managementClasses}`.trim()}
+      >
         <button
           className="mobile-menu-button"
           type="button"
