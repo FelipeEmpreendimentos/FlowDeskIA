@@ -38,9 +38,9 @@
   height: 18px;
 }
 
-/* Separa visualmente Principal, Atendimento e Gestão */
+/* Respiro uniforme entre Principal, Atendimento e Gestão */
 .sidebar-nav-group + .sidebar-nav-group {
-  margin-top: 8px;
+  margin-top: 11px;
 }
 
 @media (max-height: 760px) and (min-width: 801px) {
@@ -51,6 +51,6 @@
   }
 
   .sidebar-nav-group + .sidebar-nav-group {
-    margin-top: 5px;
+    margin-top: 7px;
   }
 }
