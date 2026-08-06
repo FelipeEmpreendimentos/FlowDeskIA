@@ -20,6 +20,7 @@ import "./access-settings.css";
 import "./base-version-refinements.css";
 import "./fine-tuning.css";
 import "./final-visual-adjustments.css";
+import "./permission-behavior.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
