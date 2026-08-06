@@ -28,11 +28,13 @@ export function HistoricoConversas() {
     useState<FiltroAvaliacao>("TODAS");
   const [carregando, setCarregando] = useState(true);
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
+  const [modalVisualizacao, setModalVisualizacao] = useState(false);
   const [modalReabertura, setModalReabertura] = useState(false);
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroDetalhes, setErroDetalhes] = useState("");
 
-  async function carregarConversas(preservarId?: number) {
+  async function carregarConversas() {
     setCarregando(true);
     setErro("");
     try {
@@ -46,11 +48,6 @@ export function HistoricoConversas() {
       setConversas(dadosConversas);
       setClientes(dadosClientes);
       setUsuarios(dadosUsuarios);
-      setSelecionada(
-        dadosConversas.find((item) => item.id === preservarId) ??
-          dadosConversas[0] ??
-          null,
-      );
     } catch (error) {
       setErro(
         error instanceof Error
@@ -64,7 +61,8 @@ export function HistoricoConversas() {
 
   async function carregarMensagens(conversa: Conversa) {
     setCarregandoMensagens(true);
-    setErro("");
+    setErroDetalhes("");
+    setMensagens([]);
     try {
       setMensagens(
         await apiRequest<Mensagem[]>(
@@ -72,7 +70,7 @@ export function HistoricoConversas() {
         ),
       );
     } catch (error) {
-      setErro(
+      setErroDetalhes(
         error instanceof Error
           ? error.message
           : "Não foi possível carregar as mensagens.",
@@ -86,11 +84,6 @@ export function HistoricoConversas() {
     void carregarConversas();
   }, []);
 
-  useEffect(() => {
-    if (selecionada) void carregarMensagens(selecionada);
-    else setMensagens([]);
-  }, [selecionada?.id]);
-
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     return conversas.filter((conversa) => {
@@ -103,6 +96,7 @@ export function HistoricoConversas() {
         cliente?.nome.toLowerCase().includes(termo) ||
         cliente?.whatsapp?.toLowerCase().includes(termo) ||
         responsavel?.nome.toLowerCase().includes(termo) ||
+        conversa.origem.toLowerCase().includes(termo) ||
         String(conversa.id).includes(termo);
       if (!correspondeBusca) return false;
       if (filtroAvaliacao === "RESPONDIDA") {
@@ -117,15 +111,6 @@ export function HistoricoConversas() {
       return true;
     });
   }, [busca, clientes, conversas, filtroAvaliacao, usuarios]);
-
-  useEffect(() => {
-    if (carregando) return;
-    const proxima =
-      filtradas.find((item) => item.id === selecionada?.id) ??
-      filtradas[0] ??
-      null;
-    if (proxima?.id !== selecionada?.id) setSelecionada(proxima);
-  }, [carregando, filtradas, selecionada?.id]);
 
   const clienteNome = (id: number) =>
     clientes.find((item) => item.id === id)?.nome ?? `Cliente #${id}`;
@@ -147,10 +132,35 @@ export function HistoricoConversas() {
     return "Sem avaliação";
   }
 
+  function abrirVisualizacao(conversa: Conversa) {
+    setSelecionada(conversa);
+    setModalVisualizacao(true);
+    void carregarMensagens(conversa);
+  }
+
+  function fecharVisualizacao() {
+    setModalVisualizacao(false);
+    setErroDetalhes("");
+    setMensagens([]);
+  }
+
+  function abrirConfirmacaoReabertura() {
+    setModalVisualizacao(false);
+    setModalReabertura(true);
+    setErroDetalhes("");
+  }
+
+  function cancelarReabertura() {
+    if (processando) return;
+    setModalReabertura(false);
+    setModalVisualizacao(true);
+    setErroDetalhes("");
+  }
+
   async function reabrirConversa() {
     if (!selecionada) return;
     setProcessando(true);
-    setErro("");
+    setErroDetalhes("");
     try {
       await apiRequest<Conversa>(`/conversas/${selecionada.id}/reabrir`, {
         method: "POST",
@@ -159,7 +169,7 @@ export function HistoricoConversas() {
       showAppToast("Conversa reaberta e colocada em atendimento.");
       navigate("/conversas");
     } catch (error) {
-      setErro(
+      setErroDetalhes(
         error instanceof Error
           ? error.message
           : "Não foi possível reabrir a conversa.",
@@ -177,149 +187,179 @@ export function HistoricoConversas() {
         description="Consulte conversas finalizadas, avaliações e resumos dos atendimentos."
       />
 
-      {erro && !modalReabertura && <Alert>{erro}</Alert>}
+      {erro && <Alert>{erro}</Alert>}
 
-      <section className="conversation-shell">
-        <aside className="conversation-list-panel">
-          <div className="conversation-filters">
-            <label className="search-field">
-              <Icon name="search" size={17} />
-              <input
-                value={busca}
-                onChange={(event) => setBusca(event.target.value)}
-                placeholder="Buscar cliente ou responsável"
-              />
-            </label>
-            <select
-              value={filtroAvaliacao}
-              onChange={(event) =>
-                setFiltroAvaliacao(event.target.value as FiltroAvaliacao)
-              }
-            >
-              <option value="TODAS">Todas as finalizadas</option>
-              <option value="RESPONDIDA">Com avaliação</option>
-              <option value="PENDENTE">Avaliação pendente</option>
-              <option value="SEM_AVALIACAO">Sem avaliação</option>
-            </select>
+      <section className="content-card conversation-history-card">
+        <div className="conversation-history-toolbar">
+          <label className="search-field conversation-history-search">
+            <Icon name="search" size={18} />
+            <input
+              value={busca}
+              onChange={(event) => setBusca(event.target.value)}
+              placeholder="Buscar por cliente, responsável, origem ou número da conversa"
+              aria-label="Buscar no histórico de conversas"
+            />
+          </label>
+
+          <select
+            value={filtroAvaliacao}
+            onChange={(event) =>
+              setFiltroAvaliacao(event.target.value as FiltroAvaliacao)
+            }
+            aria-label="Filtrar histórico por avaliação"
+          >
+            <option value="TODAS">Todas as finalizadas</option>
+            <option value="RESPONDIDA">Com avaliação</option>
+            <option value="PENDENTE">Avaliação pendente</option>
+            <option value="SEM_AVALIACAO">Sem avaliação</option>
+          </select>
+        </div>
+
+        {carregando ? (
+          <LoadingState label="Carregando histórico..." />
+        ) : filtradas.length === 0 ? (
+          <EmptyState
+            icon="clock"
+            title="Nenhuma conversa no histórico"
+            description="Altere os filtros ou finalize uma conversa para consultá-la aqui."
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table conversation-history-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Responsável</th>
+                  <th>Finalização</th>
+                  <th>Avaliação</th>
+                  <th>Status</th>
+                  <th className="actions-column">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtradas.map((conversa) => (
+                  <tr key={conversa.id}>
+                    <td>
+                      <div className="entity-cell">
+                        <span className="entity-avatar">
+                          {clienteNome(conversa.cliente_id)
+                            .charAt(0)
+                            .toUpperCase()}
+                        </span>
+                        <div>
+                          <strong>{clienteNome(conversa.cliente_id)}</strong>
+                          <small>
+                            Conversa #{conversa.id} · {conversa.origem}
+                          </small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <strong className="table-primary">
+                        {usuarioNome(conversa.responsavel_id)}
+                      </strong>
+                      <small>Responsável pelo atendimento</small>
+                    </td>
+                    <td>
+                      <strong className="table-primary">
+                        {conversa.finalizada_em
+                          ? formatDateTime(conversa.finalizada_em)
+                          : "Data não informada"}
+                      </strong>
+                      <small>
+                        {conversa.finalizada_por_id
+                          ? `Por ${usuarioNome(conversa.finalizada_por_id)}`
+                          : "Finalizador não informado"}
+                      </small>
+                    </td>
+                    <td>{avaliacaoTexto(conversa)}</td>
+                    <td>
+                      <StatusBadge value={conversa.status} />
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="icon-button"
+                          type="button"
+                          onClick={() => abrirVisualizacao(conversa)}
+                          title="Visualizar conversa"
+                          aria-label={`Visualizar conversa de ${clienteNome(
+                            conversa.cliente_id,
+                          )}`}
+                        >
+                          <Icon name="eye" size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )}
+      </section>
 
-          {carregando ? (
-            <LoadingState label="Carregando histórico..." />
-          ) : filtradas.length === 0 ? (
-            <EmptyState
-              icon="clock"
-              title="Nenhuma conversa no histórico"
-              description="Conversas finalizadas serão organizadas nesta área."
-            />
-          ) : (
-            <div className="conversation-list">
-              {filtradas.map((item) => (
-                <button
-                  className={`conversation-list-item ${
-                    selecionada?.id === item.id
-                      ? "conversation-list-item-active"
-                      : ""
-                  }`}
-                  type="button"
-                  key={item.id}
-                  onClick={() => setSelecionada(item)}
-                >
-                  <span className="entity-avatar">
-                    {clienteNome(item.cliente_id).charAt(0).toUpperCase()}
-                  </span>
-                  <div>
-                    <strong>{clienteNome(item.cliente_id)}</strong>
-                    <small>
-                      {item.finalizada_em
-                        ? `Finalizada em ${formatDateTime(item.finalizada_em)}`
-                        : "Finalização sem data informada"}
-                    </small>
-                  </div>
-                  <div className="conversation-list-signals">
-                    <StatusBadge value={item.status} />
-                  </div>
-                </button>
-              ))}
+      <Modal
+        open={modalVisualizacao}
+        title={
+          selecionada
+            ? `Conversa com ${clienteNome(selecionada.cliente_id)}`
+            : "Visualizar conversa"
+        }
+        subtitle="Consulte o resumo e todas as mensagens deste atendimento finalizado."
+        onClose={fecharVisualizacao}
+        size="large"
+      >
+        {selecionada && (
+          <div className="conversation-history-detail">
+            {erroDetalhes && <Alert>{erroDetalhes}</Alert>}
+
+            <div className="conversation-finalization-summary">
+              <div>
+                <span>Finalizada</span>
+                <strong>
+                  {selecionada.finalizada_em
+                    ? formatDateTime(selecionada.finalizada_em)
+                    : "Data não informada"}
+                </strong>
+              </div>
+              <div>
+                <span>Responsável</span>
+                <strong>{usuarioNome(selecionada.finalizada_por_id)}</strong>
+              </div>
+              <div>
+                <span>Avaliação</span>
+                <strong>{avaliacaoTexto(selecionada)}</strong>
+              </div>
+              <div>
+                <span>Origem</span>
+                <strong>{selecionada.origem}</strong>
+              </div>
+              {selecionada.resumo_finalizacao && (
+                <div className="conversation-finalization-note">
+                  <span>Resumo</span>
+                  <p>{selecionada.resumo_finalizacao}</p>
+                </div>
+              )}
             </div>
-          )}
-        </aside>
 
-        <section className="chat-panel chat-panel-finalized">
-          {!selecionada ? (
-            <EmptyState
-              icon="clock"
-              title="Selecione uma conversa"
-              description="Escolha um atendimento finalizado na lista ao lado."
-            />
-          ) : (
-            <>
-              <header className="chat-header">
-                <div className="entity-cell">
-                  <span className="entity-avatar">
-                    {clienteNome(selecionada.cliente_id)
-                      .charAt(0)
-                      .toUpperCase()}
-                  </span>
-                  <div>
-                    <strong>{clienteNome(selecionada.cliente_id)}</strong>
-                    <small>
-                      {selecionada.origem} · {usuarioNome(selecionada.responsavel_id)}
-                    </small>
-                  </div>
-                </div>
-                <div className="chat-history-controls">
-                  <span className="conversation-evaluation-chip">
-                    <Icon name="check" size={15} />
-                    {avaliacaoTexto(selecionada)}
-                  </span>
-                  <button
-                    className="button button-secondary button-small"
-                    type="button"
-                    onClick={() => {
-                      setErro("");
-                      setModalReabertura(true);
-                    }}
-                  >
-                    <Icon name="refresh" size={16} />
-                    Reabrir conversa
-                  </button>
-                </div>
-              </header>
-
-              <div className="conversation-finalization-summary">
+            <section className="conversation-history-messages">
+              <div className="card-heading">
                 <div>
-                  <span>Finalizada</span>
-                  <strong>
-                    {selecionada.finalizada_em
-                      ? formatDateTime(selecionada.finalizada_em)
-                      : "Data não informada"}
-                  </strong>
+                  <span>Conversa completa</span>
+                  <h2>Mensagens do atendimento</h2>
                 </div>
-                <div>
-                  <span>Responsável</span>
-                  <strong>{usuarioNome(selecionada.finalizada_por_id)}</strong>
-                </div>
-                <div>
-                  <span>Avaliação</span>
-                  <strong>{avaliacaoTexto(selecionada)}</strong>
-                </div>
-                {selecionada.resumo_finalizacao && (
-                  <div className="conversation-finalization-note">
-                    <span>Resumo</span>
-                    <p>{selecionada.resumo_finalizacao}</p>
-                  </div>
-                )}
               </div>
 
-              <div className="messages-area">
-                {carregandoMensagens ? (
-                  <LoadingState label="Carregando mensagens..." />
-                ) : mensagens.length === 0 ? (
-                  <div className="compact-empty">
-                    Nenhuma mensagem enviada nessa conversa.
-                  </div>
-                ) : (
-                  mensagens.map((item) => (
+              {carregandoMensagens ? (
+                <LoadingState label="Carregando mensagens..." />
+              ) : mensagens.length === 0 ? (
+                <div className="compact-empty">
+                  Nenhuma mensagem enviada nessa conversa.
+                </div>
+              ) : (
+                <div className="conversation-history-message-list">
+                  {mensagens.map((item) => (
                     <div
                       className={`message-row ${
                         item.remetente === "CLIENTE"
@@ -334,24 +374,37 @@ export function HistoricoConversas() {
                         <small>{formatDateTime(item.data_envio)}</small>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
-              <div className="conversation-readonly-footer">
-                <Icon name="lock" size={16} />
-                Esta conversa está finalizada e disponível somente para consulta.
-              </div>
-            </>
-          )}
-        </section>
-      </section>
+            <div className="modal-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={fecharVisualizacao}
+              >
+                Fechar
+              </button>
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={abrirConfirmacaoReabertura}
+              >
+                <Icon name="refresh" size={16} />
+                Reabrir conversa
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={modalReabertura}
         title="Reabrir conversa"
         subtitle="Confirme antes de retomar o atendimento."
-        onClose={() => !processando && setModalReabertura(false)}
+        onClose={cancelarReabertura}
         size="small"
       >
         <div className="confirmation-dialog">
@@ -365,12 +418,12 @@ export function HistoricoConversas() {
               e aparecerá novamente em Conversas.
             </p>
           </div>
-          {erro && <Alert>{erro}</Alert>}
+          {erroDetalhes && <Alert>{erroDetalhes}</Alert>}
           <div className="modal-actions confirmation-actions">
             <button
               className="button button-secondary"
               type="button"
-              onClick={() => setModalReabertura(false)}
+              onClick={cancelarReabertura}
               disabled={processando}
             >
               Cancelar
