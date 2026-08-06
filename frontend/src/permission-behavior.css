@@ -1,0 +1,71 @@
+/* Comportamentos visuais guiados pelas permissões efetivas do usuário. */
+
+/* Chat interno: gerenciar libera exclusivamente a criação de grupos. */
+.app-shell:not(.can-manage-chat-interno).route-chat-interno
+  .team-chat-create-button {
+  display: none;
+}
+
+/* Conversas: gerenciar libera exclusivamente o início de nova conversa. */
+.app-shell:not(.can-manage-conversas).route-conversas
+  .page-header
+  .page-actions {
+  display: none;
+}
+
+/* Clientes: consulta mantém o acesso a veículos, mas remove mutações. */
+.app-shell:not(.can-manage-clientes).route-clientes
+  .page-header
+  .page-actions,
+.app-shell:not(.can-manage-clientes).route-clientes
+  .client-table
+  .row-actions
+  .icon-button:nth-child(n + 2),
+.app-shell:not(.can-manage-clientes).route-clientes
+  .empty-state
+  .button {
+  display: none;
+}
+
+/* Veículos: sem gerenciamento, a área permanece somente para consulta. */
+.app-shell:not(.can-manage-veiculos).route-veiculos
+  .page-header
+  .page-actions,
+.app-shell:not(.can-manage-veiculos).route-veiculos
+  .entity-card
+  .row-actions,
+.app-shell:not(.can-manage-veiculos).route-veiculos
+  .empty-state
+  .button {
+  display: none;
+}
+
+/* Serviços: sem gerenciamento, cadastro e alterações ficam ocultos. */
+.app-shell:not(.can-manage-servicos).route-servicos
+  .page-header
+  .page-actions,
+.app-shell:not(.can-manage-servicos).route-servicos
+  .service-card
+  .row-actions,
+.app-shell:not(.can-manage-servicos).route-servicos
+  .empty-state
+  .button {
+  display: none;
+}
+
+/* Equipe: visualizar mostra somente a relação de usuários. */
+.app-shell:not(.can-manage-equipe).route-equipe
+  .page
+  > .tabs
+  button:nth-child(n + 2) {
+  display: none;
+}
+
+/* Relatórios possui somente um nível de permissão. */
+.access-level-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.access-level-grid-single .access-level-control {
+  max-width: none;
+}
