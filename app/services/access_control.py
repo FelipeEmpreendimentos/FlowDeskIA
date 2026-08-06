@@ -29,6 +29,7 @@ MODULES = (
     ModuleDefinition("EQUIPE", "Equipe", "Usuários, jornadas e bloqueios da agenda."),
 )
 MODULE_CODES = {item.code for item in MODULES}
+VIEW_ONLY_MODULES = {"RELATORIOS"}
 
 EMPLOYEE_DEFAULTS = {
     "AGENDA",
@@ -37,6 +38,7 @@ EMPLOYEE_DEFAULTS = {
     "CLIENTES",
     "VEICULOS",
     "SERVICOS",
+    "FINANCEIRO",
 }
 
 
@@ -57,7 +59,8 @@ def default_access(cargo: CargoUsuario, module: str) -> bool:
 
 
 def default_manage(cargo: CargoUsuario, module: str) -> bool:
-    del module
+    if module in VIEW_ONLY_MODULES:
+        return False
     return cargo in {CargoUsuario.ADMIN, CargoUsuario.GERENTE}
 
 
@@ -107,6 +110,8 @@ def user_module_access(db: Session, user: Usuario, module: str) -> bool:
 
 def user_module_manage(db: Session, user: Usuario, module: str) -> bool:
     module = validate_module(module)
+    if module in VIEW_ONLY_MODULES:
+        return False
     if not user_module_access(db, user, module):
         return False
 
