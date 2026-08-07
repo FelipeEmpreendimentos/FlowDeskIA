@@ -1,8 +1,23 @@
 /* Comportamentos visuais guiados pelas permissões efetivas do usuário. */
 
-/* Chat interno: gerenciar libera exclusivamente a criação de grupos. */
+/* Chat interno: gerenciar libera criação e exclusão de grupos. */
 .app-shell:not(.can-manage-chat-interno).route-chat-interno
-  .team-chat-create-button {
+  .team-chat-create-button,
+.app-shell:not(.can-manage-chat-interno).route-chat-interno
+  .team-chat-delete-group {
+  display: none;
+}
+
+/* Agenda: visualizar consulta; gerenciar libera criação e alterações. */
+.app-shell:not(.can-manage-agenda).route-agenda
+  .page-header
+  .page-actions,
+.app-shell:not(.can-manage-agenda).route-agenda
+  .timeline-item
+  .row-actions,
+.app-shell:not(.can-manage-agenda).route-agenda
+  .empty-state
+  .button {
   display: none;
 }
 
