@@ -21,6 +21,7 @@ import "./base-version-refinements.css";
 import "./fine-tuning.css";
 import "./final-visual-adjustments.css";
 import "./permission-behavior.css";
+import "./ui-polish.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
