@@ -41,6 +41,30 @@ def _get(db: Session, empresa_id: int, conversa_id: int) -> Conversa:
     return item
 
 
+def _conversa_ativa_existente(
+    db: Session,
+    *,
+    empresa_id: int,
+    cliente_id: int,
+    origem,
+) -> Conversa | None:
+    return db.scalar(
+        select(Conversa)
+        .where(
+            Conversa.empresa_id == empresa_id,
+            Conversa.cliente_id == cliente_id,
+            Conversa.origem == origem,
+            Conversa.status.in_(
+                [StatusConversa.ABERTA, StatusConversa.EM_ATENDIMENTO]
+            ),
+        )
+        .order_by(
+            Conversa.ultima_interacao.desc().nullslast(),
+            Conversa.created_at.desc(),
+        )
+    )
+
+
 def _ensure_access(item: Conversa, current_user: Usuario) -> None:
     if is_management(current_user):
         return
@@ -129,6 +153,23 @@ def criar_conversa(
     db: Session = Depends(get_db),
 ) -> Conversa:
     require_client(db, current_user.empresa_id, data.cliente_id)
+
+    existente = _conversa_ativa_existente(
+        db,
+        empresa_id=current_user.empresa_id,
+        cliente_id=data.cliente_id,
+        origem=data.origem,
+    )
+    if existente is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            (
+                f"Já existe uma conversa ativa deste cliente no canal "
+                f"{data.origem.value if hasattr(data.origem, 'value') else data.origem} "
+                f"(conversa #{existente.id}). Abra a conversa existente para continuar o atendimento."
+            ),
+        )
+
     values = data.model_dump()
 
     if not is_management(current_user):
