@@ -17,6 +17,9 @@ from app.services.access_control import user_module_access, user_module_manage
 bearer_scheme = HTTPBearer(auto_error=False)
 
 ROLE_PERMISSION_PATHS = {
+    "/api/v1/agendamentos": "AGENDA",
+    "/api/v1/chat-interno": "CHAT_INTERNO",
+    "/api/v1/conversas": "CONVERSAS",
     "/api/v1/clientes": "CLIENTES",
     "/api/v1/veiculos": "VEICULOS",
     "/api/v1/servicos": "SERVICOS",
