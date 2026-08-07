@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -24,6 +24,8 @@ from app.schemas.internal_chat import (
     ChatInternoMensagemOut,
     ChatInternoResumoOut,
 )
+from app.services.access_control import require_module_manage
+from app.services.audit import add_audit_log
 from app.services.db_utils import commit_or_conflict
 
 
@@ -340,6 +342,7 @@ def criar_grupo(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ChatInternoCanalOut:
+    require_module_manage(db, current_user, "CHAT_INTERNO")
     nome = data.nome.strip()
     ids = {item for item in data.usuario_ids if item != current_user.id}
     if not nome:
@@ -380,8 +383,45 @@ def criar_grupo(
             for usuario_id in membros_ids
         ]
     )
+    add_audit_log(
+        db,
+        user=current_user,
+        action="CRIOU_GRUPO_CHAT_INTERNO",
+        entity="canais_chat_interno",
+        entity_id=canal.id,
+        details={"nome": nome, "participantes": len(membros_ids)},
+    )
     commit_or_conflict(db, canal)
     return _canal_out(db, canal, current_user)
+
+
+@router.delete("/grupos/{canal_id}", status_code=status.HTTP_204_NO_CONTENT)
+def excluir_grupo(
+    canal_id: int,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    require_module_manage(db, current_user, "CHAT_INTERNO")
+    canal = _obter_canal(db, current_user, canal_id)
+    if canal.tipo != "GRUPO":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Somente grupos criados pela equipe podem ser excluídos.",
+        )
+
+    nome = canal.nome or f"Grupo #{canal.id}"
+    entity_id = canal.id
+    db.delete(canal)
+    add_audit_log(
+        db,
+        user=current_user,
+        action="EXCLUIU_GRUPO_CHAT_INTERNO",
+        entity="canais_chat_interno",
+        entity_id=entity_id,
+        details={"nome": nome},
+    )
+    commit_or_conflict(db)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/resumo", response_model=ChatInternoResumoOut)
