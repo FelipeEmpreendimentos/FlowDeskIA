@@ -8,10 +8,12 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useOutletContext } from "react-router";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import { Alert, LoadingState } from "../components/UI";
 import { apiRequest } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type { AppOutletContext, CargoUsuario } from "../types";
 import type {
   ChatInternoCanal,
@@ -109,6 +111,9 @@ export function ChatInterno() {
   const [erro, setErro] = useState("");
   const [listaMobileAberta, setListaMobileAberta] = useState(true);
   const [modalGrupoAberto, setModalGrupoAberto] = useState(false);
+  const [modalParticipantesAberto, setModalParticipantesAberto] = useState(false);
+  const [grupoExclusao, setGrupoExclusao] = useState<ChatInternoCanal | null>(null);
+  const [excluindoGrupo, setExcluindoGrupo] = useState(false);
   const [nomeGrupo, setNomeGrupo] = useState("");
   const [participantesGrupo, setParticipantesGrupo] = useState<number[]>([]);
   const [criandoGrupo, setCriandoGrupo] = useState(false);
@@ -358,6 +363,7 @@ export function ChatInterno() {
       setModalGrupoAberto(false);
       setNomeGrupo("");
       setParticipantesGrupo([]);
+      showAppToast("Grupo criado com sucesso.");
       window.dispatchEvent(new Event(CHAT_UPDATE_EVENT));
     } catch (error) {
       setErro(
@@ -367,6 +373,39 @@ export function ChatInterno() {
       );
     } finally {
       setCriandoGrupo(false);
+    }
+  }
+
+  async function confirmarExclusaoGrupo() {
+    if (!grupoExclusao || excluindoGrupo) return;
+
+    setExcluindoGrupo(true);
+    setErro("");
+    try {
+      await apiRequest<void>(`/chat-interno/grupos/${grupoExclusao.id}`, {
+        method: "DELETE",
+      });
+      setCanais((atuais) =>
+        atuais.filter((canal) => canal.id !== grupoExclusao.id),
+      );
+      if (canalId === grupoExclusao.id) {
+        setCanalId(null);
+        setMensagens([]);
+        setConteudo("");
+        setListaMobileAberta(true);
+      }
+      setGrupoExclusao(null);
+      setModalParticipantesAberto(false);
+      showAppToast("Grupo excluído com sucesso.");
+      window.dispatchEvent(new Event(CHAT_UPDATE_EVENT));
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir o grupo.",
+      );
+    } finally {
+      setExcluindoGrupo(false);
     }
   }
 
@@ -634,9 +673,33 @@ export function ChatInterno() {
                       : `${canalSelecionado.membros.length} participantes`}
                   </span>
                 </div>
-                <span className="team-chat-live-status">
-                  <i /> Atualização automática
-                </span>
+                <div className="team-chat-header-actions">
+                  {canalSelecionado.tipo !== "DIRETO" && (
+                    <button
+                      className="team-chat-participants-button"
+                      type="button"
+                      onClick={() => setModalParticipantesAberto(true)}
+                      title="Visualizar participantes"
+                    >
+                      <Icon name="team" size={16} />
+                      <span>Participantes</span>
+                    </button>
+                  )}
+                  {canalSelecionado.tipo === "GRUPO" && (
+                    <button
+                      className="team-chat-delete-group"
+                      type="button"
+                      onClick={() => setGrupoExclusao(canalSelecionado)}
+                      title="Excluir grupo"
+                    >
+                      <Icon name="trash" size={16} />
+                      <span>Excluir</span>
+                    </button>
+                  )}
+                  <span className="team-chat-live-status">
+                    <i /> Atualização automática
+                  </span>
+                </div>
               </header>
 
               <div className="team-chat-messages" aria-live="polite">
@@ -801,6 +864,59 @@ export function ChatInterno() {
           </div>
         </form>
       </Modal>
+
+      <Modal
+        open={modalParticipantesAberto && Boolean(canalSelecionado)}
+        title="Participantes"
+        subtitle={canalSelecionado?.nome ?? "Grupo"}
+        onClose={() => setModalParticipantesAberto(false)}
+        size="small"
+      >
+        <div className="team-chat-participant-list">
+          {canalSelecionado?.membros.map((pessoa) => (
+            <article className="team-chat-participant" key={pessoa.id}>
+              <span
+                className={`team-chat-avatar avatar-${pessoa.cargo.toLowerCase()}`}
+              >
+                {pessoa.foto_perfil ? (
+                  <img src={pessoa.foto_perfil} alt="" />
+                ) : (
+                  iniciais(pessoa.nome)
+                )}
+              </span>
+              <div>
+                <strong>
+                  {pessoa.id === usuario.id ? `${pessoa.nome} (você)` : pessoa.nome}
+                </strong>
+                <small>{cargoLabel[pessoa.cargo]}</small>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="modal-actions">
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={() => setModalParticipantesAberto(false)}
+          >
+            Fechar
+          </button>
+        </div>
+      </Modal>
+
+      <ConfirmationModal
+        open={Boolean(grupoExclusao)}
+        title="Excluir grupo"
+        heading={`Excluir ${grupoExclusao?.nome ?? "este grupo"}?`}
+        description="O grupo e o histórico de mensagens internas serão removidos. Esta ação não pode ser desfeita."
+        confirmLabel="Excluir grupo"
+        onClose={() => !excluindoGrupo && setGrupoExclusao(null)}
+        onConfirm={() => void confirmarExclusaoGrupo()}
+        loading={excluindoGrupo}
+        error={erro}
+        tone="danger"
+        icon="team"
+      />
     </div>
   );
 }
