@@ -58,6 +58,66 @@
   color: #c43e4d;
 }
 
+/* Navegadores com select customizável: estiliza também a caixa que abre. */
+@supports (appearance: base-select) {
+  :where(.app-shell, .modal-shell, .modal-content) select,
+  :where(.app-shell, .modal-shell, .modal-content) select::picker(select) {
+    appearance: base-select;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select {
+    background-image: none;
+    padding-right: 12px;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select::picker-icon {
+    width: 15px;
+    height: 15px;
+    color: #67788f;
+    transition: rotate 160ms ease;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select::picker(select) {
+    margin-top: 5px;
+    padding: 5px;
+    border: 1px solid #dbe2ee;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 16px 38px rgba(29, 44, 70, 0.15);
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option {
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option:hover,
+  :where(.app-shell, .modal-shell, .modal-content) select option:focus {
+    background: #f4f7fd;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option:checked {
+    background: #eef3ff;
+    color: #2749ba;
+    font-weight: 650;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option::checkmark {
+    order: 1;
+    margin-left: auto;
+    color: #3157d5;
+  }
+}
+
 /* Conversas: lista mais leve, com menos aspecto de caixas pesadas. */
 .conversation-filters {
   gap: 10px;
