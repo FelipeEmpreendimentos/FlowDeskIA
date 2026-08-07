@@ -8,7 +8,11 @@ from starlette.responses import JSONResponse, Response
 from app.core.security import decode_access_token
 from app.database.database import SessionLocal
 from app.models.models import Usuario
-from app.services.access_control import require_module_access, require_module_manage
+from app.services.access_control import (
+    require_module_access,
+    require_module_manage,
+    user_module_access,
+)
 from app.services.plans import enforce_limit, require_feature
 
 FEATURE_PATHS = {
@@ -34,6 +38,15 @@ MODULE_PATHS = {
     "/api/v1/bloqueios-agenda": "EQUIPE",
 }
 
+# A Agenda precisa ler estes cadastros para montar os nomes e opções do
+# formulário, mesmo quando as telas desses módulos estiverem bloqueadas.
+AGENDA_SUPPORT_READ_PATHS = {
+    "/api/v1/clientes",
+    "/api/v1/veiculos",
+    "/api/v1/servicos",
+    "/api/v1/usuarios",
+}
+
 CREATE_LIMITS = {
     "/api/v1/agendamentos": "agendamentos_mes",
     "/api/v1/conversas": "conversas_mes",
@@ -43,11 +56,12 @@ CREATE_LIMITS = {
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 MANAGEMENT_EXACT_PATHS = {
-    ("POST", "/api/v1/chat-interno/grupos"): "CHAT_INTERNO",
     ("POST", "/api/v1/conversas"): "CONVERSAS",
 }
 
 MANAGEMENT_MUTATION_PATHS = {
+    "/api/v1/agendamentos": "AGENDA",
+    "/api/v1/chat-interno/grupos": "CHAT_INTERNO",
     "/api/v1/clientes": "CLIENTES",
     "/api/v1/veiculos": "VEICULOS",
     "/api/v1/servicos": "SERVICOS",
@@ -88,6 +102,22 @@ def _management_module(method: str, path: str) -> str | None:
     return _value_for_path(path, MANAGEMENT_MUTATION_PATHS)
 
 
+def _agenda_support_read_allowed(
+    db,
+    user: Usuario,
+    method: str,
+    path: str,
+) -> bool:
+    if method not in READ_METHODS:
+        return False
+    if not any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in AGENDA_SUPPORT_READ_PATHS
+    ):
+        return False
+    return user_module_access(db, user, "AGENDA")
+
+
 async def plan_access_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
@@ -121,7 +151,16 @@ async def plan_access_middleware(
             )
         )
         if user is not None and module:
-            require_module_access(db, user, module)
+            try:
+                require_module_access(db, user, module)
+            except HTTPException:
+                if not _agenda_support_read_allowed(
+                    db,
+                    user,
+                    request.method,
+                    path,
+                ):
+                    raise
         if user is not None and management_module:
             require_module_manage(db, user, management_module)
         if feature:
