@@ -227,6 +227,11 @@ def update_user_module_permission(
             row.pode_gerenciar = data.manage_allowed
         row.updated_at = datetime.now(timezone.utc)
 
+    # Gerenciar pressupõe conseguir abrir o módulo. Ao liberar gerenciamento,
+    # a visualização é liberada junto para evitar uma combinação impossível.
+    if "manage_allowed" in fields and data.manage_allowed is True:
+        row.permitido = True
+
     row_id = row.id
     if row.permitido is None and row.pode_gerenciar is None:
         db.delete(row)
@@ -241,13 +246,9 @@ def update_user_module_permission(
             "usuario_id": user.id,
             "modulo": module,
             "visualizacao_anterior": previous_view,
-            "visualizacao_nova": (
-                data.view_allowed if "view_allowed" in fields else previous_view
-            ),
+            "visualizacao_nova": row.permitido,
             "gerenciamento_anterior": previous_manage,
-            "gerenciamento_novo": (
-                data.manage_allowed if "manage_allowed" in fields else previous_manage
-            ),
+            "gerenciamento_novo": row.pode_gerenciar,
         },
     )
     db.commit()
