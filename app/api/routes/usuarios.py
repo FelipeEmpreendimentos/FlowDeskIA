@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.core.security import hash_password
 from app.database.database import get_db
 from app.models.enums import CargoUsuario
-from app.models.models import Usuario
+from app.models.internal_chat import MensagemChatInterno
+from app.models.models import Agendamento, Conversa, Log, Usuario
 from app.schemas.entities import UsuarioCreate, UsuarioOut, UsuarioUpdate
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
@@ -115,6 +116,36 @@ def _validar_desativacao(
     _validar_permissao_sobre_usuario(current_user, usuario)
 
     if usuario.cargo == CargoUsuario.ADMIN:
+        administradores_ativos = db.scalar(
+            select(func.count())
+            .select_from(Usuario)
+            .where(
+                Usuario.empresa_id == current_user.empresa_id,
+                Usuario.cargo == CargoUsuario.ADMIN,
+                Usuario.ativo.is_(True),
+            )
+        )
+        if int(administradores_ativos or 0) <= 1:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "A empresa precisa manter pelo menos um administrador ativo.",
+            )
+
+
+def _validar_exclusao_permanente(
+    db: Session,
+    current_user: Usuario,
+    usuario: Usuario,
+) -> None:
+    if usuario.id == current_user.id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Você não pode excluir o próprio usuário.",
+        )
+
+    _validar_permissao_sobre_usuario(current_user, usuario)
+
+    if usuario.cargo == CargoUsuario.ADMIN and usuario.ativo:
         administradores_ativos = db.scalar(
             select(func.count())
             .select_from(Usuario)
@@ -310,5 +341,87 @@ def desativar_usuario(
         entity="usuarios",
         entity_id=usuario.id,
     )
+    commit_or_conflict(db)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{usuario_id}/permanente", status_code=status.HTTP_204_NO_CONTENT)
+def excluir_usuario_permanentemente(
+    usuario_id: int,
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
+    db: Session = Depends(get_db),
+) -> Response:
+    usuario = _get_usuario(db, current_user.empresa_id, usuario_id)
+    _validar_exclusao_permanente(db, current_user, usuario)
+
+    possui_agendamento = db.scalar(
+        select(Agendamento.id)
+        .where(
+            Agendamento.empresa_id == current_user.empresa_id,
+            Agendamento.funcionario_id == usuario.id,
+        )
+        .limit(1)
+    )
+    possui_conversa = db.scalar(
+        select(Conversa.id)
+        .where(
+            Conversa.empresa_id == current_user.empresa_id,
+            or_(
+                Conversa.responsavel_id == usuario.id,
+                Conversa.finalizada_por_id == usuario.id,
+            ),
+        )
+        .limit(1)
+    )
+    possui_mensagem_interna = db.scalar(
+        select(MensagemChatInterno.id)
+        .where(
+            MensagemChatInterno.empresa_id == current_user.empresa_id,
+            MensagemChatInterno.usuario_id == usuario.id,
+        )
+        .limit(1)
+    )
+    possui_auditoria = db.scalar(
+        select(Log.id)
+        .where(
+            Log.empresa_id == current_user.empresa_id,
+            Log.ator_id == usuario.id,
+        )
+        .limit(1)
+    )
+
+    if any(
+        item is not None
+        for item in (
+            possui_agendamento,
+            possui_conversa,
+            possui_mensagem_interna,
+            possui_auditoria,
+        )
+    ):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Este usuário possui histórico operacional. Desative-o para preservar agendamentos, conversas e auditoria.",
+        )
+
+    nome_usuario = usuario.nome
+    notify_admins(
+        db,
+        empresa_id=current_user.empresa_id,
+        titulo="Usuário excluído",
+        mensagem=f"{current_user.nome} excluiu permanentemente o usuário {nome_usuario}.",
+        exclude_user_ids=(current_user.id, usuario.id),
+    )
+    add_audit_log(
+        db,
+        user=current_user,
+        action="EXCLUIU_USUARIO",
+        entity="usuarios",
+        entity_id=usuario.id,
+        details={"nome": nome_usuario},
+    )
+    db.delete(usuario)
     commit_or_conflict(db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
