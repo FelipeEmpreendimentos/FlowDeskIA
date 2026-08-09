@@ -34,7 +34,7 @@ def _garantir_nome_unico(
     if db.scalar(query.limit(1)) is not None:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Já existe um cliente com esse nome.",
+            "Já existe um cliente cadastrado com esse nome.",
         )
     return normalizado
 
@@ -122,12 +122,15 @@ def atualizar_cliente(
     values = data.model_dump(exclude_unset=True)
 
     if "nome" in values:
-        values["nome"] = _garantir_nome_unico(
-            db,
-            empresa_id=current_user.empresa_id,
-            nome=values["nome"],
-            ignorar_id=cliente.id,
-        )
+        nome_normalizado = values["nome"].strip()
+        if nome_normalizado.lower() != cliente.nome.strip().lower():
+            nome_normalizado = _garantir_nome_unico(
+                db,
+                empresa_id=current_user.empresa_id,
+                nome=nome_normalizado,
+                ignorar_id=cliente.id,
+            )
+        values["nome"] = nome_normalizado
 
     if current_user.cargo == CargoUsuario.FUNCIONARIO and "status" in values:
         if values["status"] == cliente.status:
