@@ -1,0 +1,107 @@
+/* Ajustes visuais da rodada de revisão de 09/08. */
+
+/* Chat interno: ações de grupo compactas, apenas com ícones. */
+.team-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.team-chat-participants-button,
+.team-chat-delete-group {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 10px;
+}
+
+.team-chat-participants-button span,
+.team-chat-delete-group span {
+  display: none;
+}
+
+/* Conversas: cabeçalho e controles alinhados na mesma linha. */
+.route-conversas .chat-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.route-conversas .chat-header .entity-cell {
+  min-width: 0;
+  align-items: center;
+}
+
+.route-conversas .chat-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.route-conversas .chat-controls select,
+.route-conversas .conversation-ai-control {
+  height: 40px;
+  min-height: 40px;
+}
+
+/* Agenda: remove mensagem técnica e alinha os campos do modal. */
+.route-agenda .agenda-info {
+  display: none;
+}
+
+.route-agenda .modal-content .form-grid-2 > .field {
+  align-self: start;
+}
+
+.route-agenda .modal-content label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.route-agenda .modal-content label.field > input,
+.route-agenda .modal-content label.field > select,
+.route-agenda .modal-content label.field > textarea {
+  margin-top: 0;
+}
+
+/* Configurações: notificações ficam apenas no módulo próprio. */
+.route-configuracoes .tabs button:nth-child(2) {
+  display: none;
+}
+
+.route-configuracoes .company-logo-editor-copy > p {
+  display: none;
+}
+
+.route-configuracoes .company-logo-editor-copy {
+  gap: 8px;
+}
+
+/* Mensagem de conversa duplicada com ação contextual. */
+.conversation-existing-alert {
+  display: grid;
+  gap: 10px;
+}
+
+.conversation-existing-alert .button {
+  width: fit-content;
+}
+
+@media (max-width: 760px) {
+  .route-conversas .chat-header {
+    align-items: flex-start;
+  }
+
+  .route-conversas .chat-controls {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
