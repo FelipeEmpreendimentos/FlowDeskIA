@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, time
+from datetime import date, time
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models.enums import StatusAgendamento
@@ -199,23 +199,27 @@ def _ranking_context(
         if item.funcionario_id is not None:
             por_funcionario[item.funcionario_id].append(item)
 
-    carga = {funcionario_id: len(por_funcionario.get(funcionario_id, [])) for funcionario_id in funcionario_ids}
+    carga = {
+        funcionario_id: len(por_funcionario.get(funcionario_id, []))
+        for funcionario_id in funcionario_ids
+    }
 
     ultimas = db.execute(
-        text(
-            """
-            SELECT funcionario_id, MAX(created_at) AS ultima_atribuicao
-            FROM agendamentos
-            WHERE empresa_id = :empresa_id
-              AND funcionario_id = ANY(:funcionario_ids)
-            GROUP BY funcionario_id
-            """
-        ),
-        {"empresa_id": empresa_id, "funcionario_ids": funcionario_ids},
+        select(
+            Agendamento.funcionario_id,
+            func.max(Agendamento.created_at),
+        )
+        .where(
+            Agendamento.empresa_id == empresa_id,
+            Agendamento.funcionario_id.in_(funcionario_ids),
+        )
+        .group_by(Agendamento.funcionario_id)
     ).all()
-    ultima_atribuicao: dict[int, float] = {funcionario_id: 0.0 for funcionario_id in funcionario_ids}
+    ultima_atribuicao: dict[int, float] = {
+        funcionario_id: 0.0 for funcionario_id in funcionario_ids
+    }
     for funcionario_id, valor in ultimas:
-        if valor is not None:
+        if funcionario_id is not None and valor is not None:
             ultima_atribuicao[int(funcionario_id)] = valor.timestamp()
 
     return por_funcionario, carga, ultima_atribuicao
@@ -334,7 +338,6 @@ def smart_employee_for_slot(
                 continue
             raise
 
-        # Além de conflito/bloqueio, exige que o horário pertença à jornada real.
         if not any(
             slot_start == start and slot_end == end
             for slot_start, slot_end in available_slots(
@@ -343,7 +346,7 @@ def smart_employee_for_slot(
                 target_date=target_date,
                 funcionario_id=funcionario_id,
                 service=service,
-                interval_minutes=1,
+                interval_minutes=30,
             )
         ):
             continue
