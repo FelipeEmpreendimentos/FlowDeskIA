@@ -74,6 +74,7 @@ export function Conversas() {
     useState<NovaConversaForm>(novaConversaVazia);
   const [finalizacao, setFinalizacao] =
     useState<FinalizacaoForm>(finalizacaoVazia);
+  const [conversaExistenteId, setConversaExistenteId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
 
@@ -272,6 +273,7 @@ export function Conversas() {
   async function criarConversa(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro("");
+    setConversaExistenteId(null);
 
     try {
       const criada = await apiRequest<Conversa>("/conversas", {
@@ -298,12 +300,30 @@ export function Conversas() {
       );
       await carregarConversas(criada.id, "ATUAIS");
     } catch (error) {
-      setErro(
+      const mensagem =
         error instanceof Error
           ? error.message
-          : "Não foi possível criar a conversa.",
+          : "Não foi possível criar a conversa.";
+      const match = mensagem.match(/conversa\s+#(\d+)/i);
+      setConversaExistenteId(match ? Number(match[1]) : null);
+      setErro(
+        match
+          ? "Já existe uma conversa ativa para este cliente neste canal."
+          : mensagem,
       );
     }
+  }
+
+  async function abrirConversaExistente() {
+    if (!conversaExistenteId) return;
+    const id = conversaExistenteId;
+    setModalAberto(false);
+    setConversaExistenteId(null);
+    setErro("");
+    setVisualizacao("ATUAIS");
+    setFiltroStatus("");
+    setEscopoAtendimento("GERAL");
+    await carregarConversas(id, "ATUAIS");
   }
 
   async function enviarMensagem(event: FormEvent<HTMLFormElement>) {
@@ -374,7 +394,7 @@ export function Conversas() {
   }
 
   function escolherAcaoStatus(value: string) {
-    if (!selecionada || !value) return;
+    if (!selecionada || !value || value === selecionada.status) return;
 
     if (value === "FINALIZADA") {
       setFinalizacao(finalizacaoVazia);
@@ -462,6 +482,8 @@ export function Conversas() {
             type="button"
             onClick={() => {
               setNovaConversa(novaConversaVazia);
+              setConversaExistenteId(null);
+              setErro("");
               setModalAberto(true);
             }}
           >
@@ -716,13 +738,12 @@ export function Conversas() {
                     </select>
 
                     <select
-                      value=""
+                      value={selecionada.status}
                       onChange={(event) => escolherAcaoStatus(event.target.value)}
-                      title="Alterar status"
+                      title="Status da conversa"
                     >
-                      <option value="">Alterar status</option>
-                      <option value="ABERTA">Marcar como aberta</option>
-                      <option value="EM_ATENDIMENTO">Colocar em atendimento</option>
+                      <option value="ABERTA">Aberta</option>
+                      <option value="EM_ATENDIMENTO">Em atendimento</option>
                       <option value="FINALIZADA">Finalizar conversa</option>
                     </select>
 
@@ -850,21 +871,45 @@ export function Conversas() {
         open={modalAberto}
         title="Nova conversa"
         subtitle="Escolha o cliente, a origem e o responsável inicial."
-        onClose={() => setModalAberto(false)}
+        onClose={() => {
+          setModalAberto(false);
+          setConversaExistenteId(null);
+          setErro("");
+        }}
       >
         <form onSubmit={criarConversa}>
-          {erro && <Alert>{erro}</Alert>}
+          {erro && (
+            conversaExistenteId ? (
+              <Alert>
+                <div className="conversation-existing-alert">
+                  <span>{erro}</span>
+                  <button
+                    className="button button-secondary button-small"
+                    type="button"
+                    onClick={() => void abrirConversaExistente()}
+                  >
+                    <Icon name="chat" size={16} />
+                    Abrir conversa existente
+                  </button>
+                </div>
+              </Alert>
+            ) : (
+              <Alert>{erro}</Alert>
+            )
+          )}
           <div className="form-grid">
             <label className="field">
               Cliente
               <select
                 value={novaConversa.cliente_id}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setConversaExistenteId(null);
+                  setErro("");
                   setNovaConversa({
                     ...novaConversa,
                     cliente_id: event.target.value,
-                  })
-                }
+                  });
+                }}
                 required
               >
                 <option value="">Selecione</option>
@@ -902,12 +947,14 @@ export function Conversas() {
               Origem
               <select
                 value={novaConversa.origem}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setConversaExistenteId(null);
+                  setErro("");
                   setNovaConversa({
                     ...novaConversa,
                     origem: event.target.value as OrigemConversa,
-                  })
-                }
+                  });
+                }}
               >
                 <option value="WHATSAPP">WhatsApp</option>
                 <option value="INSTAGRAM">Instagram</option>
@@ -919,7 +966,11 @@ export function Conversas() {
             <button
               className="button button-secondary"
               type="button"
-              onClick={() => setModalAberto(false)}
+              onClick={() => {
+                setModalAberto(false);
+                setConversaExistenteId(null);
+                setErro("");
+              }}
             >
               Cancelar
             </button>
