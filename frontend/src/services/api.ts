@@ -84,6 +84,7 @@ async function fetchApi(
   return fetch(`${API_URL}${endpoint}`, {
     ...options,
     credentials: options.credentials ?? "include",
+    cache: options.cache ?? "no-store",
     headers,
   });
 }
@@ -96,6 +97,7 @@ async function renovarAccessToken(): Promise<boolean> {
       const response = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         credentials: "include",
+        cache: "no-store",
       });
 
       if (!response.ok) return false;
@@ -186,8 +188,6 @@ export async function apiRequest<T>(
         message,
       });
 
-      // O aviso já foi exibido no canto da aplicação. A mensagem vazia impede
-      // que páginas antigas mostrem o mesmo erro novamente em um bloco grande.
       throw new ApiError("", response.status);
     }
 
