@@ -48,6 +48,7 @@ const publicAuthEndpoints = [
   "/auth/redefinir-senha",
 ];
 
+const duplicateRegistryPrefixes = ["/clientes", "/servicos", "/usuarios"];
 const phoneFields = new Set(["telefone", "whatsapp"]);
 
 const fieldLabels: Record<string, string> = {
@@ -233,6 +234,14 @@ async function mensagemErro(response: Response): Promise<string> {
   return message;
 }
 
+function isRegistryDuplicate(endpoint: string, statusCode: number, message: string): boolean {
+  if (statusCode !== 409 || !/^Já existe\b/i.test(message)) return false;
+  const path = endpoint.split("?")[0];
+  return duplicateRegistryPrefixes.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -265,6 +274,15 @@ export async function apiRequest<T>(
     ) {
       clearSession({ keepCompanyId: true });
       window.location.assign("/login");
+    }
+
+    if (isRegistryDuplicate(endpoint, response.status, message)) {
+      emitAppToast({
+        type: "warning",
+        title: "Cadastro já existente",
+        message,
+      });
+      throw new ApiError("", response.status);
     }
 
     const shouldUsePermissionToast =
