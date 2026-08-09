@@ -37,7 +37,6 @@
   display: none;
 }
 
-/* A atualização continua automática; apenas a informação visual foi removida. */
 .route-chat-interno .team-chat-live-status,
 .route-chat-interno .team-chat-page-refined .team-chat-live-status {
   display: none !important;
@@ -133,11 +132,6 @@
   margin-top: 0;
 }
 
-/*
- * Funcionário é o label imediatamente anterior ao label da Data.
- * Ambos recebem linhas explícitas para rótulo e controle. O texto auxiliar
- * fica numa terceira linha e não desloca a Data para baixo.
- */
 .route-agenda
   .modal-body
   .form-grid-2
@@ -186,9 +180,126 @@
 }
 
 /* -------------------------------------------------------------------------- */
+/* Configuração da Agenda: vínculo claro entre serviço e equipe habilitada.   */
+/* -------------------------------------------------------------------------- */
+
+.agenda-settings-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.agenda-service-team-card {
+  display: grid;
+  gap: 18px;
+}
+
+.agenda-service-team-intro {
+  max-width: 900px;
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.agenda-service-team-list {
+  display: grid;
+  gap: 12px;
+}
+
+.agenda-service-team-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.8fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 18px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f9fbff;
+}
+
+.agenda-service-team-service {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.agenda-service-team-color {
+  width: 10px;
+  height: 42px;
+  flex: 0 0 10px;
+  border-radius: 999px;
+}
+
+.agenda-service-team-service > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.agenda-service-team-service strong {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-service-team-service small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.agenda-service-team-users {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.agenda-service-team-user {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: #53617a;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+  transition: border-color 0.16s, color 0.16s, background 0.16s;
+}
+
+.agenda-service-team-user input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.agenda-service-team-user-active {
+  border-color: #9fb1ef;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.agenda-service-team-user:has(input:disabled) {
+  cursor: default;
+  opacity: 0.76;
+}
+
+.agenda-settings-save {
+  margin-top: 0;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Configurações e mensagens já aprovadas na rodada.                           */
 /* -------------------------------------------------------------------------- */
 
+/* A antiga aba interna de notificações permanece inacessível. A central única
+ * é a página aberta pelo sino no topo e o Dashboard mantém somente o resumo. */
 .route-configuracoes .tabs button:nth-child(2) {
   display: none;
 }
@@ -217,6 +328,14 @@
 @media (max-width: 1050px) {
   .route-chat-interno .team-chat-conversation-header {
     padding-right: 82px;
+  }
+
+  .agenda-service-team-row {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-service-team-users {
+    justify-content: flex-start;
   }
 }
 
@@ -251,6 +370,10 @@
     min-width: 0;
     max-width: none;
   }
+
+  .agenda-service-team-user {
+    flex: 1 1 calc(50% - 8px);
+  }
 }
 
 @media (max-width: 620px) {
@@ -261,5 +384,9 @@
   .route-conversas .conversation-ai-control {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .agenda-service-team-user {
+    flex-basis: 100%;
   }
 }
