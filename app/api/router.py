@@ -22,6 +22,7 @@ from app.api.routes import (
     preferencias_notificacoes,
     relatorios,
     servicos,
+    smart_agenda,
     super_admin,
     super_admin_dashboard,
     system,
@@ -41,6 +42,9 @@ api_router.include_router(usuarios.router)
 api_router.include_router(clientes.router)
 api_router.include_router(veiculos.router)
 api_router.include_router(servicos.router)
+# A agenda inteligente precisa ser registrada antes da rota legada de
+# disponibilidade para centralizar a regra de distribuição automática.
+api_router.include_router(smart_agenda.router)
 api_router.include_router(agenda.router)
 api_router.include_router(configuracao_agenda.router)
 api_router.include_router(financeiro_permissoes.router)
