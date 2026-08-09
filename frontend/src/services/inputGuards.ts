@@ -6,7 +6,6 @@ function isContactInput(target: EventTarget | null): target is HTMLInputElement 
   if (
     target.type === "tel" ||
     target.inputMode === "tel" ||
-    target.inputMode === "numeric" ||
     target.autocomplete === "tel"
   ) {
     return true;
