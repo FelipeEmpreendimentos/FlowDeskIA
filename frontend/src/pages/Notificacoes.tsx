@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { Alert, EmptyState, LoadingState, PageHeader } from "../components/UI";
 import { apiRequest } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type { Notificacao } from "../types";
 import { formatDateTime } from "../utils/format";
 
@@ -84,7 +85,6 @@ export function Notificacoes() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
 
   const todasDesativadas = preferencias
     ? opcoes.every((item) => !preferencias[item.chave])
@@ -115,12 +115,6 @@ export function Notificacoes() {
     void carregar();
   }, []);
 
-  useEffect(() => {
-    if (!sucesso) return;
-    const timer = window.setTimeout(() => setSucesso(""), 4000);
-    return () => window.clearTimeout(timer);
-  }, [sucesso]);
-
   async function marcarLida(item: Notificacao) {
     try {
       const atualizada = await apiRequest<Notificacao>(
@@ -132,6 +126,7 @@ export function Notificacoes() {
           notificacao.id === atualizada.id ? atualizada : notificacao,
         ),
       );
+      showAppToast("Notificação marcada como lida.");
     } catch (error) {
       setErro(
         error instanceof Error
@@ -149,7 +144,7 @@ export function Notificacoes() {
       setNotificacoes((atuais) =>
         atuais.map((item) => ({ ...item, lida: true })),
       );
-      setSucesso("Todas as notificações foram marcadas como lidas.");
+      showAppToast("Todas as notificações foram marcadas como lidas.");
     } catch (error) {
       setErro(
         error instanceof Error
@@ -166,22 +161,29 @@ export function Notificacoes() {
     });
   }
 
-  async function desativarTodas() {
-    if (!preferencias || todasDesativadas) return;
+  async function alternarTodas() {
+    if (!preferencias) return;
 
     setSalvando(true);
     setErro("");
+    const ativar = todasDesativadas;
     try {
       const payload = Object.fromEntries(
-        opcoes.map((item) => [item.chave, false]),
+        opcoes.map((item) => [item.chave, ativar]),
       ) as Record<ChavePreferencia, boolean>;
       setPreferencias(await atualizarPreferencias(payload));
-      setSucesso("Todas as categorias de notificação foram desativadas.");
+      showAppToast(
+        ativar
+          ? "Todas as categorias de notificação foram ativadas."
+          : "Todas as categorias de notificação foram desativadas.",
+      );
     } catch (error) {
       setErro(
         error instanceof Error
           ? error.message
-          : "Não foi possível desativar as notificações.",
+          : ativar
+            ? "Não foi possível ativar as notificações."
+            : "Não foi possível desativar as notificações.",
       );
     } finally {
       setSalvando(false);
@@ -198,7 +200,7 @@ export function Notificacoes() {
         opcoes.map((item) => [item.chave, preferencias[item.chave]]),
       ) as Record<ChavePreferencia, boolean>;
       setPreferencias(await atualizarPreferencias(payload));
-      setSucesso("Preferências salvas com sucesso.");
+      showAppToast("Preferências de notificação salvas com sucesso.");
     } catch (error) {
       setErro(
         error instanceof Error
@@ -230,7 +232,6 @@ export function Notificacoes() {
       />
 
       {erro && <Alert>{erro}</Alert>}
-      {sucesso && <Alert type="success">{sucesso}</Alert>}
 
       {carregando ? (
         <LoadingState label="Carregando notificações..." />
@@ -292,11 +293,11 @@ export function Notificacoes() {
               <button
                 className="button button-small button-secondary notification-disable-all"
                 type="button"
-                onClick={() => void desativarTodas()}
-                disabled={salvando || todasDesativadas}
+                onClick={() => void alternarTodas()}
+                disabled={salvando}
               >
                 <Icon name="bell" size={15} />
-                {todasDesativadas ? "Tudo desativado" : "Desativar todas"}
+                {todasDesativadas ? "Ativar todas" : "Desativar todas"}
               </button>
             </div>
             {preferencias && (
