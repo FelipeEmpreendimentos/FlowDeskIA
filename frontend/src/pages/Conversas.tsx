@@ -66,6 +66,7 @@ export function Conversas() {
   const [carregando, setCarregando] = useState(true);
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [assumindoConversa, setAssumindoConversa] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [modalFinalizacao, setModalFinalizacao] = useState(false);
   const [modalReabertura, setModalReabertura] = useState(false);
@@ -393,6 +394,34 @@ export function Conversas() {
     }
   }
 
+  async function assumirConversa() {
+    if (!selecionada || selecionada.responsavel_id !== null) return;
+
+    setAssumindoConversa(true);
+    setErro("");
+    try {
+      const atualizada = await apiRequest<Conversa>(
+        `/conversas/${selecionada.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ responsavel_id: usuario.id }),
+        },
+      );
+      setSelecionada(atualizada);
+      setEscopoAtendimento("MEUS");
+      setSucesso("Conversa assumida com sucesso.");
+      await carregarConversas(atualizada.id, "ATUAIS");
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível assumir a conversa.",
+      );
+    } finally {
+      setAssumindoConversa(false);
+    }
+  }
+
   function escolherAcaoStatus(value: string) {
     if (!selecionada || !value || value === selecionada.status) return;
 
@@ -689,6 +718,18 @@ export function Conversas() {
                     <small>
                       {selecionada.origem} · {usuarioNome(selecionada.responsavel_id)}
                     </small>
+                    {selecionada.status !== "FINALIZADA" &&
+                      selecionada.responsavel_id === null && (
+                        <button
+                          className="button button-secondary button-small conversation-assume-button"
+                          type="button"
+                          onClick={() => void assumirConversa()}
+                          disabled={assumindoConversa}
+                        >
+                          <Icon name="team" size={15} />
+                          {assumindoConversa ? "Assumindo..." : "Assumir conversa"}
+                        </button>
+                      )}
                   </div>
                 </div>
 
