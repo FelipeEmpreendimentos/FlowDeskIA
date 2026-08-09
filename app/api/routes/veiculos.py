@@ -66,7 +66,9 @@ def listar_veiculos(
 @router.post("", response_model=VeiculoOut, status_code=status.HTTP_201_CREATED)
 def criar_veiculo(
     data: VeiculoCreate,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
     db: Session = Depends(get_db),
 ) -> Veiculo:
     require_client(db, current_user.empresa_id, data.cliente_id)
