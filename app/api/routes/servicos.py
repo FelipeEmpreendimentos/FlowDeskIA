@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.database.database import get_db
 from app.models.enums import CargoUsuario
-from app.models.models import Servico, ServicoAdicionalVeiculo, Usuario
+from app.models.models import Agendamento, Servico, ServicoAdicionalVeiculo, Usuario
 from app.schemas.entities import ServicoCreate, ServicoOut, ServicoUpdate
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
@@ -179,5 +179,42 @@ def desativar_servico(
         entity="servicos",
         entity_id=servico.id,
     )
+    commit_or_conflict(db)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{servico_id}/permanente", status_code=status.HTTP_204_NO_CONTENT)
+def excluir_servico_permanentemente(
+    servico_id: int,
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
+    db: Session = Depends(get_db),
+) -> Response:
+    servico = require_service(db, current_user.empresa_id, servico_id)
+
+    possui_agendamento = db.scalar(
+        select(Agendamento.id)
+        .where(
+            Agendamento.empresa_id == current_user.empresa_id,
+            Agendamento.servico_id == servico.id,
+        )
+        .limit(1)
+    )
+    if possui_agendamento is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Este serviço possui histórico de agendamentos. Desative-o para preservar os registros.",
+        )
+
+    add_audit_log(
+        db,
+        user=current_user,
+        action="EXCLUIU_SERVICO",
+        entity="servicos",
+        entity_id=servico.id,
+        details={"nome": servico.nome},
+    )
+    db.delete(servico)
     commit_or_conflict(db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
