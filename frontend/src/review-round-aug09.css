@@ -93,6 +93,55 @@
   margin-top: 0;
 }
 
+/*
+ * Funcionário fica imediatamente antes de Data no formulário. Os dois usam a
+ * mesma grade de linhas para que rótulo e controle comecem exatamente no
+ * mesmo eixo, independentemente do texto auxiliar do funcionário.
+ */
+.route-agenda
+  .modal-content
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"]),
+.route-agenda
+  .modal-content
+  .form-grid-2
+  > label.field:has(> input[type="date"]) {
+  display: grid !important;
+  grid-template-rows: 17px 44px auto;
+  align-content: start;
+  align-items: start;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+}
+
+.route-agenda
+  .modal-content
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"])
+  > select,
+.route-agenda
+  .modal-content
+  .form-grid-2
+  > label.field:has(> input[type="date"])
+  > input[type="date"] {
+  width: 100%;
+  height: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  align-self: stretch;
+}
+
+.route-agenda
+  .modal-content
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"])
+  > small {
+  margin: 0;
+  align-self: start;
+  line-height: 1.45;
+}
+
 /* Configurações: notificações ficam no módulo próprio. */
 .route-configuracoes .tabs button:nth-child(2) {
   display: none;
