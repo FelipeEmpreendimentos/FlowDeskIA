@@ -31,7 +31,7 @@ def _garantir_nome_unico(
     if db.scalar(query.limit(1)) is not None:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Já existe um serviço com esse nome.",
+            "Já existe um serviço cadastrado com esse nome.",
         )
     return normalizado
 
@@ -137,12 +137,15 @@ def atualizar_servico(
     values = data.model_dump(exclude_unset=True)
     adicionais = values.pop("adicionais", None)
     if "nome" in values:
-        values["nome"] = _garantir_nome_unico(
-            db,
-            empresa_id=current_user.empresa_id,
-            nome=values["nome"],
-            ignorar_id=servico.id,
-        )
+        nome_normalizado = values["nome"].strip()
+        if nome_normalizado.lower() != servico.nome.strip().lower():
+            nome_normalizado = _garantir_nome_unico(
+                db,
+                empresa_id=current_user.empresa_id,
+                nome=nome_normalizado,
+                ignorar_id=servico.id,
+            )
+        values["nome"] = nome_normalizado
     apply_patch(servico, values)
     if adicionais is not None:
         _sincronizar_adicionais(servico, adicionais)
