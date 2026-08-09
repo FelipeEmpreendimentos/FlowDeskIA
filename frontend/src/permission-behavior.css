@@ -8,17 +8,21 @@
   display: none;
 }
 
-/* Agenda: visualizar consulta; gerenciar libera criação e alterações. */
+/*
+ * Agenda:
+ * Visualizar representa a agenda pessoal. O funcionário pode criar, editar,
+ * avançar status e cancelar os próprios atendimentos, mas não escolhe outro
+ * profissional nem filtra a agenda por funcionário.
+ * Gerenciar libera o escopo global e a escolha de qualquer profissional.
+ */
 .app-shell:not(.can-manage-agenda).route-agenda
-  .page-header
-  .page-actions,
+  .agenda-toolbar
+  > label.field.compact-field:last-of-type,
 .app-shell:not(.can-manage-agenda).route-agenda
-  .timeline-item
-  .row-actions,
-.app-shell:not(.can-manage-agenda).route-agenda
-  .empty-state
-  .button {
-  display: none;
+  .modal-body
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"]) {
+  display: none !important;
 }
 
 /* Conversas: gerenciar libera exclusivamente o início de nova conversa. */
@@ -28,27 +32,39 @@
   display: none;
 }
 
-/* Clientes: consulta mantém o acesso a veículos, mas remove mutações. */
+/*
+ * Clientes:
+ * Visualizar permite consultar e editar dados cadastrais simples. Cadastro,
+ * mudança de status, desativação e exclusão continuam exigindo Gerenciar.
+ */
 .app-shell:not(.can-manage-clientes).route-clientes
   .page-header
   .page-actions,
 .app-shell:not(.can-manage-clientes).route-clientes
   .client-table
   .row-actions
-  .icon-button:nth-child(n + 2),
+  .icon-button:nth-child(n + 3),
 .app-shell:not(.can-manage-clientes).route-clientes
   .empty-state
-  .button {
+  .button,
+.app-shell:not(.can-manage-clientes).route-clientes
+  .modal-body
+  label.field:has(> select) {
   display: none;
 }
 
-/* Veículos: sem gerenciamento, a área permanece somente para consulta. */
+/*
+ * Veículos:
+ * Visualizar permite editar o cadastro existente. Criar e excluir continuam
+ * restritos a Gerenciar.
+ */
 .app-shell:not(.can-manage-veiculos).route-veiculos
   .page-header
   .page-actions,
 .app-shell:not(.can-manage-veiculos).route-veiculos
   .entity-card
-  .row-actions,
+  .row-actions
+  .icon-button.danger,
 .app-shell:not(.can-manage-veiculos).route-veiculos
   .empty-state
   .button {
