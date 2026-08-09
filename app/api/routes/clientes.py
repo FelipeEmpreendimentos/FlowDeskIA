@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -15,6 +15,28 @@ from app.services.ownership import require_client
 from app.services.plans import enforce_limit
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
+
+
+def _garantir_nome_unico(
+    db: Session,
+    *,
+    empresa_id: int,
+    nome: str,
+    ignorar_id: int | None = None,
+) -> str:
+    normalizado = nome.strip()
+    query = select(Cliente.id).where(
+        Cliente.empresa_id == empresa_id,
+        func.lower(func.trim(Cliente.nome)) == normalizado.lower(),
+    )
+    if ignorar_id is not None:
+        query = query.where(Cliente.id != ignorar_id)
+    if db.scalar(query.limit(1)) is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Já existe um cliente com esse nome.",
+        )
+    return normalizado
 
 
 @router.get("", response_model=list[ClienteOut])
@@ -61,7 +83,13 @@ def criar_cliente(
     db: Session = Depends(get_db),
 ) -> Cliente:
     enforce_limit(db, current_user.empresa_id, "clientes")
-    cliente = Cliente(empresa_id=current_user.empresa_id, **data.model_dump())
+    values = data.model_dump()
+    values["nome"] = _garantir_nome_unico(
+        db,
+        empresa_id=current_user.empresa_id,
+        nome=values["nome"],
+    )
+    cliente = Cliente(empresa_id=current_user.empresa_id, **values)
     db.add(cliente)
     db.flush()
     add_audit_log(
@@ -93,10 +121,16 @@ def atualizar_cliente(
     cliente = require_client(db, current_user.empresa_id, cliente_id)
     values = data.model_dump(exclude_unset=True)
 
+    if "nome" in values:
+        values["nome"] = _garantir_nome_unico(
+            db,
+            empresa_id=current_user.empresa_id,
+            nome=values["nome"],
+            ignorar_id=cliente.id,
+        )
+
     if current_user.cargo == CargoUsuario.FUNCIONARIO and "status" in values:
         if values["status"] == cliente.status:
-            # O formulário compartilhado pode reenviar o status atual mesmo
-            # quando o funcionário editou apenas os dados operacionais.
             values.pop("status")
         else:
             raise HTTPException(
