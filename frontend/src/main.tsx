@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import App from "./App";
+import { installContactInputGuards } from "./services/inputGuards";
 import "./index.css";
 import "./permission-ui.css";
 import "./financeiro.css";
@@ -23,6 +24,8 @@ import "./final-visual-adjustments.css";
 import "./permission-behavior.css";
 import "./ui-polish.css";
 import "./review-round-aug09.css";
+
+installContactInputGuards();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
