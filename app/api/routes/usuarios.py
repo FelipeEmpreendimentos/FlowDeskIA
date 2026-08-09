@@ -32,6 +32,28 @@ def _get_usuario(
     return usuario
 
 
+def _garantir_nome_unico(
+    db: Session,
+    *,
+    empresa_id: int,
+    nome: str,
+    ignorar_id: int | None = None,
+) -> str:
+    normalizado = nome.strip()
+    query = select(Usuario.id).where(
+        Usuario.empresa_id == empresa_id,
+        func.lower(func.trim(Usuario.nome)) == normalizado.lower(),
+    )
+    if ignorar_id is not None:
+        query = query.where(Usuario.id != ignorar_id)
+    if db.scalar(query.limit(1)) is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Já existe um usuário com esse nome na equipe.",
+        )
+    return normalizado
+
+
 def _validar_permissao_sobre_usuario(
     current_user: Usuario,
     usuario: Usuario,
@@ -138,9 +160,14 @@ def criar_usuario(
         )
 
     enforce_limit(db, current_user.empresa_id, "usuarios")
-    usuario = Usuario(
+    nome = _garantir_nome_unico(
+        db,
         empresa_id=current_user.empresa_id,
         nome=data.nome,
+    )
+    usuario = Usuario(
+        empresa_id=current_user.empresa_id,
+        nome=nome,
         email=data.email,
         senha_hash=hash_password(data.senha),
         telefone=data.telefone,
@@ -195,6 +222,14 @@ def atualizar_usuario(
 ) -> Usuario:
     usuario = _get_usuario(db, current_user.empresa_id, usuario_id)
     values = data.model_dump(exclude_unset=True)
+
+    if "nome" in values:
+        values["nome"] = _garantir_nome_unico(
+            db,
+            empresa_id=current_user.empresa_id,
+            nome=values["nome"],
+            ignorar_id=usuario.id,
+        )
 
     novo_cargo = values.get("cargo")
     _validar_permissao_sobre_usuario(
