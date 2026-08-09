@@ -37,6 +37,12 @@ const moduleIcons: Partial<Record<ModuleCode, "finance" | "team" | "calendar" | 
 const viewOnlyModules = new Set<ModuleCode>(["RELATORIOS"]);
 
 const viewDescriptions: Partial<Record<ModuleCode, string>> = {
+  AGENDA:
+    "Mostra somente a própria agenda e permite criar, editar, avançar status e cancelar os próprios agendamentos.",
+  CLIENTES:
+    "Permite consultar clientes e editar dados cadastrais, sem criar, bloquear, desativar ou excluir.",
+  VEICULOS:
+    "Permite consultar e editar veículos existentes, sem cadastrar ou excluir.",
   FINANCEIRO:
     "Mostra somente os atendimentos do próprio profissional e permite receber as próprias pendências.",
   EQUIPE: "Mostra somente a lista de usuários, sem jornadas e bloqueios.",
@@ -44,6 +50,8 @@ const viewDescriptions: Partial<Record<ModuleCode, string>> = {
 };
 
 const managementDescriptions: Partial<Record<ModuleCode, string>> = {
+  AGENDA:
+    "Libera toda a agenda, escolha de qualquer funcionário e gerenciamento de todos os agendamentos.",
   CHAT_INTERNO: "Permite criar novos grupos no chat interno.",
   CONVERSAS: "Permite iniciar uma nova conversa com cliente.",
   CLIENTES: "Permite cadastrar, editar e alterar a situação dos clientes.",
@@ -359,20 +367,11 @@ export function ConfiguracaoAcessos() {
                   >
                     <header>
                       <span className="access-module-icon">
-                        <Icon
-                          name={moduleIcons[module.code] ?? "settings"}
-                          size={18}
-                        />
+                        <Icon name={moduleIcons[module.code] ?? "settings"} size={18} />
                       </span>
                       <div>
                         <strong>{module.name}</strong>
-                        <small>
-                          {!module.enabled
-                            ? "Módulo desativado para a empresa"
-                            : somenteVisualizacao
-                              ? "Este módulo possui somente visualização."
-                              : module.description}
-                        </small>
+                        <small>{module.description}</small>
                       </div>
                     </header>
                     <div
