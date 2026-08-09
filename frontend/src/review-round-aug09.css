@@ -1,52 +1,81 @@
 /* Ajustes visuais da rodada de revisão de 09/08. */
 
-/* Chat interno: participantes e exclusão ficam realmente lado a lado. */
-.team-chat-conversation-header > .team-chat-header-actions {
+/* -------------------------------------------------------------------------- */
+/* Chat interno: ações do grupo separadas do sino global e sem sobreposição.   */
+/* -------------------------------------------------------------------------- */
+
+.route-chat-interno .team-chat-conversation-header {
+  min-height: 88px;
+  padding-right: 96px;
+}
+
+.route-chat-interno .team-chat-conversation-header > .team-chat-header-actions {
   display: grid;
   grid-template-columns: 34px 34px;
+  grid-template-rows: 34px auto;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: end;
-  gap: 5px 6px;
+  column-gap: 6px;
+  row-gap: 5px;
   margin-left: auto;
 }
 
-.team-chat-participants-button,
-.team-chat-delete-group {
+.route-chat-interno .team-chat-participants-button,
+.route-chat-interno .team-chat-delete-group {
   display: grid;
   width: 34px;
   min-width: 34px;
   height: 34px;
   min-height: 34px;
   place-items: center;
+  align-self: center;
+  justify-self: end;
   padding: 0;
+  margin: 0;
   border-radius: 10px;
 }
 
-.team-chat-participants-button span,
-.team-chat-delete-group span {
+.route-chat-interno .team-chat-participants-button span,
+.route-chat-interno .team-chat-delete-group span {
   display: none;
 }
 
-.team-chat-conversation-header > .team-chat-header-actions .team-chat-live-status {
+.route-chat-interno
+  .team-chat-conversation-header
+  > .team-chat-header-actions
+  .team-chat-live-status {
   grid-column: 1 / -1;
+  grid-row: 2;
   justify-self: end;
+  align-self: center;
   margin: 0 !important;
+  padding: 0;
   white-space: nowrap;
 }
 
-/* Conversas: identidade e controles usam o mesmo eixo vertical. */
+/* A regra antiga deslocava o status para a área ocupada pelo sino. */
+.route-chat-interno .team-chat-page-refined .team-chat-live-status {
+  margin-right: 0 !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Conversas: responsável, situação e IA compartilham exatamente o mesmo eixo. */
+/* -------------------------------------------------------------------------- */
+
 .route-conversas .chat-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 72px;
   align-items: center !important;
-  gap: 18px;
+  column-gap: 18px;
 }
 
 .route-conversas .chat-header .entity-cell {
   min-width: 0;
   min-height: 40px;
-  flex: 1 1 auto;
   align-items: center;
+  align-self: center;
 }
 
 .route-conversas .chat-header .entity-cell > div {
@@ -56,98 +85,129 @@
 }
 
 .route-conversas .chat-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: 154px 154px auto;
   flex: 0 0 auto;
   align-self: center;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: end;
   gap: 8px;
-  margin-left: auto;
+  margin: 0;
 }
 
 .route-conversas .chat-controls select,
 .route-conversas .conversation-ai-control {
-  height: 40px;
-  min-height: 40px;
-  margin: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px !important;
+  min-height: 40px !important;
+  align-self: center;
+  margin: 0 !important;
 }
 
-/* Agenda: remove mensagem técnica e alinha os campos do modal. */
+.route-conversas .chat-controls select[title="Responsável"],
+.route-conversas .chat-controls select[title="Status da conversa"] {
+  min-width: 154px;
+  max-width: 154px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 40px;
+}
+
+.route-conversas .conversation-ai-control {
+  min-width: 104px;
+  justify-content: center;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Agenda: o Modal real usa .modal-body. Funcionário e Data iniciam no topo.  */
+/* -------------------------------------------------------------------------- */
+
 .route-agenda .agenda-info {
   display: none;
 }
 
-.route-agenda .modal-content .form-grid-2 > .field {
-  align-self: start;
+.route-agenda .modal-body .form-grid-2 {
+  align-items: start;
 }
 
-.route-agenda .modal-content label.field {
-  display: flex;
-  flex-direction: column;
+.route-agenda .modal-body .form-grid-2 > .field {
+  align-self: start !important;
+}
+
+.route-agenda .modal-body label.field {
+  display: grid;
+  align-content: start;
   gap: 7px;
+  margin: 0;
 }
 
-.route-agenda .modal-content label.field > input,
-.route-agenda .modal-content label.field > select,
-.route-agenda .modal-content label.field > textarea {
+.route-agenda .modal-body label.field > input,
+.route-agenda .modal-body label.field > select,
+.route-agenda .modal-body label.field > textarea {
   margin-top: 0;
 }
 
 /*
- * Funcionário fica imediatamente antes de Data no formulário. Os dois usam a
- * mesma grade de linhas para que rótulo e controle comecem exatamente no
- * mesmo eixo, independentemente do texto auxiliar do funcionário.
+ * Funcionário é o label imediatamente anterior ao label da Data.
+ * Ambos recebem linhas explícitas para rótulo e controle. O texto auxiliar
+ * fica numa terceira linha e não desloca a Data para baixo.
  */
 .route-agenda
-  .modal-content
+  .modal-body
   .form-grid-2
   > label.field:has(+ label.field > input[type="date"]),
 .route-agenda
-  .modal-content
+  .modal-body
   .form-grid-2
   > label.field:has(> input[type="date"]) {
   display: grid !important;
   grid-template-rows: 17px 44px auto;
   align-content: start;
   align-items: start;
+  align-self: start !important;
   gap: 7px;
   margin: 0;
   padding: 0;
 }
 
 .route-agenda
-  .modal-content
+  .modal-body
   .form-grid-2
   > label.field:has(+ label.field > input[type="date"])
   > select,
 .route-agenda
-  .modal-content
+  .modal-body
   .form-grid-2
   > label.field:has(> input[type="date"])
   > input[type="date"] {
+  grid-row: 2;
   width: 100%;
   height: 44px !important;
   min-height: 44px !important;
-  margin: 0 !important;
   align-self: stretch;
+  margin: 0 !important;
 }
 
 .route-agenda
-  .modal-content
+  .modal-body
   .form-grid-2
   > label.field:has(+ label.field > input[type="date"])
   > small {
-  margin: 0;
+  grid-row: 3;
   align-self: start;
+  margin: 0;
   line-height: 1.45;
 }
 
-/* Configurações: notificações ficam no módulo próprio. */
+/* -------------------------------------------------------------------------- */
+/* Configurações e mensagens já aprovadas na rodada.                           */
+/* -------------------------------------------------------------------------- */
+
 .route-configuracoes .tabs button:nth-child(2) {
   display: none;
 }
 
-/* A tela Módulos e permissões tem duas abas próprias e ambas devem aparecer. */
 .access-settings-page .access-settings-tabs button:nth-child(2) {
   display: inline-flex !important;
 }
@@ -160,7 +220,6 @@
   gap: 8px;
 }
 
-/* Mensagem de conversa duplicada com ação contextual. */
 .conversation-existing-alert {
   display: grid;
   gap: 10px;
@@ -170,18 +229,60 @@
   width: fit-content;
 }
 
+@media (max-width: 1050px) {
+  .route-chat-interno .team-chat-conversation-header {
+    padding-right: 84px;
+  }
+
+  .route-chat-interno
+    .team-chat-conversation-header
+    > .team-chat-header-actions
+    .team-chat-live-status {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .route-chat-interno .team-chat-conversation-header {
+    min-height: 68px;
+    padding-right: 72px;
+  }
+}
+
 @media (max-width: 760px) {
-  .team-chat-conversation-header > .team-chat-header-actions {
+  .route-chat-interno .team-chat-conversation-header > .team-chat-header-actions {
     grid-template-columns: 34px 34px;
+    grid-template-rows: 34px;
   }
 
   .route-conversas .chat-header {
+    display: flex;
     align-items: flex-start !important;
+    flex-wrap: wrap;
   }
 
   .route-conversas .chat-controls {
     width: 100%;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     margin-left: 0;
-    justify-content: flex-start;
+    justify-content: stretch;
+  }
+
+  .route-conversas .chat-controls select[title="Responsável"],
+  .route-conversas .chat-controls select[title="Status da conversa"] {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .route-conversas .chat-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .route-conversas .conversation-ai-control {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
