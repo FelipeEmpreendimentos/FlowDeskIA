@@ -17,7 +17,7 @@ const cards: ConfiguracaoCard[] = [
     to: "/configuracoes/dados",
     title: "Empresa e conta",
     description:
-      "Consulte os dados da empresa, altere sua senha e ajuste preferências pessoais.",
+      "Consulte os dados da empresa, altere sua senha e ajuste dados pessoais.",
     icon: "settings",
     cargos: ["ADMIN", "GERENTE", "FUNCIONARIO"],
   },
@@ -25,7 +25,7 @@ const cards: ConfiguracaoCard[] = [
     to: "/configuracoes/agenda",
     title: "Agenda",
     description:
-      "Defina o intervalo usado para oferecer os horários disponíveis aos clientes.",
+      "Defina intervalos, equipes por serviço e regras usadas na distribuição automática.",
     icon: "calendar",
     cargos: ["ADMIN", "GERENTE"],
   },
@@ -37,14 +37,6 @@ const cards: ConfiguracaoCard[] = [
     icon: "lock",
     cargos: ["ADMIN"],
     badge: "Administrador",
-  },
-  {
-    to: "/notificacoes",
-    title: "Notificações",
-    description:
-      "Veja os avisos recentes e escolha quais categorias deseja receber.",
-    icon: "bell",
-    cargos: ["ADMIN", "GERENTE", "FUNCIONARIO"],
   },
   {
     to: "/atividades",
@@ -85,8 +77,8 @@ export function ConfiguracoesHub() {
         title={funcionario ? "Minha conta" : "Configurações"}
         description={
           funcionario
-            ? "Gerencie sua conta, senha e preferências de notificações."
-            : "As configurações menos frequentes ficam organizadas em um único lugar."
+            ? "Gerencie seus dados de conta e segurança. As notificações ficam disponíveis pelo sino no topo."
+            : "As configurações menos frequentes ficam organizadas em um único lugar. As notificações são acessadas pelo sino no topo."
         }
       />
 
