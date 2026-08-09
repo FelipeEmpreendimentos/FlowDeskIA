@@ -73,6 +73,9 @@ export function Clientes() {
     useState<Cliente | null>(null);
   const [alterandoSituacao, setAlterandoSituacao] = useState(false);
   const [erroConfirmacao, setErroConfirmacao] = useState("");
+  const [clienteExclusao, setClienteExclusao] = useState<Cliente | null>(null);
+  const [excluindoCliente, setExcluindoCliente] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState("");
 
   async function carregarClientes() {
     setCarregando(true);
@@ -261,6 +264,40 @@ export function Clientes() {
     }
   }
 
+  function abrirExclusao(cliente: Cliente) {
+    setClienteExclusao(cliente);
+    setErroExclusao("");
+  }
+
+  function fecharExclusao() {
+    if (excluindoCliente) return;
+    setClienteExclusao(null);
+    setErroExclusao("");
+  }
+
+  async function confirmarExclusao() {
+    if (!clienteExclusao) return;
+
+    setExcluindoCliente(true);
+    setErroExclusao("");
+    try {
+      await apiRequest<void>(`/clientes/${clienteExclusao.id}/permanente`, {
+        method: "DELETE",
+      });
+      setClienteExclusao(null);
+      setSucesso("Cliente excluído com sucesso.");
+      await Promise.all([carregarClientes(), carregarResumoClientes()]);
+    } catch (error) {
+      setErroExclusao(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir o cliente.",
+      );
+    } finally {
+      setExcluindoCliente(false);
+    }
+  }
+
   return (
     <div className="page">
       <PageHeader
@@ -301,7 +338,9 @@ export function Clientes() {
         </div>
       )}
 
-      {erro && !modalAberto && !clienteConfirmacao && <Alert>{erro}</Alert>}
+      {erro && !modalAberto && !clienteConfirmacao && !clienteExclusao && (
+        <Alert>{erro}</Alert>
+      )}
 
       <section className="mini-metrics">
         <article>
@@ -464,6 +503,14 @@ export function Clientes() {
                             size={17}
                           />
                         </button>
+                        <button
+                          className="icon-button danger"
+                          type="button"
+                          onClick={() => abrirExclusao(cliente)}
+                          title="Excluir cliente permanentemente"
+                        >
+                          <Icon name="trash" size={17} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -505,8 +552,9 @@ export function Clientes() {
                 onChange={(event) =>
                   setForm({ ...form, whatsapp: event.target.value })
                 }
-                placeholder="(46) 99999-9999"
-                inputMode="tel"
+                placeholder="46999999999"
+                inputMode="numeric"
+                maxLength={15}
                 autoComplete="tel"
                 required
               />
@@ -647,6 +695,49 @@ export function Clientes() {
                   : clienteConfirmacao.status === "ATIVO"
                     ? "Desativar cliente"
                     : "Reativar cliente"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(clienteExclusao)}
+        title="Excluir cliente"
+        subtitle="Esta ação é permanente."
+        onClose={fecharExclusao}
+        size="small"
+      >
+        {clienteExclusao && (
+          <div className="confirmation-dialog">
+            <span className="confirmation-icon confirmation-icon-danger">
+              <Icon name="trash" size={24} />
+            </span>
+            <div className="confirmation-copy">
+              <strong>Excluir {clienteExclusao.nome} permanentemente?</strong>
+              <p>
+                Clientes sem histórico podem ser removidos definitivamente. Se houver
+                atendimentos ou conversas vinculados, o sistema bloqueará a exclusão
+                para preservar o histórico e você poderá apenas desativá-lo.
+              </p>
+            </div>
+            {erroExclusao && <Alert>{erroExclusao}</Alert>}
+            <div className="modal-actions confirmation-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={fecharExclusao}
+                disabled={excluindoCliente}
+              >
+                Cancelar
+              </button>
+              <button
+                className="button button-danger"
+                type="button"
+                onClick={() => void confirmarExclusao()}
+                disabled={excluindoCliente}
+              >
+                {excluindoCliente ? "Excluindo..." : "Excluir cliente"}
               </button>
             </div>
           </div>
