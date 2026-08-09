@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.database.database import get_db
 from app.models.enums import CargoUsuario, StatusCliente
-from app.models.models import Cliente, Usuario
+from app.models.models import Agendamento, Cliente, Conversa, Usuario
 from app.schemas.entities import ClienteCreate, ClienteOut, ClienteUpdate
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
@@ -171,5 +171,51 @@ def desativar_cliente(
         entity="clientes",
         entity_id=cliente.id,
     )
+    commit_or_conflict(db)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{cliente_id}/permanente", status_code=status.HTTP_204_NO_CONTENT)
+def excluir_cliente_permanentemente(
+    cliente_id: int,
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
+    db: Session = Depends(get_db),
+) -> Response:
+    cliente = require_client(db, current_user.empresa_id, cliente_id)
+
+    possui_agendamento = db.scalar(
+        select(Agendamento.id)
+        .where(
+            Agendamento.empresa_id == current_user.empresa_id,
+            Agendamento.cliente_id == cliente.id,
+        )
+        .limit(1)
+    )
+    possui_conversa = db.scalar(
+        select(Conversa.id)
+        .where(
+            Conversa.empresa_id == current_user.empresa_id,
+            Conversa.cliente_id == cliente.id,
+        )
+        .limit(1)
+    )
+
+    if possui_agendamento is not None or possui_conversa is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Este cliente possui histórico de atendimentos ou conversas. Desative-o para preservar os registros.",
+        )
+
+    add_audit_log(
+        db,
+        user=current_user,
+        action="EXCLUIU_CLIENTE",
+        entity="clientes",
+        entity_id=cliente.id,
+        details={"nome": cliente.nome},
+    )
+    db.delete(cliente)
     commit_or_conflict(db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
