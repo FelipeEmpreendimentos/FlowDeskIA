@@ -23,6 +23,13 @@ interface TokenResponse {
   expires_in: number;
 }
 
+interface ApiValidationIssue {
+  msg?: string;
+  loc?: Array<string | number>;
+  type?: string;
+  ctx?: Record<string, unknown>;
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -40,6 +47,21 @@ const publicAuthEndpoints = [
   "/auth/recuperar-senha",
   "/auth/redefinir-senha",
 ];
+
+const phoneFields = new Set(["telefone", "whatsapp"]);
+
+const fieldLabels: Record<string, string> = {
+  nome: "Nome",
+  email: "E-mail",
+  telefone: "Telefone",
+  whatsapp: "WhatsApp",
+  senha: "Senha",
+  nova_senha: "Nova senha",
+  confirmar_senha: "Confirmação da senha",
+  descricao: "Descrição",
+  duracao_minutos: "Duração",
+  preco: "Preço",
+};
 
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -64,14 +86,45 @@ export function buildQuery(
   return serialized ? `?${serialized}` : "";
 }
 
+function normalizePhoneFields(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizePhoneFields);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => {
+      if (phoneFields.has(key) && typeof item === "string") {
+        const digits = item.replace(/\D/g, "").slice(0, 15);
+        return [key, digits || null];
+      }
+      return [key, normalizePhoneFields(item)];
+    }),
+  );
+}
+
+function normalizeRequestBody(body: BodyInit | null | undefined): BodyInit | null | undefined {
+  if (typeof body !== "string") return body;
+
+  try {
+    return JSON.stringify(normalizePhoneFields(JSON.parse(body)));
+  } catch {
+    return body;
+  }
+}
+
 async function fetchApi(
   endpoint: string,
   options: RequestInit,
   token: string | null,
 ): Promise<Response> {
   const headers = new Headers(options.headers);
+  const body = normalizeRequestBody(options.body);
 
-  if (options.body && !(options.body instanceof FormData)) {
+  if (body && !(body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -83,6 +136,7 @@ async function fetchApi(
 
   return fetch(`${API_URL}${endpoint}`, {
     ...options,
+    body,
     credentials: options.credentials ?? "include",
     cache: options.cache ?? "no-store",
     headers,
@@ -120,18 +174,57 @@ export async function restoreRememberedSession(): Promise<boolean> {
   return renovarAccessToken();
 }
 
+function validationMessage(issue: ApiValidationIssue): string {
+  const field = String(issue.loc?.at(-1) ?? "campo");
+  const label = fieldLabels[field] ?? "Campo informado";
+  const maxLength = Number(issue.ctx?.max_length ?? 0);
+  const minLength = Number(issue.ctx?.min_length ?? 0);
+
+  if (issue.type === "string_too_long") {
+    return maxLength
+      ? `${label} deve ter no máximo ${maxLength} caracteres.`
+      : `${label} ultrapassou o tamanho permitido.`;
+  }
+
+  if (issue.type === "string_too_short") {
+    return minLength
+      ? `${label} deve ter pelo menos ${minLength} caracteres.`
+      : `${label} está muito curto.`;
+  }
+
+  if (issue.type === "missing") {
+    return `${label} é obrigatório.`;
+  }
+
+  if (issue.type === "value_error") {
+    return issue.msg?.replace(/^Value error,\s*/i, "") || "Confira o valor informado.";
+  }
+
+  const englishMax = issue.msg?.match(/at most\s+(\d+)\s+characters/i);
+  if (englishMax) {
+    return `${label} deve ter no máximo ${englishMax[1]} caracteres.`;
+  }
+
+  const englishMin = issue.msg?.match(/at least\s+(\d+)\s+characters/i);
+  if (englishMin) {
+    return `${label} deve ter pelo menos ${englishMin[1]} caracteres.`;
+  }
+
+  return "Confira os dados informados e tente novamente.";
+}
+
 async function mensagemErro(response: Response): Promise<string> {
   let message = "Não foi possível concluir a solicitação.";
 
   try {
     const error = (await response.json()) as {
-      detail?: string | Array<{ msg?: string }>;
+      detail?: string | ApiValidationIssue[];
     };
 
     if (typeof error.detail === "string") {
       message = error.detail;
-    } else if (Array.isArray(error.detail) && error.detail[0]?.msg) {
-      message = error.detail[0].msg;
+    } else if (Array.isArray(error.detail) && error.detail.length > 0) {
+      message = validationMessage(error.detail[0]);
     }
   } catch {
     // Mantém a mensagem padrão quando a API não retorna JSON.
