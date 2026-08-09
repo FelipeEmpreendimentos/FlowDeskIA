@@ -1,23 +1,20 @@
 /* Ajustes visuais da rodada de revisão de 09/08. */
 
 /* -------------------------------------------------------------------------- */
-/* Chat interno: ações do grupo separadas do sino global e sem sobreposição.   */
+/* Chat interno: somente ações do grupo, alinhadas e separadas do sino global. */
 /* -------------------------------------------------------------------------- */
 
 .route-chat-interno .team-chat-conversation-header {
-  min-height: 88px;
-  padding-right: 96px;
+  min-height: 72px;
+  padding-right: 92px;
 }
 
 .route-chat-interno .team-chat-conversation-header > .team-chat-header-actions {
-  display: grid;
-  grid-template-columns: 34px 34px;
-  grid-template-rows: 34px auto;
+  display: flex;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: end;
-  column-gap: 6px;
-  row-gap: 5px;
+  justify-content: flex-end;
+  gap: 7px;
   margin-left: auto;
 }
 
@@ -29,8 +26,7 @@
   height: 34px;
   min-height: 34px;
   place-items: center;
-  align-self: center;
-  justify-self: end;
+  flex: 0 0 34px;
   padding: 0;
   margin: 0;
   border-radius: 10px;
@@ -41,22 +37,11 @@
   display: none;
 }
 
-.route-chat-interno
-  .team-chat-conversation-header
-  > .team-chat-header-actions
-  .team-chat-live-status {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  justify-self: end;
-  align-self: center;
-  margin: 0 !important;
-  padding: 0;
-  white-space: nowrap;
-}
-
-/* A regra antiga deslocava o status para a área ocupada pelo sino. */
+/* A atualização continua automática; apenas a informação visual foi removida. */
+.route-chat-interno .team-chat-live-status,
 .route-chat-interno .team-chat-page-refined .team-chat-live-status {
-  margin-right: 0 !important;
+  display: none !important;
+  margin: 0 !important;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -231,14 +216,7 @@
 
 @media (max-width: 1050px) {
   .route-chat-interno .team-chat-conversation-header {
-    padding-right: 84px;
-  }
-
-  .route-chat-interno
-    .team-chat-conversation-header
-    > .team-chat-header-actions
-    .team-chat-live-status {
-    display: none;
+    padding-right: 82px;
   }
 }
 
@@ -251,8 +229,7 @@
 
 @media (max-width: 760px) {
   .route-chat-interno .team-chat-conversation-header > .team-chat-header-actions {
-    grid-template-columns: 34px 34px;
-    grid-template-rows: 34px;
+    gap: 6px;
   }
 
   .route-conversas .chat-header {
