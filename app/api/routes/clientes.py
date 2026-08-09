@@ -79,7 +79,9 @@ def listar_clientes(
 @router.post("", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
 def criar_cliente(
     data: ClienteCreate,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
     db: Session = Depends(get_db),
 ) -> Cliente:
     enforce_limit(db, current_user.empresa_id, "clientes")
@@ -138,7 +140,7 @@ def atualizar_cliente(
         else:
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
-                "Funcionários não podem alterar o status de clientes.",
+                "Para alterar o status do cliente é necessário Gerenciar Clientes.",
             )
     if values.get("status") == StatusCliente.ATIVO and cliente.status == StatusCliente.INATIVO:
         enforce_limit(db, current_user.empresa_id, "clientes")
