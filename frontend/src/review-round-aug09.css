@@ -1,19 +1,23 @@
 /* Ajustes visuais da rodada de revisão de 09/08. */
 
-/* Chat interno: ações de grupo compactas, apenas com ícones. */
-.team-chat-header-actions {
-  display: flex;
+/* Chat interno: participantes e exclusão ficam realmente lado a lado. */
+.team-chat-conversation-header > .team-chat-header-actions {
+  display: grid;
+  grid-template-columns: 34px 34px;
   align-items: center;
-  gap: 6px;
+  justify-content: end;
+  gap: 5px 6px;
   margin-left: auto;
 }
 
 .team-chat-participants-button,
 .team-chat-delete-group {
+  display: grid;
   width: 34px;
   min-width: 34px;
   height: 34px;
   min-height: 34px;
+  place-items: center;
   padding: 0;
   border-radius: 10px;
 }
@@ -23,31 +27,49 @@
   display: none;
 }
 
-/* Conversas: cabeçalho e controles alinhados na mesma linha. */
+.team-chat-conversation-header > .team-chat-header-actions .team-chat-live-status {
+  grid-column: 1 / -1;
+  justify-self: end;
+  margin: 0 !important;
+  white-space: nowrap;
+}
+
+/* Conversas: identidade e controles usam o mesmo eixo vertical. */
 .route-conversas .chat-header {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  min-height: 72px;
+  align-items: center !important;
+  gap: 18px;
 }
 
 .route-conversas .chat-header .entity-cell {
   min-width: 0;
+  min-height: 40px;
+  flex: 1 1 auto;
   align-items: center;
 }
 
+.route-conversas .chat-header .entity-cell > div {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
 .route-conversas .chat-controls {
-  margin-left: auto;
   display: flex;
+  flex: 0 0 auto;
+  align-self: center;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .route-conversas .chat-controls select,
 .route-conversas .conversation-ai-control {
   height: 40px;
   min-height: 40px;
+  margin: 0;
 }
 
 /* Agenda: remove mensagem técnica e alinha os campos do modal. */
@@ -71,9 +93,14 @@
   margin-top: 0;
 }
 
-/* Configurações: notificações ficam apenas no módulo próprio. */
+/* Configurações: notificações ficam no módulo próprio. */
 .route-configuracoes .tabs button:nth-child(2) {
   display: none;
+}
+
+/* A tela Módulos e permissões tem duas abas próprias e ambas devem aparecer. */
+.access-settings-page .access-settings-tabs button:nth-child(2) {
+  display: inline-flex !important;
 }
 
 .route-configuracoes .company-logo-editor-copy > p {
@@ -95,8 +122,12 @@
 }
 
 @media (max-width: 760px) {
+  .team-chat-conversation-header > .team-chat-header-actions {
+    grid-template-columns: 34px 34px;
+  }
+
   .route-conversas .chat-header {
-    align-items: flex-start;
+    align-items: flex-start !important;
   }
 
   .route-conversas .chat-controls {
