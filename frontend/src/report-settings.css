@@ -81,7 +81,8 @@
   background: var(--primary);
 }
 
-.report-source-note {
+.report-source-note,
+.report-source-runtime-note {
   display: flex;
   align-items: flex-start;
   gap: 9px;
@@ -92,6 +93,11 @@
   background: #f5f8ff;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.report-source-runtime-note {
+  width: fit-content;
+  margin-bottom: 14px;
 }
 
 .report-source-footer {
