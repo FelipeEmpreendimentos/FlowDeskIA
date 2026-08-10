@@ -10,6 +10,7 @@ type AbaRelatorio = "resumo" | "servicos" | "equipe" | "avaliacoes";
 interface Resumo {
   data_inicio: string;
   data_fim: string;
+  usar_financeiro: boolean;
   atendimentos: number;
   faturamento: string | number;
   recebido: string | number;
@@ -69,6 +70,7 @@ interface Avaliacoes {
 const resumoVazio: Resumo = {
   data_inicio: todayISO(),
   data_fim: todayISO(),
+  usar_financeiro: true,
   atendimentos: 0,
   faturamento: 0,
   recebido: 0,
@@ -106,7 +108,13 @@ function dataCurta(dataIso: string): string {
   });
 }
 
-function GraficoEvolucao({ dados }: { dados: EvolucaoItem[] }) {
+function GraficoEvolucao({
+  dados,
+  usarFinanceiro,
+}: {
+  dados: EvolucaoItem[];
+  usarFinanceiro: boolean;
+}) {
   const largura = 760;
   const altura = 270;
   const margem = { top: 24, right: 22, bottom: 42, left: 62 };
@@ -114,7 +122,11 @@ function GraficoEvolucao({ dados }: { dados: EvolucaoItem[] }) {
   const areaAltura = altura - margem.top - margem.bottom;
   const maiorValor = Math.max(
     1,
-    ...dados.flatMap((item) => [Number(item.faturamento), Number(item.recebido)]),
+    ...dados.flatMap((item) =>
+      usarFinanceiro
+        ? [Number(item.faturamento), Number(item.recebido)]
+        : [Number(item.faturamento)],
+    ),
   );
   const passoX = dados.length > 1 ? areaLargura / (dados.length - 1) : areaLargura;
 
@@ -137,18 +149,22 @@ function GraficoEvolucao({ dados }: { dados: EvolucaoItem[] }) {
       <div className="card-heading">
         <div>
           <span>Evolução no período</span>
-          <h2>Faturamento e recebimentos</h2>
+          <h2>
+            {usarFinanceiro
+              ? "Faturamento e recebimentos"
+              : "Faturamento dos atendimentos finalizados"}
+          </h2>
         </div>
         <div className="report-chart-legend">
           <span><i className="legend-billed" />Faturamento</span>
-          <span><i className="legend-received" />Recebido</span>
+          {usarFinanceiro && <span><i className="legend-received" />Recebido</span>}
         </div>
       </div>
 
       {dados.length === 0 ? (
         <div className="compact-empty">Sem dados para montar o gráfico.</div>
       ) : (
-        <div className="report-line-chart" role="img" aria-label="Evolução de faturamento e recebimentos">
+        <div className="report-line-chart" role="img" aria-label="Evolução do faturamento">
           <svg viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none">
             {[0, 0.25, 0.5, 0.75, 1].map((parte) => {
               const y = margem.top + areaAltura - parte * areaAltura;
@@ -169,7 +185,9 @@ function GraficoEvolucao({ dados }: { dados: EvolucaoItem[] }) {
             })}
 
             <polyline className="report-line report-line-billed" points={pontos("faturamento")} />
-            <polyline className="report-line report-line-received" points={pontos("recebido")} />
+            {usarFinanceiro && (
+              <polyline className="report-line report-line-received" points={pontos("recebido")} />
+            )}
 
             {indicesRotulos.map((index) => {
               const item = dados[index];
@@ -368,6 +386,13 @@ export function Relatorios() {
         </div>
       </section>
 
+      {!resumo.usar_financeiro && !carregando && (
+        <div className="report-source-runtime-note">
+          <Icon name="calendar" size={16} />
+          Faturamento calculado diretamente pelos agendamentos finalizados.
+        </div>
+      )}
+
       <div className="tabs report-tabs">
         <button className={aba === "resumo" ? "tab-active" : ""} type="button" onClick={() => setAba("resumo")}>Visão geral</button>
         <button className={aba === "servicos" ? "tab-active" : ""} type="button" onClick={() => setAba("servicos")}>Serviços</button>
@@ -381,20 +406,28 @@ export function Relatorios() {
         <>
           <section className="report-metrics-grid">
             <article className="metric-card"><span>Faturamento</span><strong>{formatCurrency(resumo.faturamento)}</strong><small>{resumo.atendimentos} atendimentos</small></article>
-            <article className="metric-card"><span>Valor recebido</span><strong>{formatCurrency(resumo.recebido)}</strong><small>{formatCurrency(resumo.pendente)} pendente</small></article>
-            <article className="metric-card"><span>Ticket médio</span><strong>{formatCurrency(resumo.ticket_medio)}</strong><small>{formatCurrency(resumo.descontos)} em descontos</small></article>
+            {resumo.usar_financeiro ? (
+              <article className="metric-card"><span>Valor recebido</span><strong>{formatCurrency(resumo.recebido)}</strong><small>{formatCurrency(resumo.pendente)} pendente</small></article>
+            ) : (
+              <article className="metric-card"><span>Origem</span><strong>Agendamentos</strong><small>Somente atendimentos finalizados</small></article>
+            )}
+            <article className="metric-card"><span>Ticket médio</span><strong>{formatCurrency(resumo.ticket_medio)}</strong><small>{resumo.usar_financeiro ? `${formatCurrency(resumo.descontos)} em descontos` : "Sem depender de recebimentos"}</small></article>
             <article className="metric-card"><span>Clientes recorrentes</span><strong>{resumo.clientes_recorrentes}</strong><small>{resumo.clientes_novos} clientes novos</small></article>
           </section>
 
           <section className="report-charts-grid">
-            <GraficoEvolucao dados={evolucao} />
+            <GraficoEvolucao dados={evolucao} usarFinanceiro={resumo.usar_financeiro} />
             <GraficoServicos servicos={servicos} />
           </section>
 
           <section className="report-summary-grid">
             <article className="content-card report-highlight"><span>Eficiência operacional</span><strong>{resumo.atendimentos}</strong><p>Atendimentos finalizados e contabilizados no período.</p></article>
             <article className="content-card report-highlight"><span>Cancelamentos</span><strong>{resumo.cancelamentos}</strong><p>Agendamentos cancelados entre as datas selecionadas.</p></article>
-            <article className="content-card report-highlight"><span>Saldo a receber</span><strong>{formatCurrency(resumo.pendente)}</strong><p>Valores parciais ou ainda não pagos.</p></article>
+            {resumo.usar_financeiro ? (
+              <article className="content-card report-highlight"><span>Saldo a receber</span><strong>{formatCurrency(resumo.pendente)}</strong><p>Valores parciais ou ainda não pagos.</p></article>
+            ) : (
+              <article className="content-card report-highlight"><span>Regra de faturamento</span><strong>Finalizado</strong><p>O valor entra no relatório quando o atendimento é finalizado na Agenda.</p></article>
+            )}
           </section>
         </>
       ) : aba === "servicos" ? (
@@ -403,8 +436,8 @@ export function Relatorios() {
           {servicos.length === 0 ? (
             <EmptyState icon="services" title="Sem dados de serviços" description="Finalize atendimentos para alimentar este relatório." />
           ) : (
-            <div className="table-wrap"><table className="data-table report-table"><thead><tr><th>Serviço</th><th>Atendimentos</th><th>Faturamento</th><th>Recebido</th><th>Ticket médio</th></tr></thead><tbody>
-              {servicos.map((item) => <tr key={item.servico_id}><td><strong className="table-primary">{item.servico_nome}</strong></td><td>{item.atendimentos}</td><td>{formatCurrency(item.faturamento)}</td><td>{formatCurrency(item.recebido)}</td><td>{formatCurrency(item.ticket_medio)}</td></tr>)}
+            <div className="table-wrap"><table className="data-table report-table"><thead><tr><th>Serviço</th><th>Atendimentos</th><th>Faturamento</th>{resumo.usar_financeiro && <th>Recebido</th>}<th>Ticket médio</th></tr></thead><tbody>
+              {servicos.map((item) => <tr key={item.servico_id}><td><strong className="table-primary">{item.servico_nome}</strong></td><td>{item.atendimentos}</td><td>{formatCurrency(item.faturamento)}</td>{resumo.usar_financeiro && <td>{formatCurrency(item.recebido)}</td>}<td>{formatCurrency(item.ticket_medio)}</td></tr>)}
             </tbody></table></div>
           )}
         </section>
@@ -414,8 +447,8 @@ export function Relatorios() {
           {funcionarios.length === 0 ? (
             <EmptyState icon="team" title="Sem dados da equipe" description="Os resultados aparecem após os primeiros atendimentos finalizados." />
           ) : (
-            <div className="table-wrap"><table className="data-table report-table"><thead><tr><th>Funcionário</th><th>Atendimentos</th><th>Faturamento</th><th>Recebido</th><th>Ticket médio</th></tr></thead><tbody>
-              {funcionarios.map((item) => <tr key={item.funcionario_id ?? "sem-responsavel"}><td><strong className="table-primary">{item.funcionario_nome}</strong></td><td>{item.atendimentos}</td><td>{formatCurrency(item.faturamento)}</td><td>{formatCurrency(item.recebido)}</td><td>{formatCurrency(item.ticket_medio)}</td></tr>)}
+            <div className="table-wrap"><table className="data-table report-table"><thead><tr><th>Funcionário</th><th>Atendimentos</th><th>Faturamento</th>{resumo.usar_financeiro && <th>Recebido</th>}<th>Ticket médio</th></tr></thead><tbody>
+              {funcionarios.map((item) => <tr key={item.funcionario_id ?? "sem-responsavel"}><td><strong className="table-primary">{item.funcionario_nome}</strong></td><td>{item.atendimentos}</td><td>{formatCurrency(item.faturamento)}</td>{resumo.usar_financeiro && <td>{formatCurrency(item.recebido)}</td>}<td>{formatCurrency(item.ticket_medio)}</td></tr>)}
             </tbody></table></div>
           )}
         </section>
