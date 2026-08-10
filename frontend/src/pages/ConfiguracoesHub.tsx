@@ -30,6 +30,15 @@ const cards: ConfiguracaoCard[] = [
     cargos: ["ADMIN", "GERENTE"],
   },
   {
+    to: "/configuracoes/relatorios",
+    title: "Relatórios e financeiro",
+    description:
+      "Escolha se o faturamento vem do Financeiro ou diretamente dos agendamentos finalizados.",
+    icon: "finance",
+    cargos: ["ADMIN"],
+    badge: "Administrador",
+  },
+  {
     to: "/configuracoes/acessos",
     title: "Módulos e permissões",
     description:
