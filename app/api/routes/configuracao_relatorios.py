@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import get_current_user, require_roles
 from app.database.database import get_db
 from app.models.enums import CargoUsuario
 from app.models.models import Usuario
@@ -23,7 +23,7 @@ class ConfiguracaoRelatoriosUpdate(BaseModel):
 
 @router.get("", response_model=ConfiguracaoRelatoriosOut)
 def obter_configuracao_relatorios(
-    current_user: Usuario = Depends(require_roles(CargoUsuario.ADMIN)),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ConfiguracaoRelatoriosOut:
     return ConfiguracaoRelatoriosOut(
