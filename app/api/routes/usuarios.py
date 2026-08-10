@@ -10,6 +10,7 @@ from app.models.internal_chat import MensagemChatInterno
 from app.models.models import Agendamento, Conversa, Log, Usuario
 from app.schemas.entities import UsuarioCreate, UsuarioOut, UsuarioUpdate
 from app.services.audit import add_audit_log
+from app.services.contact import normalize_brazilian_mobile
 from app.services.db_utils import apply_patch, commit_or_conflict
 from app.services.notifications import notify_admins
 from app.services.plans import enforce_limit
@@ -201,7 +202,7 @@ def criar_usuario(
         nome=nome,
         email=data.email,
         senha_hash=hash_password(data.senha),
-        telefone=data.telefone,
+        telefone=normalize_brazilian_mobile(data.telefone, field_label="Telefone"),
         foto_perfil=data.foto_perfil,
         cargo=data.cargo,
     )
@@ -264,6 +265,12 @@ def atualizar_usuario(
                 ignorar_id=usuario.id,
             )
         values["nome"] = nome_normalizado
+
+    if "telefone" in values:
+        values["telefone"] = normalize_brazilian_mobile(
+            values.get("telefone"),
+            field_label="Telefone",
+        )
 
     novo_cargo = values.get("cargo")
     _validar_permissao_sobre_usuario(
