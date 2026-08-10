@@ -84,11 +84,14 @@
   display: none;
 }
 
-/* Equipe: visualizar mostra somente a relação de usuários. */
+/* Equipe: visualizar mostra somente a relação de usuários, sem aviso redundante. */
 .app-shell:not(.can-manage-equipe).route-equipe
   .page
   > .tabs
-  button:nth-child(n + 2) {
+  button:nth-child(n + 2),
+.app-shell:not(.can-manage-equipe).route-equipe
+  .page
+  > .alert-info {
   display: none;
 }
 
