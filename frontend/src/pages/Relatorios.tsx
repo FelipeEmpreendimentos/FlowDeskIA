@@ -352,6 +352,13 @@ export function Relatorios() {
         description="Acompanhe faturamento, atendimentos, equipe e satisfação dos clientes."
       />
 
+      {!resumo.usar_financeiro && !carregando && (
+        <div className="report-source-runtime-note">
+          <Icon name="calendar" size={16} />
+          Faturamento calculado diretamente pelos agendamentos finalizados.
+        </div>
+      )}
+
       {erro && <Alert>{erro}</Alert>}
 
       <section className="content-card report-filter-card">
@@ -386,13 +393,6 @@ export function Relatorios() {
         </div>
       </section>
 
-      {!resumo.usar_financeiro && !carregando && (
-        <div className="report-source-runtime-note">
-          <Icon name="calendar" size={16} />
-          Faturamento calculado diretamente pelos agendamentos finalizados.
-        </div>
-      )}
-
       <div className="tabs report-tabs">
         <button className={aba === "resumo" ? "tab-active" : ""} type="button" onClick={() => setAba("resumo")}>Visão geral</button>
         <button className={aba === "servicos" ? "tab-active" : ""} type="button" onClick={() => setAba("servicos")}>Serviços</button>
@@ -406,10 +406,8 @@ export function Relatorios() {
         <>
           <section className="report-metrics-grid">
             <article className="metric-card"><span>Faturamento</span><strong>{formatCurrency(resumo.faturamento)}</strong><small>{resumo.atendimentos} atendimentos</small></article>
-            {resumo.usar_financeiro ? (
+            {resumo.usar_financeiro && (
               <article className="metric-card"><span>Valor recebido</span><strong>{formatCurrency(resumo.recebido)}</strong><small>{formatCurrency(resumo.pendente)} pendente</small></article>
-            ) : (
-              <article className="metric-card"><span>Origem</span><strong>Agendamentos</strong><small>Somente atendimentos finalizados</small></article>
             )}
             <article className="metric-card"><span>Ticket médio</span><strong>{formatCurrency(resumo.ticket_medio)}</strong><small>{resumo.usar_financeiro ? `${formatCurrency(resumo.descontos)} em descontos` : "Sem depender de recebimentos"}</small></article>
             <article className="metric-card"><span>Clientes recorrentes</span><strong>{resumo.clientes_recorrentes}</strong><small>{resumo.clientes_novos} clientes novos</small></article>
