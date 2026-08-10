@@ -12,7 +12,11 @@ export function formatBrazilianMobile(value: string | null | undefined): string 
 
   const ddd = digits.slice(0, 2);
   const numero = digits.slice(2);
-  if (numero.length <= 5) return `(${ddd}) ${numero}`;
+  if (numero.length <= 4) return `(${ddd}) ${numero}`;
+
+  if (digits.length <= 10) {
+    return `(${ddd}) ${numero.slice(0, 4)}-${numero.slice(4)}`;
+  }
 
   return `(${ddd}) ${numero.slice(0, 5)}-${numero.slice(5)}`;
 }
@@ -20,8 +24,8 @@ export function formatBrazilianMobile(value: string | null | undefined): string 
 function isContactInput(target: EventTarget | null): target is HTMLInputElement {
   if (!(target instanceof HTMLInputElement)) return false;
 
-  // A regra de celular desta rodada vale especificamente para Clientes e
-  // Usuários da equipe. Outros telefones da empresa podem ter regras próprias.
+  // A regra desta rodada vale especificamente para Clientes e Usuários da
+  // equipe. Outros telefones da empresa podem ter regras próprias.
   if (!target.closest(".route-clientes, .route-equipe")) return false;
 
   if (
