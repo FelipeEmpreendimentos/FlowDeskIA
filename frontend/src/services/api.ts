@@ -242,6 +242,13 @@ function isRegistryDuplicate(endpoint: string, statusCode: number, message: stri
   );
 }
 
+function isContactValidation(statusCode: number, message: string): boolean {
+  return (
+    statusCode === 422 &&
+    /^(WhatsApp|Telefone) deve conter DDD \+ número com 8 ou 9 dígitos/i.test(message)
+  );
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -280,6 +287,17 @@ export async function apiRequest<T>(
       emitAppToast({
         type: "warning",
         title: "Cadastro já existente",
+        message,
+      });
+      throw new ApiError("", response.status);
+    }
+
+    if (isContactValidation(response.status, message)) {
+      emitAppToast({
+        type: "warning",
+        title: message.startsWith("WhatsApp")
+          ? "Confira o WhatsApp"
+          : "Confira o telefone",
         message,
       });
       throw new ApiError("", response.status);
