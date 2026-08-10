@@ -96,6 +96,7 @@ def resumo(
 ) -> RelatorioResumoOut:
     inicio, fim = _periodo(data_inicio, data_fim)
     inicio_dt, fim_dt = _datetime_bounds(inicio, fim)
+    usar_financeiro = reports_use_finance(db, current_user.empresa_id)
     fonte = _fonte_faturamento(db, current_user.empresa_id)
 
     financeiro = db.execute(
@@ -152,6 +153,7 @@ def resumo(
     return RelatorioResumoOut(
         data_inicio=inicio,
         data_fim=fim,
+        usar_financeiro=usar_financeiro,
         atendimentos=int(financeiro[0] or 0),
         faturamento=dinheiro(financeiro[1]),
         recebido=dinheiro(financeiro[2]),
