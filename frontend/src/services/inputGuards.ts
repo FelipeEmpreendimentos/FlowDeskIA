@@ -1,4 +1,21 @@
-const MAX_CONTACT_DIGITS = 15;
+const MAX_MOBILE_DIGITS = 11;
+const MAX_MOBILE_FORMATTED_LENGTH = 15;
+
+export function mobileDigits(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "").slice(0, MAX_MOBILE_DIGITS);
+}
+
+export function formatBrazilianMobile(value: string | null | undefined): string {
+  const digits = mobileDigits(value);
+  if (!digits) return "";
+  if (digits.length < 3) return `(${digits}`;
+
+  const ddd = digits.slice(0, 2);
+  const numero = digits.slice(2);
+  if (numero.length <= 5) return `(${ddd}) ${numero}`;
+
+  return `(${ddd}) ${numero.slice(0, 5)}-${numero.slice(5)}`;
+}
 
 function isContactInput(target: EventTarget | null): target is HTMLInputElement {
   if (!(target instanceof HTMLInputElement)) return false;
@@ -18,12 +35,11 @@ function isContactInput(target: EventTarget | null): target is HTMLInputElement 
 
 function normalizeContactInput(input: HTMLInputElement): void {
   input.inputMode = "numeric";
-  input.maxLength = MAX_CONTACT_DIGITS;
-  input.pattern = "[0-9]*";
+  input.maxLength = MAX_MOBILE_FORMATTED_LENGTH;
 
-  const normalized = input.value.replace(/\D/g, "").slice(0, MAX_CONTACT_DIGITS);
-  if (input.value !== normalized) {
-    input.value = normalized;
+  const formatted = formatBrazilianMobile(input.value);
+  if (input.value !== formatted) {
+    input.value = formatted;
   }
 }
 
@@ -33,53 +49,6 @@ export function installContactInputGuards(): void {
     (event) => {
       if (!isContactInput(event.target)) return;
       normalizeContactInput(event.target);
-    },
-    true,
-  );
-
-  document.addEventListener(
-    "beforeinput",
-    (event) => {
-      if (!isContactInput(event.target)) return;
-      const inputEvent = event as InputEvent;
-      const input = event.target;
-
-      if (!inputEvent.data || !inputEvent.inputType.startsWith("insert")) return;
-      if (/\D/.test(inputEvent.data)) {
-        event.preventDefault();
-        return;
-      }
-
-      const start = input.selectionStart ?? input.value.length;
-      const end = input.selectionEnd ?? start;
-      const nextLength =
-        input.value.length - (end - start) + inputEvent.data.length;
-      if (nextLength > MAX_CONTACT_DIGITS) {
-        event.preventDefault();
-      }
-    },
-    true,
-  );
-
-  document.addEventListener(
-    "paste",
-    (event) => {
-      if (!isContactInput(event.target)) return;
-      const input = event.target;
-      const digits = event.clipboardData
-        ?.getData("text")
-        .replace(/\D/g, "") ?? "";
-
-      event.preventDefault();
-
-      const start = input.selectionStart ?? input.value.length;
-      const end = input.selectionEnd ?? start;
-      const available = Math.max(
-        0,
-        MAX_CONTACT_DIGITS - (input.value.length - (end - start)),
-      );
-      input.setRangeText(digits.slice(0, available), start, end, "end");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
     },
     true,
   );
