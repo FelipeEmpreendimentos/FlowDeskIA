@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import {
@@ -9,8 +9,13 @@ import {
   PageHeader,
   StatusBadge,
 } from "../components/UI";
-import { apiRequest, buildQuery } from "../services/api";
-import type { Cliente, StatusCliente } from "../types";
+import { ApiError, apiRequest, buildQuery } from "../services/api";
+import { formatBrazilianMobile, mobileDigits } from "../services/inputGuards";
+import type {
+  AppOutletContext,
+  Cliente,
+  StatusCliente,
+} from "../types";
 import { normalizeNullable } from "../utils/format";
 
 type CampoBuscaCliente = "todos" | "nome" | "telefone" | "email";
@@ -54,6 +59,8 @@ const placeholdersBusca: Record<CampoBuscaCliente, string> = {
 
 export function Clientes() {
   const navigate = useNavigate();
+  const { usuario } = useOutletContext<AppOutletContext>();
+  const podeGerenciar = usuario.cargo !== "FUNCIONARIO";
   const [searchParams, setSearchParams] = useSearchParams();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [resumo, setResumo] = useState<ResumoClientes>(resumoVazio);
@@ -65,7 +72,7 @@ export function Clientes() {
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
   const [modalAberto, setModalAberto] = useState(
-    searchParams.get("novo") === "1",
+    searchParams.get("novo") === "1" && podeGerenciar,
   );
   const [editando, setEditando] = useState<Cliente | null>(null);
   const [form, setForm] = useState<ClienteForm>({ ...formVazio });
@@ -74,6 +81,8 @@ export function Clientes() {
   const [alterandoSituacao, setAlterandoSituacao] = useState(false);
   const [erroConfirmacao, setErroConfirmacao] = useState("");
   const [clienteExclusao, setClienteExclusao] = useState<Cliente | null>(null);
+  const [clienteExclusaoHistorico, setClienteExclusaoHistorico] =
+    useState<Cliente | null>(null);
   const [excluindoCliente, setExcluindoCliente] = useState(false);
   const [erroExclusao, setErroExclusao] = useState("");
 
@@ -140,7 +149,7 @@ export function Clientes() {
   }, [sucesso]);
 
   useEffect(() => {
-    if (searchParams.get("novo") === "1") {
+    if (searchParams.get("novo") === "1" && podeGerenciar) {
       abrirNovo();
       setSearchParams({}, { replace: true });
     }
@@ -152,6 +161,7 @@ export function Clientes() {
   }
 
   function abrirNovo() {
+    if (!podeGerenciar) return;
     setEditando(null);
     setForm({ ...formVazio });
     setModalAberto(true);
@@ -162,7 +172,7 @@ export function Clientes() {
     setEditando(cliente);
     setForm({
       nome: cliente.nome,
-      whatsapp: cliente.whatsapp ?? cliente.telefone ?? "",
+      whatsapp: formatBrazilianMobile(cliente.whatsapp ?? cliente.telefone ?? ""),
       email: cliente.email ?? "",
       observacoes: cliente.observacoes ?? "",
       status: cliente.status,
@@ -183,13 +193,20 @@ export function Clientes() {
     setSalvando(true);
     setErro("");
 
-    const payload = {
-      nome: form.nome.trim(),
-      whatsapp: normalizeNullable(form.whatsapp),
+    const contato = {
+      whatsapp: mobileDigits(form.whatsapp) || null,
       email: normalizeNullable(form.email),
-      observacoes: normalizeNullable(form.observacoes),
-      ...(editando ? { status: form.status } : {}),
     };
+
+    const payload =
+      editando && !podeGerenciar
+        ? contato
+        : {
+            nome: form.nome.trim(),
+            ...contato,
+            observacoes: normalizeNullable(form.observacoes),
+            ...(editando ? { status: form.status } : {}),
+          };
 
     try {
       if (editando) {
@@ -197,7 +214,11 @@ export function Clientes() {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
-        setSucesso("Cliente atualizado com sucesso.");
+        setSucesso(
+          podeGerenciar
+            ? "Cliente atualizado com sucesso."
+            : "Contato do cliente atualizado com sucesso.",
+        );
       } else {
         await apiRequest<Cliente>("/clientes", {
           method: "POST",
@@ -266,6 +287,7 @@ export function Clientes() {
 
   function abrirExclusao(cliente: Cliente) {
     setClienteExclusao(cliente);
+    setClienteExclusaoHistorico(null);
     setErroExclusao("");
   }
 
@@ -275,23 +297,87 @@ export function Clientes() {
     setErroExclusao("");
   }
 
+  function fecharExclusaoHistorico() {
+    if (excluindoCliente) return;
+    setClienteExclusaoHistorico(null);
+    setErroExclusao("");
+  }
+
   async function confirmarExclusao() {
     if (!clienteExclusao) return;
 
+    const cliente = clienteExclusao;
     setExcluindoCliente(true);
     setErroExclusao("");
     try {
-      await apiRequest<void>(`/clientes/${clienteExclusao.id}/permanente`, {
+      await apiRequest<void>(`/clientes/${cliente.id}/permanente`, {
         method: "DELETE",
       });
       setClienteExclusao(null);
       setSucesso("Cliente excluído com sucesso.");
       await Promise.all([carregarClientes(), carregarResumoClientes()]);
     } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.status === 409 &&
+        /histórico de atendimentos ou conversas/i.test(error.message)
+      ) {
+        setClienteExclusao(null);
+        setClienteExclusaoHistorico(cliente);
+        setErroExclusao("");
+      } else {
+        setErroExclusao(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível excluir o cliente.",
+        );
+      }
+    } finally {
+      setExcluindoCliente(false);
+    }
+  }
+
+  async function confirmarExclusaoComHistorico() {
+    if (!clienteExclusaoHistorico) return;
+
+    setExcluindoCliente(true);
+    setErroExclusao("");
+    try {
+      await apiRequest<void>(
+        `/clientes/${clienteExclusaoHistorico.id}/permanente?confirmar_historico=true`,
+        { method: "DELETE" },
+      );
+      setClienteExclusaoHistorico(null);
+      setSucesso("Cliente e registros vinculados excluídos com sucesso.");
+      await Promise.all([carregarClientes(), carregarResumoClientes()]);
+    } catch (error) {
       setErroExclusao(
         error instanceof Error
           ? error.message
-          : "Não foi possível excluir o cliente.",
+          : "Não foi possível excluir o cliente e seus registros.",
+      );
+    } finally {
+      setExcluindoCliente(false);
+    }
+  }
+
+  async function desativarEmVezDeExcluir() {
+    if (!clienteExclusaoHistorico) return;
+
+    setExcluindoCliente(true);
+    setErroExclusao("");
+    try {
+      await apiRequest<void>(`/clientes/${clienteExclusaoHistorico.id}`, {
+        method: "DELETE",
+      });
+      setClienteExclusaoHistorico(null);
+      setSucesso("Cliente desativado e histórico preservado com sucesso.");
+      await Promise.all([carregarClientes(), carregarResumoClientes()]);
+    } catch (error) {
+      setErroExclusao(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível desativar o cliente.",
       );
     } finally {
       setExcluindoCliente(false);
@@ -338,9 +424,11 @@ export function Clientes() {
         </div>
       )}
 
-      {erro && !modalAberto && !clienteConfirmacao && !clienteExclusao && (
-        <Alert>{erro}</Alert>
-      )}
+      {erro &&
+        !modalAberto &&
+        !clienteConfirmacao &&
+        !clienteExclusao &&
+        !clienteExclusaoHistorico && <Alert>{erro}</Alert>}
 
       <section className="mini-metrics">
         <article>
@@ -450,7 +538,9 @@ export function Clientes() {
                     </td>
                     <td>
                       <strong className="table-primary">
-                        {cliente.whatsapp ?? cliente.telefone ?? "—"}
+                        {formatBrazilianMobile(
+                          cliente.whatsapp ?? cliente.telefone ?? "",
+                        ) || "—"}
                       </strong>
                       <small>
                         {cliente.whatsapp || cliente.telefone
@@ -524,7 +614,11 @@ export function Clientes() {
       <Modal
         open={modalAberto}
         title={editando ? "Editar cliente" : "Novo cliente"}
-        subtitle="Informe os dados essenciais do cliente."
+        subtitle={
+          editando && !podeGerenciar
+            ? "Atualize o WhatsApp e o e-mail do cliente."
+            : "Informe os dados essenciais do cliente."
+        }
         onClose={fecharModal}
         size="large"
       >
@@ -542,17 +636,22 @@ export function Clientes() {
                 required
                 minLength={2}
                 autoComplete="name"
+                disabled={Boolean(editando) && !podeGerenciar}
               />
             </label>
 
             <label className="field">
               WhatsApp
               <input
+                type="tel"
                 value={form.whatsapp}
                 onChange={(event) =>
-                  setForm({ ...form, whatsapp: event.target.value })
+                  setForm({
+                    ...form,
+                    whatsapp: formatBrazilianMobile(event.target.value),
+                  })
                 }
-                placeholder="46999999999"
+                placeholder="(46) 99999-9999"
                 inputMode="numeric"
                 maxLength={15}
                 autoComplete="tel"
@@ -573,7 +672,7 @@ export function Clientes() {
               />
             </label>
 
-            {editando && (
+            {editando && podeGerenciar && (
               <label className="field field-span-2">
                 Status
                 <select
@@ -601,6 +700,7 @@ export function Clientes() {
                   setForm({ ...form, observacoes: event.target.value })
                 }
                 placeholder="Informações importantes sobre o cliente"
+                disabled={Boolean(editando) && !podeGerenciar}
               />
             </label>
           </div>
@@ -716,9 +816,9 @@ export function Clientes() {
             <div className="confirmation-copy">
               <strong>Excluir {clienteExclusao.nome} permanentemente?</strong>
               <p>
-                Clientes sem histórico podem ser removidos definitivamente. Se houver
-                atendimentos ou conversas vinculados, o sistema bloqueará a exclusão
-                para preservar o histórico e você poderá apenas desativá-lo.
+                O cadastro será removido definitivamente. Se houver histórico
+                vinculado, o sistema exibirá uma confirmação adicional antes de
+                apagar esses registros.
               </p>
             </div>
             {erroExclusao && <Alert>{erroExclusao}</Alert>}
@@ -737,7 +837,61 @@ export function Clientes() {
                 onClick={() => void confirmarExclusao()}
                 disabled={excluindoCliente}
               >
-                {excluindoCliente ? "Excluindo..." : "Excluir cliente"}
+                {excluindoCliente ? "Verificando..." : "Excluir cliente"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(clienteExclusaoHistorico)}
+        title="Cliente possui histórico"
+        subtitle="Confirme com atenção antes de excluir."
+        onClose={fecharExclusaoHistorico}
+        size="small"
+      >
+        {clienteExclusaoHistorico && (
+          <div className="confirmation-dialog">
+            <span className="confirmation-icon confirmation-icon-danger">
+              <Icon name="trash" size={24} />
+            </span>
+            <div className="confirmation-copy">
+              <strong>
+                Excluir {clienteExclusaoHistorico.nome} e todo o histórico?
+              </strong>
+              <p>
+                Este cliente possui atendimentos ou conversas vinculados. Se você
+                continuar, esses registros e seus dados relacionados serão excluídos
+                permanentemente. Para manter o histórico, desative o cliente em vez
+                de excluí-lo.
+              </p>
+            </div>
+            {erroExclusao && <Alert>{erroExclusao}</Alert>}
+            <div className="modal-actions confirmation-actions client-history-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={fecharExclusaoHistorico}
+                disabled={excluindoCliente}
+              >
+                Cancelar
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => void desativarEmVezDeExcluir()}
+                disabled={excluindoCliente}
+              >
+                Desativar cliente
+              </button>
+              <button
+                className="button button-danger"
+                type="button"
+                onClick={() => void confirmarExclusaoComHistorico()}
+                disabled={excluindoCliente}
+              >
+                {excluindoCliente ? "Excluindo..." : "Excluir mesmo assim"}
               </button>
             </div>
           </div>
