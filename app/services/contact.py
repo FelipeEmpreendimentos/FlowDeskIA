@@ -8,7 +8,7 @@ def normalize_brazilian_mobile(
     *,
     field_label: str = "Telefone",
 ) -> str | None:
-    """Normaliza celular brasileiro para DDD + 9 dígitos (11 números)."""
+    """Normaliza contato brasileiro para DDD + número com 8 ou 9 dígitos."""
     if value is None:
         return None
 
@@ -16,10 +16,10 @@ def normalize_brazilian_mobile(
     if not digits:
         return None
 
-    if len(digits) != 11 or digits[2] != "9":
+    if len(digits) not in (10, 11):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"{field_label} deve conter DDD + celular com 9 dígitos, por exemplo (46) 99999-9999.",
+            f"{field_label} deve conter DDD + número com 8 ou 9 dígitos, por exemplo (46) 8888-8888 ou (46) 99999-9999.",
         )
 
     return digits
