@@ -10,6 +10,7 @@ from app.api.routes import (
     chat_interno,
     clientes,
     configuracao_agenda,
+    configuracao_relatorios,
     configuracoes,
     conversas,
     empresas,
@@ -47,6 +48,7 @@ api_router.include_router(servicos.router)
 api_router.include_router(smart_agenda.router)
 api_router.include_router(agenda.router)
 api_router.include_router(configuracao_agenda.router)
+api_router.include_router(configuracao_relatorios.router)
 api_router.include_router(financeiro_permissoes.router)
 api_router.include_router(financeiro.router)
 api_router.include_router(relatorios.router)
