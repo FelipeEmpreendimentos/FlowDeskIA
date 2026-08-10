@@ -1,7 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router";
-import { restoreRememberedSession } from "../services/api";
+import { apiRequest, restoreRememberedSession } from "../services/api";
 import { getToken } from "../services/auth";
+import {
+  applyReportFinanceVisibility,
+  type ReportSettings,
+} from "../services/reportSettings";
 import { LoadingState } from "./UI";
 
 type AuthStatus = "checking" | "authenticated" | "unauthenticated";
@@ -19,6 +23,25 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
       if (!ativo) return;
       setStatus(restaurada ? "authenticated" : "unauthenticated");
     });
+
+    return () => {
+      ativo = false;
+    };
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    let ativo = true;
+    void apiRequest<ReportSettings>("/configuracoes/relatorios")
+      .then((configuracao) => {
+        if (!ativo) return;
+        applyReportFinanceVisibility(configuracao.usar_financeiro);
+      })
+      .catch(() => {
+        if (!ativo) return;
+        applyReportFinanceVisibility(true);
+      });
 
     return () => {
       ativo = false;
