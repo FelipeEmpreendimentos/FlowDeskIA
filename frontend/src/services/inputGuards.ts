@@ -20,6 +20,10 @@ export function formatBrazilianMobile(value: string | null | undefined): string 
 function isContactInput(target: EventTarget | null): target is HTMLInputElement {
   if (!(target instanceof HTMLInputElement)) return false;
 
+  // A regra de celular desta rodada vale especificamente para Clientes e
+  // Usuários da equipe. Outros telefones da empresa podem ter regras próprias.
+  if (!target.closest(".route-clientes, .route-equipe")) return false;
+
   if (
     target.type === "tel" ||
     target.inputMode === "tel" ||
