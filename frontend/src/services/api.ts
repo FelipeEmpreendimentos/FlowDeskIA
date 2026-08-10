@@ -99,7 +99,7 @@ function normalizePhoneFields(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, item]) => {
       if (phoneFields.has(key) && typeof item === "string") {
-        const digits = item.replace(/\D/g, "").slice(0, 15);
+        const digits = item.replace(/\D/g, "").slice(0, 11);
         return [key, digits || null];
       }
       return [key, normalizePhoneFields(item)];
