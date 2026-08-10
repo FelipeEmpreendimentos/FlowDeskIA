@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class RelatorioResumoOut(BaseModel):
     data_inicio: date
     data_fim: date
+    usar_financeiro: bool
     atendimentos: int
     faturamento: Decimal
     recebido: Decimal
