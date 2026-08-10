@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -10,6 +10,7 @@ from app.models.enums import CargoUsuario, StatusCliente
 from app.models.models import Agendamento, Cliente, Conversa, Usuario
 from app.schemas.entities import ClienteCreate, ClienteOut, ClienteUpdate
 from app.services.audit import add_audit_log
+from app.services.contact import normalize_brazilian_mobile
 from app.services.db_utils import apply_patch, commit_or_conflict
 from app.services.ownership import require_client
 from app.services.plans import enforce_limit
@@ -37,6 +38,39 @@ def _garantir_nome_unico(
             "Já existe um cliente cadastrado com esse nome.",
         )
     return normalizado
+
+
+def _normalizar_contatos(values: dict) -> None:
+    if "telefone" in values:
+        values["telefone"] = normalize_brazilian_mobile(
+            values.get("telefone"),
+            field_label="Telefone",
+        )
+    if "whatsapp" in values:
+        values["whatsapp"] = normalize_brazilian_mobile(
+            values.get("whatsapp"),
+            field_label="WhatsApp",
+        )
+
+
+def _possui_historico(db: Session, *, empresa_id: int, cliente_id: int) -> bool:
+    possui_agendamento = db.scalar(
+        select(Agendamento.id)
+        .where(
+            Agendamento.empresa_id == empresa_id,
+            Agendamento.cliente_id == cliente_id,
+        )
+        .limit(1)
+    )
+    possui_conversa = db.scalar(
+        select(Conversa.id)
+        .where(
+            Conversa.empresa_id == empresa_id,
+            Conversa.cliente_id == cliente_id,
+        )
+        .limit(1)
+    )
+    return possui_agendamento is not None or possui_conversa is not None
 
 
 @router.get("", response_model=list[ClienteOut])
@@ -91,6 +125,7 @@ def criar_cliente(
         empresa_id=current_user.empresa_id,
         nome=values["nome"],
     )
+    _normalizar_contatos(values)
     cliente = Cliente(empresa_id=current_user.empresa_id, **values)
     db.add(cliente)
     db.flush()
@@ -123,6 +158,15 @@ def atualizar_cliente(
     cliente = require_client(db, current_user.empresa_id, cliente_id)
     values = data.model_dump(exclude_unset=True)
 
+    if current_user.cargo == CargoUsuario.FUNCIONARIO:
+        campos_permitidos = {"telefone", "whatsapp", "email"}
+        campos_bloqueados = set(values) - campos_permitidos
+        if campos_bloqueados:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Com Visualizar Clientes você pode alterar somente WhatsApp, telefone e e-mail.",
+            )
+
     if "nome" in values:
         nome_normalizado = values["nome"].strip()
         if nome_normalizado.lower() != cliente.nome.strip().lower():
@@ -134,14 +178,8 @@ def atualizar_cliente(
             )
         values["nome"] = nome_normalizado
 
-    if current_user.cargo == CargoUsuario.FUNCIONARIO and "status" in values:
-        if values["status"] == cliente.status:
-            values.pop("status")
-        else:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "Para alterar o status do cliente é necessário Gerenciar Clientes.",
-            )
+    _normalizar_contatos(values)
+
     if values.get("status") == StatusCliente.ATIVO and cliente.status == StatusCliente.INATIVO:
         enforce_limit(db, current_user.empresa_id, "clientes")
 
@@ -152,6 +190,7 @@ def atualizar_cliente(
         action="ATUALIZOU_CLIENTE",
         entity="clientes",
         entity_id=cliente.id,
+        details={"campos": sorted(values.keys())},
     )
     return commit_or_conflict(db, cliente)
 
@@ -180,44 +219,47 @@ def desativar_cliente(
 @router.delete("/{cliente_id}/permanente", status_code=status.HTTP_204_NO_CONTENT)
 def excluir_cliente_permanentemente(
     cliente_id: int,
+    confirmar_historico: bool = False,
     current_user: Usuario = Depends(
         require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
     ),
     db: Session = Depends(get_db),
 ) -> Response:
     cliente = require_client(db, current_user.empresa_id, cliente_id)
-
-    possui_agendamento = db.scalar(
-        select(Agendamento.id)
-        .where(
-            Agendamento.empresa_id == current_user.empresa_id,
-            Agendamento.cliente_id == cliente.id,
-        )
-        .limit(1)
-    )
-    possui_conversa = db.scalar(
-        select(Conversa.id)
-        .where(
-            Conversa.empresa_id == current_user.empresa_id,
-            Conversa.cliente_id == cliente.id,
-        )
-        .limit(1)
+    possui_historico = _possui_historico(
+        db,
+        empresa_id=current_user.empresa_id,
+        cliente_id=cliente.id,
     )
 
-    if possui_agendamento is not None or possui_conversa is not None:
+    if possui_historico and not confirmar_historico:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Este cliente possui histórico de atendimentos ou conversas. Desative-o para preservar os registros.",
+            "Este cliente possui histórico de atendimentos ou conversas. Confirme a exclusão novamente para remover também todos os registros vinculados.",
         )
 
+    nome = cliente.nome
+    entity_id = cliente.id
     add_audit_log(
         db,
         user=current_user,
         action="EXCLUIU_CLIENTE",
         entity="clientes",
-        entity_id=cliente.id,
-        details={"nome": cliente.nome},
+        entity_id=entity_id,
+        details={
+            "nome": nome,
+            "historico_removido": possui_historico,
+        },
     )
-    db.delete(cliente)
+
+    # Os vínculos do cliente usam ON DELETE CASCADE/SET NULL no banco.
+    # O DELETE direto garante que atendimentos, conversas, mensagens, veículos,
+    # memórias e registros financeiros derivados sejam tratados pelas FKs.
+    db.execute(
+        delete(Cliente).where(
+            Cliente.id == entity_id,
+            Cliente.empresa_id == current_user.empresa_id,
+        )
+    )
     commit_or_conflict(db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
