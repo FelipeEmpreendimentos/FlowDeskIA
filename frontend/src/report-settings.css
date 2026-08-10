@@ -97,15 +97,29 @@
 
 .report-source-runtime-note {
   width: fit-content;
-  margin-bottom: 14px;
+  max-width: 100%;
+  margin: -4px 0 16px;
+  padding: 9px 12px;
+  align-items: center;
+  border-radius: 999px;
+  font-weight: 650;
 }
 
 .report-source-footer {
   margin-top: 0;
 }
 
+html.reports-from-finalized-appointments .sidebar-nav a[href="/financeiro"] {
+  display: none !important;
+}
+
 @media (max-width: 760px) {
   .report-source-options {
     grid-template-columns: 1fr;
+  }
+
+  .report-source-runtime-note {
+    width: 100%;
+    border-radius: 12px;
   }
 }
