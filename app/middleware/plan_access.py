@@ -93,11 +93,38 @@ def _value_for_path(path: str, mapping: dict[str, str]) -> str | None:
     return None
 
 
+def _is_numeric_child(path: str, prefix: str) -> bool:
+    if not path.startswith(f"{prefix}/"):
+        return False
+    suffix = path[len(prefix) + 1 :]
+    return suffix.isdigit()
+
+
+def _view_level_mutation_allowed(method: str, path: str) -> bool:
+    """Mutações que pertencem ao escopo operacional de Visualizar.
+
+    A autorização fina continua nas rotas. O middleware apenas deixa a
+    requisição chegar ao backend para que ele valide propriedade/campos.
+    """
+    if path == "/api/v1/agendamentos" and method == "POST":
+        return True
+    if _is_numeric_child(path, "/api/v1/agendamentos") and method in {
+        "PATCH",
+        "DELETE",
+    }:
+        return True
+    if _is_numeric_child(path, "/api/v1/clientes") and method == "PATCH":
+        return True
+    if _is_numeric_child(path, "/api/v1/veiculos") and method == "PATCH":
+        return True
+    return False
+
+
 def _management_module(method: str, path: str) -> str | None:
     exact = MANAGEMENT_EXACT_PATHS.get((method, path))
     if exact:
         return exact
-    if method in READ_METHODS:
+    if method in READ_METHODS or _view_level_mutation_allowed(method, path):
         return None
     return _value_for_path(path, MANAGEMENT_MUTATION_PATHS)
 
