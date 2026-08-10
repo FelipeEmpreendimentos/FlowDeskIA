@@ -3,10 +3,10 @@ import { Icon } from "../components/Icon";
 import { Alert, LoadingState, PageHeader } from "../components/UI";
 import { apiRequest } from "../services/api";
 import { showAppToast } from "../services/feedback";
-
-interface ConfiguracaoRelatorios {
-  usar_financeiro: boolean;
-}
+import {
+  applyReportFinanceVisibility,
+  type ReportSettings,
+} from "../services/reportSettings";
 
 export function ConfiguracaoRelatorios() {
   const [usarFinanceiro, setUsarFinanceiro] = useState(true);
@@ -20,11 +20,12 @@ export function ConfiguracaoRelatorios() {
       setCarregando(true);
       setErro("");
       try {
-        const data = await apiRequest<ConfiguracaoRelatorios>(
+        const data = await apiRequest<ReportSettings>(
           "/configuracoes/relatorios",
         );
         setUsarFinanceiro(data.usar_financeiro);
         setValorSalvo(data.usar_financeiro);
+        applyReportFinanceVisibility(data.usar_financeiro);
       } catch (error) {
         setErro(
           error instanceof Error
@@ -43,7 +44,7 @@ export function ConfiguracaoRelatorios() {
     setSalvando(true);
     setErro("");
     try {
-      const data = await apiRequest<ConfiguracaoRelatorios>(
+      const data = await apiRequest<ReportSettings>(
         "/configuracoes/relatorios",
         {
           method: "PUT",
@@ -52,6 +53,7 @@ export function ConfiguracaoRelatorios() {
       );
       setUsarFinanceiro(data.usar_financeiro);
       setValorSalvo(data.usar_financeiro);
+      applyReportFinanceVisibility(data.usar_financeiro);
       showAppToast("Origem do faturamento dos relatórios atualizada com sucesso.");
     } catch (error) {
       setErro(
