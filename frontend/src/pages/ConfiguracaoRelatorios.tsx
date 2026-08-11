@@ -96,7 +96,11 @@ export function ConfiguracaoRelatorios() {
             calculam os valores.
           </p>
 
-          <div className="report-source-options" role="radiogroup" aria-label="Origem do faturamento">
+          <div
+            className="report-source-options"
+            role="radiogroup"
+            aria-label="Origem do faturamento"
+          >
             <button
               className={`report-source-option ${usarFinanceiro ? "active" : ""}`}
               type="button"
@@ -140,10 +144,15 @@ export function ConfiguracaoRelatorios() {
 
           {!usarFinanceiro && (
             <div className="report-source-note">
-              <Icon name="check" size={17} />
-              <span>
-                Neste modo, somente agendamentos com status <strong>Finalizado</strong>
-                entram no faturamento. O valor considerado é o valor final do atendimento.
+              <span className="report-source-note-icon">
+                <Icon name="check" size={16} />
+              </span>
+              <span className="report-source-note-copy">
+                <strong>Relatórios pela Agenda</strong>
+                <small>
+                  Só atendimentos finalizados entram no faturamento. O FlowDeskIA
+                  considera automaticamente o valor final de cada agendamento.
+                </small>
               </span>
             </div>
           )}
