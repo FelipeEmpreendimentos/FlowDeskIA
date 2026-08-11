@@ -13,6 +13,7 @@ from app.models.enums import CargoUsuario
 from app.models.models import Empresa, Usuario
 from app.models.platform import EmpresaPlataforma
 from app.services.access_control import user_module_access, user_module_manage
+from app.services.appointment_retention import auto_cancel_stale_appointments
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -103,6 +104,12 @@ def get_current_user(
             status.HTTP_403_FORBIDDEN,
             "O acesso da empresa está suspenso. Entre em contato com o suporte.",
         )
+
+    auto_cancel_stale_appointments(
+        db,
+        empresa_id=empresa_id,
+        timezone_name=empresa.timezone,
+    )
 
     module = _module_for_request(request)
     if (
