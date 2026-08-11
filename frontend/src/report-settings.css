@@ -81,28 +81,61 @@
   background: var(--primary);
 }
 
-.report-source-note,
-.report-source-runtime-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 12px 14px;
-  border: 1px solid #c8d6ff;
-  border-radius: 12px;
+.report-source-note {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  width: fit-content;
+  max-width: 680px;
+  padding: 11px 13px;
+  border: 1px solid #d9e2fb;
+  border-radius: 14px;
   color: #405279;
-  background: #f5f8ff;
+  background: #f8faff;
+}
+
+.report-source-note-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--primary);
+  background: #edf2ff;
+}
+
+.report-source-note-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.report-source-note-copy strong {
+  color: var(--text);
   font-size: 13px;
-  line-height: 1.5;
+}
+
+.report-source-note-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .report-source-runtime-note {
+  display: flex;
   width: fit-content;
   max-width: 100%;
+  align-items: center;
+  gap: 9px;
   margin: -4px 0 16px;
   padding: 9px 12px;
-  align-items: center;
+  border: 1px solid #c8d6ff;
   border-radius: 999px;
+  color: #405279;
+  background: #f5f8ff;
+  font-size: 13px;
   font-weight: 650;
+  line-height: 1.5;
 }
 
 .report-source-footer {
@@ -118,6 +151,7 @@ html.reports-from-finalized-appointments .sidebar-nav a[href="/financeiro"] {
     grid-template-columns: 1fr;
   }
 
+  .report-source-note,
   .report-source-runtime-note {
     width: 100%;
     border-radius: 12px;
