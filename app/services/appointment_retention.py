@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import or_, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.enums import StatusAgendamento
@@ -39,30 +40,35 @@ def auto_cancel_stale_appointments(
     threshold_date = threshold_local.date()
     threshold_time = threshold_local.time().replace(tzinfo=None)
 
-    result = db.execute(
-        update(Agendamento)
-        .where(
-            Agendamento.empresa_id == empresa_id,
-            Agendamento.status.notin_(
-                (
-                    StatusAgendamento.FINALIZADO,
-                    StatusAgendamento.CANCELADO,
-                )
-            ),
-            or_(
-                Agendamento.data < threshold_date,
-                (
-                    (Agendamento.data == threshold_date)
-                    & (Agendamento.hora_fim <= threshold_time)
+    try:
+        result = db.execute(
+            update(Agendamento)
+            .where(
+                Agendamento.empresa_id == empresa_id,
+                Agendamento.status.notin_(
+                    (
+                        StatusAgendamento.FINALIZADO,
+                        StatusAgendamento.CANCELADO,
+                    )
                 ),
-            ),
+                or_(
+                    Agendamento.data < threshold_date,
+                    (
+                        (Agendamento.data == threshold_date)
+                        & (Agendamento.hora_fim <= threshold_time)
+                    ),
+                ),
+            )
+            .values(
+                status=StatusAgendamento.CANCELADO,
+                cancelado_em=now_utc,
+            )
         )
-        .values(
-            status=StatusAgendamento.CANCELADO,
-            cancelado_em=now_utc,
-        )
-    )
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        _last_cleanup_by_company[empresa_id] = now_utc
+        return 0
 
-    db.commit()
     _last_cleanup_by_company[empresa_id] = now_utc
     return int(result.rowcount or 0)
