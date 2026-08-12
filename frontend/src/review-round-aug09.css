@@ -93,12 +93,12 @@
 .route-conversas .chat-controls {
   position: relative;
   z-index: 21;
-  display: grid;
-  grid-template-columns: 154px 154px auto;
+  display: flex;
+  height: 40px;
   flex: 0 0 auto;
   align-self: center;
-  align-items: center;
-  justify-content: end;
+  align-items: stretch;
+  justify-content: flex-end;
   gap: 8px;
   margin: 0;
   overflow: visible;
@@ -107,22 +107,25 @@
 .route-conversas .chat-controls select,
 .route-conversas .conversation-ai-control {
   box-sizing: border-box;
-  width: 100%;
   height: 40px !important;
   min-height: 40px !important;
-  align-self: center;
+  max-height: 40px !important;
+  align-self: stretch;
   margin: 0 !important;
+  vertical-align: top;
 }
 
 .route-conversas .chat-controls select[title="Responsável"],
 .route-conversas .chat-controls select[title="Status da conversa"] {
   position: relative;
   z-index: 22;
+  width: 154px;
   min-width: 154px;
   max-width: 154px;
+  flex: 0 0 154px;
   padding: 0 32px 0 12px !important;
   overflow: visible;
-  line-height: normal !important;
+  line-height: 1.2 !important;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -134,6 +137,7 @@
 
 .route-conversas .conversation-ai-control {
   min-width: 104px;
+  flex: 0 0 auto;
   justify-content: center;
 }
 
@@ -407,7 +411,9 @@
   }
 
   .route-conversas .chat-controls {
+    display: grid;
     width: 100%;
+    height: auto;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     margin-left: 0;
     justify-content: stretch;
@@ -418,6 +424,7 @@
     width: 100%;
     min-width: 0;
     max-width: none;
+    flex-basis: auto;
   }
 
   .agenda-service-team-user {
