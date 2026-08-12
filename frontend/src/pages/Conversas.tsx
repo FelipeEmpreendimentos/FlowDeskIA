@@ -489,11 +489,27 @@ export function Conversas() {
       setFiltroStatus("EM_ATENDIMENTO");
       await carregarConversas(reaberta.id, "ATUAIS");
     } catch (error) {
-      setErro(
+      const mensagem =
         error instanceof Error
           ? error.message
-          : "Não foi possível reabrir a conversa.",
-      );
+          : "Não foi possível reabrir a conversa.";
+      const match = mensagem.match(/conversa\s+#(\d+)/i);
+
+      if (match) {
+        const existenteId = Number(match[1]);
+        setModalReabertura(false);
+        setErro("");
+        setVisualizacao("ATUAIS");
+        setFiltroStatus("");
+        setEscopoAtendimento("GERAL");
+        setSucesso(
+          "Este cliente já possui uma conversa ativa. Abrimos o atendimento existente.",
+        );
+        await carregarConversas(existenteId, "ATUAIS");
+        return;
+      }
+
+      setErro(mensagem);
     } finally {
       setProcessandoStatus(false);
     }
