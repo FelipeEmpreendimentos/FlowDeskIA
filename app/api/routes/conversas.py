@@ -10,7 +10,7 @@ from app.api.deps import get_current_user, require_roles
 from app.core.permissions import is_management
 from app.database.database import get_db
 from app.models.enums import CargoUsuario, RemetenteMensagem, StatusConversa
-from app.models.models import Conversa, Mensagem, Usuario
+from app.models.models import Cliente, Conversa, Mensagem, Usuario
 from app.schemas.entities import (
     ConversaAvaliacaoResposta,
     ConversaCreate,
@@ -41,27 +41,64 @@ def _get(db: Session, empresa_id: int, conversa_id: int) -> Conversa:
     return item
 
 
+def _lock_client_conversation_scope(
+    db: Session,
+    *,
+    empresa_id: int,
+    cliente_id: int,
+) -> None:
+    """Serializa criação/reabertura de conversas para o mesmo cliente.
+
+    O lock na linha do cliente evita que duas requisições concorrentes passem pela
+    checagem de conversa ativa ao mesmo tempo. Em bancos que não suportam
+    ``FOR UPDATE`` a consulta continua válida, sem alterar a regra funcional.
+    """
+    require_client(db, empresa_id, cliente_id)
+    db.execute(
+        select(Cliente.id)
+        .where(
+            Cliente.id == cliente_id,
+            Cliente.empresa_id == empresa_id,
+        )
+        .with_for_update()
+    )
+
+
 def _conversa_ativa_existente(
     db: Session,
     *,
     empresa_id: int,
     cliente_id: int,
     origem,
+    exclude_id: int | None = None,
 ) -> Conversa | None:
+    query = select(Conversa).where(
+        Conversa.empresa_id == empresa_id,
+        Conversa.cliente_id == cliente_id,
+        Conversa.origem == origem,
+        Conversa.status.in_(
+            [StatusConversa.ABERTA, StatusConversa.EM_ATENDIMENTO]
+        ),
+    )
+    if exclude_id is not None:
+        query = query.where(Conversa.id != exclude_id)
+
     return db.scalar(
-        select(Conversa)
-        .where(
-            Conversa.empresa_id == empresa_id,
-            Conversa.cliente_id == cliente_id,
-            Conversa.origem == origem,
-            Conversa.status.in_(
-                [StatusConversa.ABERTA, StatusConversa.EM_ATENDIMENTO]
-            ),
-        )
-        .order_by(
+        query.order_by(
             Conversa.ultima_interacao.desc().nullslast(),
             Conversa.created_at.desc(),
         )
+    )
+
+
+def _raise_active_conversation_conflict(existente: Conversa, origem) -> None:
+    canal = origem.value if hasattr(origem, "value") else origem
+    raise HTTPException(
+        status.HTTP_409_CONFLICT,
+        (
+            f"Já existe uma conversa ativa deste cliente no canal {canal} "
+            f"(conversa #{existente.id}). Abra a conversa existente para continuar o atendimento."
+        ),
     )
 
 
@@ -152,7 +189,11 @@ def criar_conversa(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Conversa:
-    require_client(db, current_user.empresa_id, data.cliente_id)
+    _lock_client_conversation_scope(
+        db,
+        empresa_id=current_user.empresa_id,
+        cliente_id=data.cliente_id,
+    )
 
     existente = _conversa_ativa_existente(
         db,
@@ -161,14 +202,7 @@ def criar_conversa(
         origem=data.origem,
     )
     if existente is not None:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            (
-                f"Já existe uma conversa ativa deste cliente no canal "
-                f"{data.origem.value if hasattr(data.origem, 'value') else data.origem} "
-                f"(conversa #{existente.id}). Abra a conversa existente para continuar o atendimento."
-            ),
-        )
+        _raise_active_conversation_conflict(existente, data.origem)
 
     values = data.model_dump()
 
@@ -402,6 +436,21 @@ def reabrir_conversa(
             "Somente conversas finalizadas podem ser reabertas.",
         )
 
+    _lock_client_conversation_scope(
+        db,
+        empresa_id=current_user.empresa_id,
+        cliente_id=item.cliente_id,
+    )
+    existente = _conversa_ativa_existente(
+        db,
+        empresa_id=current_user.empresa_id,
+        cliente_id=item.cliente_id,
+        origem=item.origem,
+        exclude_id=item.id,
+    )
+    if existente is not None:
+        _raise_active_conversation_conflict(existente, item.origem)
+
     item.status = StatusConversa.EM_ATENDIMENTO
     item.responsavel_id = current_user.id
     item.ia_ativa = False
@@ -496,6 +545,25 @@ def criar_mensagem(
             status.HTTP_403_FORBIDDEN,
             "Funcionários só podem enviar mensagens como funcionário.",
         )
+
+    if (
+        data.remetente == RemetenteMensagem.CLIENTE
+        and conversation.status == StatusConversa.FINALIZADA
+    ):
+        _lock_client_conversation_scope(
+            db,
+            empresa_id=current_user.empresa_id,
+            cliente_id=conversation.cliente_id,
+        )
+        existente = _conversa_ativa_existente(
+            db,
+            empresa_id=current_user.empresa_id,
+            cliente_id=conversation.cliente_id,
+            origem=conversation.origem,
+            exclude_id=conversation.id,
+        )
+        if existente is not None:
+            _raise_active_conversation_conflict(existente, conversation.origem)
 
     message = Mensagem(
         conversa_id=conversa_id,
