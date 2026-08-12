@@ -48,11 +48,14 @@
 /* -------------------------------------------------------------------------- */
 
 .route-conversas .chat-header {
+  position: relative;
+  z-index: 20;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: 72px;
   align-items: center !important;
   column-gap: 18px;
+  overflow: visible;
 }
 
 .route-conversas .chat-header .entity-cell {
@@ -88,6 +91,8 @@
 }
 
 .route-conversas .chat-controls {
+  position: relative;
+  z-index: 21;
   display: grid;
   grid-template-columns: 154px 154px auto;
   flex: 0 0 auto;
@@ -96,6 +101,7 @@
   justify-content: end;
   gap: 8px;
   margin: 0;
+  overflow: visible;
 }
 
 .route-conversas .chat-controls select,
@@ -110,11 +116,20 @@
 
 .route-conversas .chat-controls select[title="Responsável"],
 .route-conversas .chat-controls select[title="Status da conversa"] {
+  position: relative;
+  z-index: 22;
   min-width: 154px;
   max-width: 154px;
-  padding-top: 0;
-  padding-bottom: 0;
-  line-height: 40px;
+  padding: 0 32px 0 12px !important;
+  overflow: visible;
+  line-height: normal !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-conversas .chat-controls select[title="Responsável"] option,
+.route-conversas .chat-controls select[title="Status da conversa"] option {
+  line-height: normal;
 }
 
 .route-conversas .conversation-ai-control {
