@@ -42,6 +42,13 @@
   align-self: center !important;
 }
 
+@media (min-width: 761px) {
+  .route-conversas .chat-controls {
+    position: relative;
+    top: 2px;
+  }
+}
+
 @media (max-width: 760px) {
   .route-conversas .chat-controls {
     display: grid !important;
