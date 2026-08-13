@@ -31,6 +31,14 @@
   align-self: center !important;
 }
 
+@supports (appearance: base-select) {
+  .route-conversas .chat-controls select[title="Responsável"],
+  .route-conversas .chat-controls select[title="Status da conversa"] {
+    display: flex !important;
+    align-items: center !important;
+  }
+}
+
 .route-conversas .conversation-ai-control {
   box-sizing: border-box;
   width: 104px;
