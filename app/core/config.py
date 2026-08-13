@@ -62,6 +62,11 @@ class Settings:
     smtp_use_ssl: bool
     smtp_timeout_seconds: int
 
+    openai_api_key: str | None
+    openai_model: str
+    openai_timeout_seconds: int
+    openai_max_output_tokens: int
+
     cors_origins: list[str]
 
     @property
@@ -72,6 +77,10 @@ class Settings:
             and self.smtp_password
             and self.smtp_from
         )
+
+    @property
+    def openai_configured(self) -> bool:
+        return bool(self.openai_api_key)
 
 
 settings = Settings(
@@ -101,6 +110,10 @@ settings = Settings(
     smtp_starttls=_boolean("SMTP_STARTTLS", True),
     smtp_use_ssl=_boolean("SMTP_USE_SSL", False),
     smtp_timeout_seconds=int(os.getenv("SMTP_TIMEOUT_SECONDS", "20")),
+    openai_api_key=os.getenv("OPENAI_API_KEY") or None,
+    openai_model=os.getenv("OPENAI_MODEL", "gpt-5-mini").strip(),
+    openai_timeout_seconds=int(os.getenv("OPENAI_TIMEOUT_SECONDS", "30")),
+    openai_max_output_tokens=int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "500")),
     cors_origins=_csv(
         "CORS_ORIGINS",
         "http://localhost:3000,http://localhost:5173",
@@ -111,6 +124,11 @@ if settings.smtp_starttls and settings.smtp_use_ssl:
     raise RuntimeError(
         "SMTP_STARTTLS e SMTP_USE_SSL não podem estar ativos ao mesmo tempo."
     )
+
+if settings.openai_timeout_seconds <= 0:
+    raise RuntimeError("OPENAI_TIMEOUT_SECONDS precisa ser maior que zero.")
+if settings.openai_max_output_tokens <= 0:
+    raise RuntimeError("OPENAI_MAX_OUTPUT_TOKENS precisa ser maior que zero.")
 
 if settings.environment in PRODUCTION_ENVIRONMENTS:
     if settings.jwt_secret == DEFAULT_JWT_SECRET or len(settings.jwt_secret) < 32:
