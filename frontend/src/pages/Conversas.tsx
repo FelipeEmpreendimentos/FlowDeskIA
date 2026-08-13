@@ -10,6 +10,7 @@ import {
   StatusBadge,
 } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type {
   AppOutletContext,
   Cliente,
@@ -306,18 +307,23 @@ export function Conversas() {
           ? error.message
           : "Não foi possível criar a conversa.";
       const match = mensagem.match(/conversa\s+#(\d+)/i);
-      setConversaExistenteId(match ? Number(match[1]) : null);
-      setErro(
-        match
-          ? "Já existe uma conversa ativa para este cliente neste canal."
-          : mensagem,
-      );
+
+      if (match) {
+        showAppToast(
+          "Este cliente já possui uma conversa ativa. Abrindo o atendimento existente.",
+          { type: "warning" },
+        );
+        await abrirConversaExistente(Number(match[1]));
+        return;
+      }
+
+      setErro(mensagem);
     }
   }
 
-  async function abrirConversaExistente() {
-    if (!conversaExistenteId) return;
-    const id = conversaExistenteId;
+  async function abrirConversaExistente(idRecebido?: number) {
+    const id = idRecebido ?? conversaExistenteId;
+    if (!id) return;
     setModalAberto(false);
     setConversaExistenteId(null);
     setErro("");
@@ -502,8 +508,9 @@ export function Conversas() {
         setVisualizacao("ATUAIS");
         setFiltroStatus("");
         setEscopoAtendimento("GERAL");
-        setSucesso(
-          "Este cliente já possui uma conversa ativa. Abrimos o atendimento existente.",
+        showAppToast(
+          "Este cliente já possui uma conversa ativa. Abrindo o atendimento existente.",
+          { type: "warning" },
         );
         await carregarConversas(existenteId, "ATUAIS");
         return;
