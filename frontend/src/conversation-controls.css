@@ -28,6 +28,7 @@
   min-height: 40px !important;
   max-height: 40px !important;
   flex: 0 0 154px;
+  align-self: center !important;
 }
 
 .route-conversas .conversation-ai-control {
@@ -38,6 +39,7 @@
   min-height: 40px !important;
   max-height: 40px !important;
   flex: 0 0 104px;
+  align-self: center !important;
 }
 
 @media (max-width: 760px) {
