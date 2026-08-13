@@ -8,6 +8,7 @@ class LoginRequest(BaseModel):
     empresa_id: int = Field(gt=0)
     email: str = Field(min_length=3, max_length=150)
     senha: str = Field(min_length=6, max_length=128)
+    manter_conectado: bool = False
 
 
 class TokenResponse(BaseModel):

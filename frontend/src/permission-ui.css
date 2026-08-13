@@ -31,7 +31,7 @@
   display: none;
 }
 
-/* ---------- Permissões visuais por cargo ---------- */
+/* ---------- Permissões visuais ---------- */
 
 /* Configurações ficam em modo somente leitura sem ocupar a tela com um alerta. */
 .role-funcionario.route-configuracoes
@@ -45,30 +45,30 @@
   display: none;
 }
 
-/* Funcionários consultam o catálogo, mas a gestão dos serviços é administrativa. */
-.role-funcionario.route-servicos .page-actions,
-.role-funcionario.route-servicos .service-card-header .row-actions,
-.role-funcionario.route-servicos .empty-state .button,
-.role-funcionario .quick-action-grid a[href="/servicos"] {
+/*
+ * As ações dos módulos não são mais escondidas apenas pelo cargo FUNCIONARIO.
+ * A fonte de verdade é a permissão efetiva can-manage-* adicionada pelo
+ * AppLayout e aplicada em permission-behavior.css.
+ */
+.app-shell:not(.can-manage-servicos).route-servicos .page-actions,
+.app-shell:not(.can-manage-servicos).route-servicos .service-card-header .row-actions,
+.app-shell:not(.can-manage-servicos).route-servicos .empty-state .button {
   display: none !important;
 }
 
-/* Funcionários podem cadastrar e editar veículos, mas não excluí-los. */
-.role-funcionario.route-veiculos button[title="Excluir veículo"] {
+.app-shell:not(.can-manage-veiculos).route-veiculos button[title="Excluir veículo"] {
   display: none;
 }
 
-/* Funcionários editam dados operacionais do cliente, sem trocar sua situação. */
-.role-funcionario.route-clientes button[title="Desativar"],
-.role-funcionario.route-clientes button[title="Reativar"],
-.role-funcionario.route-clientes
+.app-shell:not(.can-manage-clientes).route-clientes button[title="Desativar"],
+.app-shell:not(.can-manage-clientes).route-clientes button[title="Reativar"],
+.app-shell:not(.can-manage-clientes).route-clientes
   .modal
   label:has(select option[value="BLOQUEADO"]) {
   display: none;
 }
 
-/* Cancelamento de agendamento permanece reservado à gestão. */
-.role-funcionario.route-agenda button[title="Cancelar agendamento"] {
+.app-shell:not(.can-manage-agenda).route-agenda button[title="Cancelar agendamento"] {
   display: none;
 }
 

@@ -110,6 +110,8 @@ export interface Agendamento {
 export interface SlotDisponivel {
   hora_inicio: string;
   hora_fim: string;
+  funcionario_id: number;
+  funcionario_nome: string;
 }
 
 export interface Horario {
@@ -228,5 +230,6 @@ export interface DashboardResumo {
 
 export interface AppOutletContext {
   usuario: UsuarioLogado;
+  modulos: Partial<Record<string, boolean>>;
   atualizarUsuario: () => Promise<void>;
 }

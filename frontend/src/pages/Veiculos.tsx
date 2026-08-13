@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import { Alert, EmptyState, LoadingState, PageHeader } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type { Cliente, TipoVeiculo, Veiculo } from "../types";
 import { displayVehicle, normalizeNullable } from "../utils/format";
 
@@ -55,15 +57,12 @@ function tipoVeiculoLabel(tipo: TipoVeiculo | null): string {
 
 export function Veiculos() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [clienteInicial] = useState(
-    () => searchParams.get("cliente") ?? "",
-  );
+  const [clienteInicial] = useState(() => searchParams.get("cliente") ?? "");
   const clienteInicialAplicado = useRef(false);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [busca, setBusca] = useState("");
-  const [campoBusca, setCampoBusca] =
-    useState<CampoBuscaVeiculo>("todos");
+  const [campoBusca, setCampoBusca] = useState<CampoBuscaVeiculo>("todos");
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [editando, setEditando] = useState<Veiculo | null>(null);
@@ -72,8 +71,9 @@ export function Veiculos() {
     cliente_id: clienteInicial,
   });
   const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [veiculoExclusao, setVeiculoExclusao] = useState<Veiculo | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   async function carregar() {
     setCarregando(true);
@@ -115,7 +115,6 @@ export function Veiculos() {
   const clienteNome = (id: number) =>
     clientes.find((item) => item.id === id)?.nome ?? `Cliente #${id}`;
 
-
   useEffect(() => {
     if (
       clienteInicialAplicado.current ||
@@ -126,9 +125,7 @@ export function Veiculos() {
     }
 
     clienteInicialAplicado.current = true;
-    const cliente = clientes.find(
-      (item) => item.id === Number(clienteInicial),
-    );
+    const cliente = clientes.find((item) => item.id === Number(clienteInicial));
 
     if (cliente) {
       setCampoBusca("cliente");
@@ -193,7 +190,7 @@ export function Veiculos() {
           method: "PATCH",
           body: JSON.stringify(fields),
         });
-        setSucesso("Veículo atualizado com sucesso.");
+        showAppToast("Veículo atualizado com sucesso.");
       } else {
         await apiRequest<Veiculo>("/veiculos", {
           method: "POST",
@@ -202,7 +199,7 @@ export function Veiculos() {
             ...fields,
           }),
         });
-        setSucesso("Veículo cadastrado com sucesso.");
+        showAppToast("Veículo cadastrado com sucesso.");
       }
 
       fecharModal();
@@ -218,16 +215,28 @@ export function Veiculos() {
     }
   }
 
-  async function excluir(item: Veiculo) {
-    if (!window.confirm(`Excluir o veículo ${displayVehicle(item)}?`)) {
-      return;
-    }
+  function solicitarExclusao(item: Veiculo) {
+    setErro("");
+    setVeiculoExclusao(item);
+  }
 
+  function fecharExclusao() {
+    if (excluindo) return;
+    setVeiculoExclusao(null);
+    setErro("");
+  }
+
+  async function confirmarExclusao() {
+    if (!veiculoExclusao) return;
+
+    setExcluindo(true);
+    setErro("");
     try {
-      await apiRequest<void>(`/veiculos/${item.id}`, {
+      await apiRequest<void>(`/veiculos/${veiculoExclusao.id}`, {
         method: "DELETE",
       });
-      setSucesso("Veículo excluído.");
+      setVeiculoExclusao(null);
+      showAppToast("Veículo excluído com sucesso.");
       await carregar();
     } catch (error) {
       setErro(
@@ -235,10 +244,10 @@ export function Veiculos() {
           ? error.message
           : "Não foi possível excluir o veículo.",
       );
+    } finally {
+      setExcluindo(false);
     }
   }
-
-
 
   return (
     <div className="page">
@@ -258,15 +267,7 @@ export function Veiculos() {
         }
       />
 
-      {sucesso && (
-        <Alert type="success">
-          {sucesso}
-          <button className="alert-close" onClick={() => setSucesso("")}>
-            ×
-          </button>
-        </Alert>
-      )}
-      {erro && !modalAberto && <Alert>{erro}</Alert>}
+      {erro && !modalAberto && !veiculoExclusao && <Alert>{erro}</Alert>}
 
       <section className="content-card">
         <div className="toolbar">
@@ -313,7 +314,6 @@ export function Veiculos() {
               </select>
             </label>
           </div>
-
         </div>
 
         {carregando ? (
@@ -353,7 +353,7 @@ export function Veiculos() {
                     <button
                       className="icon-button danger"
                       type="button"
-                      onClick={() => void excluir(item)}
+                      onClick={() => solicitarExclusao(item)}
                       title="Excluir veículo"
                     >
                       <Icon name="trash" size={17} />
@@ -493,6 +493,22 @@ export function Veiculos() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmationModal
+        open={Boolean(veiculoExclusao)}
+        title="Excluir veículo"
+        heading={`Excluir ${
+          veiculoExclusao ? displayVehicle(veiculoExclusao) : "este veículo"
+        }?`}
+        description="O veículo será removido do cadastro do cliente. Esta ação não pode ser desfeita."
+        confirmLabel="Excluir veículo"
+        onClose={fecharExclusao}
+        onConfirm={() => void confirmarExclusao()}
+        loading={excluindo}
+        error={erro}
+        tone="danger"
+        icon="car"
+      />
     </div>
   );
 }

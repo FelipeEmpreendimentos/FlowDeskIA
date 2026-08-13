@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
-import { apiRequest } from "../services/api";
-import { getCompanyId, getToken, saveSession } from "../services/auth";
 import { Icon } from "../components/Icon";
+import { LoadingState } from "../components/UI";
+import { apiRequest, restoreRememberedSession } from "../services/api";
+import { getCompanyId, getToken, saveSession } from "../services/auth";
 
 interface LoginResponse {
   access_token: string;
@@ -15,11 +16,37 @@ export function Login() {
   const [empresaId, setEmpresaId] = useState(getCompanyId());
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [manterConectado, setManterConectado] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [verificandoSessao, setVerificandoSessao] = useState(!getToken());
+  const [sessaoRestaurada, setSessaoRestaurada] = useState(Boolean(getToken()));
 
-  if (getToken()) {
+  useEffect(() => {
+    if (!verificandoSessao) return;
+
+    let ativo = true;
+    void restoreRememberedSession().then((restaurada) => {
+      if (!ativo) return;
+      setSessaoRestaurada(restaurada);
+      setVerificandoSessao(false);
+    });
+
+    return () => {
+      ativo = false;
+    };
+  }, [verificandoSessao]);
+
+  if (verificandoSessao) {
+    return (
+      <main className="app-loading">
+        <LoadingState label="Verificando sua sessão..." />
+      </main>
+    );
+  }
+
+  if (sessaoRestaurada || getToken()) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -35,13 +62,18 @@ export function Login() {
           empresa_id: Number(empresaId),
           email: email.trim(),
           senha,
+          manter_conectado: manterConectado,
         }),
       });
 
       saveSession(response.access_token, empresaId);
       navigate("/dashboard", { replace: true });
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível realizar o login.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível realizar o login.",
+      );
     } finally {
       setCarregando(false);
     }
@@ -67,7 +99,12 @@ export function Login() {
       </section>
 
       <section className="login-form-area">
-        <form className="login-card" onSubmit={handleSubmit}>
+        <form
+          className="login-card"
+          onSubmit={handleSubmit}
+          autoComplete="on"
+          method="post"
+        >
           <header>
             <span className="login-label">Acesso ao sistema</span>
             <h2>Bem-vindo de volta</h2>
@@ -78,6 +115,8 @@ export function Login() {
             Empresa ID
             <input
               type="number"
+              name="organization"
+              autoComplete="organization"
               min="1"
               inputMode="numeric"
               value={empresaId}
@@ -90,7 +129,8 @@ export function Login() {
             E-mail
             <input
               type="email"
-              autoComplete="email"
+              name="username"
+              autoComplete="username"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="seuemail@exemplo.com"
@@ -103,6 +143,7 @@ export function Login() {
             <div className="password-field">
               <input
                 type={mostrarSenha ? "text" : "password"}
+                name="password"
                 autoComplete="current-password"
                 value={senha}
                 onChange={(event) => setSenha(event.target.value)}
@@ -121,6 +162,17 @@ export function Login() {
           </label>
 
           <div className="login-options">
+            <label className="remember-device-option">
+              <input
+                className="remember-device-input"
+                type="checkbox"
+                checked={manterConectado}
+                onChange={(event) => setManterConectado(event.target.checked)}
+              />
+              <span className="remember-device-box" aria-hidden="true" />
+              <span>Lembre de mim</span>
+            </label>
+
             <Link className="auth-link" to="/recuperar-senha">
               Esqueceu sua senha?
             </Link>
@@ -128,7 +180,11 @@ export function Login() {
 
           {erro && <div className="alert alert-error">{erro}</div>}
 
-          <button className="button button-primary button-full" type="submit" disabled={carregando}>
+          <button
+            className="button button-primary button-full"
+            type="submit"
+            disabled={carregando}
+          >
             {carregando ? "Entrando..." : "Entrar"}
           </button>
         </form>

@@ -1,7 +1,7 @@
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, literal, select
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps import require_roles
@@ -12,12 +12,14 @@ from app.models.models import Agendamento, Cliente, Conversa, Servico, Usuario
 from app.schemas.reports import (
     AvaliacaoComentarioItem,
     RelatorioAvaliacoesOut,
+    RelatorioEvolucaoItem,
     RelatorioFuncionarioItem,
     RelatorioResumoOut,
     RelatorioServicoItem,
 )
 from app.services.finance import dinheiro
 from app.services.plans import require_feature
+from app.services.report_settings import reports_use_finance
 
 
 router = APIRouter(prefix="/relatorios", tags=["Relatórios"])
@@ -42,6 +44,47 @@ def _datetime_bounds(inicio: date, fim: date) -> tuple[datetime, datetime]:
     )
 
 
+def _fonte_faturamento(db: Session, empresa_id: int):
+    """Fonte única dos valores usados nos relatórios.
+
+    No modo integrado usa o fechamento financeiro atual. No modo independente,
+    somente atendimentos FINALIZADO entram no faturamento e o valor realizado é
+    o valor_final do próprio agendamento. Nesse modo não existe pendência nem
+    desconto financeiro dentro do FlowDeskIA.
+    """
+    if reports_use_finance(db, empresa_id):
+        return (
+            select(
+                FechamentoFinanceiro.agendamento_id.label("agendamento_id"),
+                FechamentoFinanceiro.valor_final.label("valor_final"),
+                FechamentoFinanceiro.valor_recebido.label("valor_recebido"),
+                FechamentoFinanceiro.valor_pendente.label("valor_pendente"),
+                FechamentoFinanceiro.desconto_valor.label("desconto_valor"),
+            )
+            .where(
+                FechamentoFinanceiro.empresa_id == empresa_id,
+                FechamentoFinanceiro.status != "ESTORNADO",
+            )
+            .subquery("fonte_faturamento")
+        )
+
+    valor = func.coalesce(Agendamento.valor_final, 0)
+    return (
+        select(
+            Agendamento.id.label("agendamento_id"),
+            valor.label("valor_final"),
+            valor.label("valor_recebido"),
+            literal(0).label("valor_pendente"),
+            literal(0).label("desconto_valor"),
+        )
+        .where(
+            Agendamento.empresa_id == empresa_id,
+            Agendamento.status == StatusAgendamento.FINALIZADO,
+        )
+        .subquery("fonte_faturamento")
+    )
+
+
 @router.get("/resumo", response_model=RelatorioResumoOut)
 def resumo(
     data_inicio: date | None = None,
@@ -53,20 +96,22 @@ def resumo(
 ) -> RelatorioResumoOut:
     inicio, fim = _periodo(data_inicio, data_fim)
     inicio_dt, fim_dt = _datetime_bounds(inicio, fim)
+    usar_financeiro = reports_use_finance(db, current_user.empresa_id)
+    fonte = _fonte_faturamento(db, current_user.empresa_id)
 
     financeiro = db.execute(
         select(
-            func.count(FechamentoFinanceiro.id),
-            func.coalesce(func.sum(FechamentoFinanceiro.valor_final), 0),
-            func.coalesce(func.sum(FechamentoFinanceiro.valor_recebido), 0),
-            func.coalesce(func.sum(FechamentoFinanceiro.valor_pendente), 0),
-            func.coalesce(func.sum(FechamentoFinanceiro.desconto_valor), 0),
-            func.coalesce(func.avg(FechamentoFinanceiro.valor_final), 0),
+            func.count(fonte.c.agendamento_id),
+            func.coalesce(func.sum(fonte.c.valor_final), 0),
+            func.coalesce(func.sum(fonte.c.valor_recebido), 0),
+            func.coalesce(func.sum(fonte.c.valor_pendente), 0),
+            func.coalesce(func.sum(fonte.c.desconto_valor), 0),
+            func.coalesce(func.avg(fonte.c.valor_final), 0),
         )
-        .join(Agendamento, Agendamento.id == FechamentoFinanceiro.agendamento_id)
+        .select_from(fonte)
+        .join(Agendamento, Agendamento.id == fonte.c.agendamento_id)
         .where(
-            FechamentoFinanceiro.empresa_id == current_user.empresa_id,
-            FechamentoFinanceiro.status != "ESTORNADO",
+            Agendamento.empresa_id == current_user.empresa_id,
             Agendamento.data >= inicio,
             Agendamento.data <= fim,
         )
@@ -91,18 +136,14 @@ def resumo(
 
     recorrentes_subquery = (
         select(Agendamento.cliente_id)
-        .join(
-            FechamentoFinanceiro,
-            FechamentoFinanceiro.agendamento_id == Agendamento.id,
-        )
+        .join(fonte, fonte.c.agendamento_id == Agendamento.id)
         .where(
             Agendamento.empresa_id == current_user.empresa_id,
             Agendamento.data >= inicio,
             Agendamento.data <= fim,
-            FechamentoFinanceiro.status != "ESTORNADO",
         )
         .group_by(Agendamento.cliente_id)
-        .having(func.count(FechamentoFinanceiro.id) >= 2)
+        .having(func.count(fonte.c.agendamento_id) >= 2)
         .subquery()
     )
     clientes_recorrentes = db.scalar(
@@ -112,6 +153,7 @@ def resumo(
     return RelatorioResumoOut(
         data_inicio=inicio,
         data_fim=fim,
+        usar_financeiro=usar_financeiro,
         atendimentos=int(financeiro[0] or 0),
         faturamento=dinheiro(financeiro[1]),
         recebido=dinheiro(financeiro[2]),
@@ -124,6 +166,66 @@ def resumo(
     )
 
 
+@router.get("/evolucao", response_model=list[RelatorioEvolucaoItem])
+def relatorio_evolucao(
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
+    db: Session = Depends(get_db),
+) -> list[RelatorioEvolucaoItem]:
+    inicio, fim = _periodo(data_inicio, data_fim)
+    fonte = _fonte_faturamento(db, current_user.empresa_id)
+    rows = db.execute(
+        select(
+            Agendamento.data,
+            func.count(fonte.c.agendamento_id),
+            func.coalesce(func.sum(fonte.c.valor_final), 0),
+            func.coalesce(func.sum(fonte.c.valor_recebido), 0),
+            func.coalesce(func.sum(fonte.c.valor_pendente), 0),
+        )
+        .select_from(Agendamento)
+        .join(fonte, fonte.c.agendamento_id == Agendamento.id)
+        .where(
+            Agendamento.empresa_id == current_user.empresa_id,
+            Agendamento.data >= inicio,
+            Agendamento.data <= fim,
+        )
+        .group_by(Agendamento.data)
+        .order_by(Agendamento.data)
+    ).all()
+
+    por_data = {
+        row[0]: RelatorioEvolucaoItem(
+            data=row[0],
+            atendimentos=int(row[1] or 0),
+            faturamento=dinheiro(row[2]),
+            recebido=dinheiro(row[3]),
+            pendente=dinheiro(row[4]),
+        )
+        for row in rows
+    }
+
+    resultado: list[RelatorioEvolucaoItem] = []
+    cursor = inicio
+    while cursor <= fim:
+        resultado.append(
+            por_data.get(
+                cursor,
+                RelatorioEvolucaoItem(
+                    data=cursor,
+                    atendimentos=0,
+                    faturamento=dinheiro(0),
+                    recebido=dinheiro(0),
+                    pendente=dinheiro(0),
+                ),
+            )
+        )
+        cursor += timedelta(days=1)
+    return resultado
+
+
 @router.get("/servicos", response_model=list[RelatorioServicoItem])
 def relatorio_servicos(
     data_inicio: date | None = None,
@@ -134,29 +236,27 @@ def relatorio_servicos(
     db: Session = Depends(get_db),
 ) -> list[RelatorioServicoItem]:
     inicio, fim = _periodo(data_inicio, data_fim)
+    fonte = _fonte_faturamento(db, current_user.empresa_id)
 
     rows = db.execute(
         select(
             Servico.id,
             Servico.nome,
-            func.count(FechamentoFinanceiro.id),
-            func.coalesce(func.sum(FechamentoFinanceiro.valor_final), 0),
-            func.coalesce(func.sum(FechamentoFinanceiro.valor_recebido), 0),
-            func.coalesce(func.avg(FechamentoFinanceiro.valor_final), 0),
+            func.count(fonte.c.agendamento_id),
+            func.coalesce(func.sum(fonte.c.valor_final), 0),
+            func.coalesce(func.sum(fonte.c.valor_recebido), 0),
+            func.coalesce(func.avg(fonte.c.valor_final), 0),
         )
+        .select_from(Servico)
         .join(Agendamento, Agendamento.servico_id == Servico.id)
-        .join(
-            FechamentoFinanceiro,
-            FechamentoFinanceiro.agendamento_id == Agendamento.id,
-        )
+        .join(fonte, fonte.c.agendamento_id == Agendamento.id)
         .where(
             Servico.empresa_id == current_user.empresa_id,
             Agendamento.data >= inicio,
             Agendamento.data <= fim,
-            FechamentoFinanceiro.status != "ESTORNADO",
         )
         .group_by(Servico.id, Servico.nome)
-        .order_by(func.sum(FechamentoFinanceiro.valor_final).desc())
+        .order_by(func.sum(fonte.c.valor_final).desc())
     ).all()
 
     return [
@@ -182,29 +282,27 @@ def relatorio_funcionarios(
     db: Session = Depends(get_db),
 ) -> list[RelatorioFuncionarioItem]:
     inicio, fim = _periodo(data_inicio, data_fim)
+    fonte = _fonte_faturamento(db, current_user.empresa_id)
 
     rows = db.execute(
         select(
             Agendamento.funcionario_id,
             func.coalesce(Usuario.nome, "Sem responsável"),
-            func.count(FechamentoFinanceiro.id),
-            func.coalesce(func.sum(FechamentoFinanceiro.valor_final), 0),
-            func.coalesce(func.sum(FechamentoFinanceiro.valor_recebido), 0),
-            func.coalesce(func.avg(FechamentoFinanceiro.valor_final), 0),
+            func.count(fonte.c.agendamento_id),
+            func.coalesce(func.sum(fonte.c.valor_final), 0),
+            func.coalesce(func.sum(fonte.c.valor_recebido), 0),
+            func.coalesce(func.avg(fonte.c.valor_final), 0),
         )
-        .join(
-            FechamentoFinanceiro,
-            FechamentoFinanceiro.agendamento_id == Agendamento.id,
-        )
+        .select_from(Agendamento)
+        .join(fonte, fonte.c.agendamento_id == Agendamento.id)
         .outerjoin(Usuario, Usuario.id == Agendamento.funcionario_id)
         .where(
             Agendamento.empresa_id == current_user.empresa_id,
             Agendamento.data >= inicio,
             Agendamento.data <= fim,
-            FechamentoFinanceiro.status != "ESTORNADO",
         )
         .group_by(Agendamento.funcionario_id, Usuario.nome)
-        .order_by(func.sum(FechamentoFinanceiro.valor_final).desc())
+        .order_by(func.sum(fonte.c.valor_final).desc())
     ).all()
 
     return [

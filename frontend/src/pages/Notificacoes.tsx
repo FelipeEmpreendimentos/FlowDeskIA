@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { Alert, EmptyState, LoadingState, PageHeader } from "../components/UI";
 import { apiRequest } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type { Notificacao } from "../types";
 import { formatDateTime } from "../utils/format";
 
@@ -34,13 +35,48 @@ const opcoes: Array<{
   descricao: string;
   icon: "calendar" | "finance" | "chat" | "check" | "settings" | "lock" | "bell";
 }> = [
-  { chave: "agendamentos", titulo: "Agendamentos", descricao: "Criações, alterações, cancelamentos e atendimentos atribuídos.", icon: "calendar" },
-  { chave: "financeiro", titulo: "Financeiro", descricao: "Pagamentos pendentes, recebimentos e ajustes importantes.", icon: "finance" },
-  { chave: "conversas", titulo: "Conversas", descricao: "Clientes aguardando, transferências e novas mensagens.", icon: "chat" },
-  { chave: "avaliacoes", titulo: "Avaliações", descricao: "Novas avaliações e alertas de notas baixas.", icon: "check" },
-  { chave: "integracoes", titulo: "Integrações", descricao: "Falhas ou desconexões do WhatsApp e outros canais.", icon: "settings" },
-  { chave: "planos_limites", titulo: "Plano e limites", descricao: "Consumo próximo do limite, teste e assinatura.", icon: "lock" },
-  { chave: "sistema", titulo: "Sistema", descricao: "Avisos gerais de segurança e operação.", icon: "bell" },
+  {
+    chave: "agendamentos",
+    titulo: "Agendamentos",
+    descricao: "Criações, alterações, cancelamentos e atendimentos atribuídos.",
+    icon: "calendar",
+  },
+  {
+    chave: "financeiro",
+    titulo: "Financeiro",
+    descricao: "Pagamentos pendentes, recebimentos e ajustes importantes.",
+    icon: "finance",
+  },
+  {
+    chave: "conversas",
+    titulo: "Conversas",
+    descricao: "Clientes aguardando, transferências e novas mensagens.",
+    icon: "chat",
+  },
+  {
+    chave: "avaliacoes",
+    titulo: "Avaliações",
+    descricao: "Novas avaliações e alertas de notas baixas.",
+    icon: "check",
+  },
+  {
+    chave: "integracoes",
+    titulo: "Integrações",
+    descricao: "Falhas ou desconexões do WhatsApp e outros canais.",
+    icon: "settings",
+  },
+  {
+    chave: "planos_limites",
+    titulo: "Plano e limites",
+    descricao: "Consumo próximo do limite, teste e assinatura.",
+    icon: "lock",
+  },
+  {
+    chave: "sistema",
+    titulo: "Sistema",
+    descricao: "Avisos gerais de segurança e operação.",
+    icon: "bell",
+  },
 ];
 
 export function Notificacoes() {
@@ -49,7 +85,10 @@ export function Notificacoes() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
+
+  const todasDesativadas = preferencias
+    ? opcoes.every((item) => !preferencias[item.chave])
+    : true;
 
   async function carregar() {
     setCarregando(true);
@@ -76,12 +115,6 @@ export function Notificacoes() {
     void carregar();
   }, []);
 
-  useEffect(() => {
-    if (!sucesso) return;
-    const timer = window.setTimeout(() => setSucesso(""), 4000);
-    return () => window.clearTimeout(timer);
-  }, [sucesso]);
-
   async function marcarLida(item: Notificacao) {
     try {
       const atualizada = await apiRequest<Notificacao>(
@@ -93,8 +126,13 @@ export function Notificacoes() {
           notificacao.id === atualizada.id ? atualizada : notificacao,
         ),
       );
+      showAppToast("Notificação marcada como lida.");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível marcar a notificação.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível marcar a notificação.",
+      );
     }
   }
 
@@ -103,10 +141,52 @@ export function Notificacoes() {
       await apiRequest<{ mensagem: string }>("/notificacoes/marcar-todas-lidas", {
         method: "PATCH",
       });
-      setNotificacoes((atuais) => atuais.map((item) => ({ ...item, lida: true })));
-      setSucesso("Todas as notificações foram marcadas como lidas.");
+      setNotificacoes((atuais) =>
+        atuais.map((item) => ({ ...item, lida: true })),
+      );
+      showAppToast("Todas as notificações foram marcadas como lidas.");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível atualizar as notificações.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar as notificações.",
+      );
+    }
+  }
+
+  async function atualizarPreferencias(payload: Record<ChavePreferencia, boolean>) {
+    return apiRequest<Preferencias>("/preferencias-notificacoes", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async function alternarTodas() {
+    if (!preferencias) return;
+
+    setSalvando(true);
+    setErro("");
+    const ativar = todasDesativadas;
+    try {
+      const payload = Object.fromEntries(
+        opcoes.map((item) => [item.chave, ativar]),
+      ) as Record<ChavePreferencia, boolean>;
+      setPreferencias(await atualizarPreferencias(payload));
+      showAppToast(
+        ativar
+          ? "Todas as categorias de notificação foram ativadas."
+          : "Todas as categorias de notificação foram desativadas.",
+      );
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : ativar
+            ? "Não foi possível ativar as notificações."
+            : "Não foi possível desativar as notificações.",
+      );
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -118,16 +198,15 @@ export function Notificacoes() {
     try {
       const payload = Object.fromEntries(
         opcoes.map((item) => [item.chave, preferencias[item.chave]]),
-      );
-      setPreferencias(
-        await apiRequest<Preferencias>("/preferencias-notificacoes", {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        }),
-      );
-      setSucesso("Preferências salvas com sucesso.");
+      ) as Record<ChavePreferencia, boolean>;
+      setPreferencias(await atualizarPreferencias(payload));
+      showAppToast("Preferências de notificação salvas com sucesso.");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível salvar as preferências.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar as preferências.",
+      );
     } finally {
       setSalvando(false);
     }
@@ -153,7 +232,6 @@ export function Notificacoes() {
       />
 
       {erro && <Alert>{erro}</Alert>}
-      {sucesso && <Alert type="success">{sucesso}</Alert>}
 
       {carregando ? (
         <LoadingState label="Carregando notificações..." />
@@ -207,11 +285,20 @@ export function Notificacoes() {
           </section>
 
           <aside className="content-card notification-preferences-card">
-            <div className="card-heading">
+            <div className="card-heading notification-preferences-heading">
               <div>
                 <span>Preferências pessoais</span>
                 <h2>O que deseja receber</h2>
               </div>
+              <button
+                className="button button-small button-secondary notification-disable-all"
+                type="button"
+                onClick={() => void alternarTodas()}
+                disabled={salvando}
+              >
+                <Icon name="bell" size={15} />
+                {todasDesativadas ? "Ativar todas" : "Desativar todas"}
+              </button>
             </div>
             {preferencias && (
               <form onSubmit={salvarPreferencias}>
@@ -229,6 +316,7 @@ export function Notificacoes() {
                         <input
                           type="checkbox"
                           checked={preferencias[item.chave]}
+                          disabled={salvando}
                           onChange={(event) =>
                             setPreferencias({
                               ...preferencias,
@@ -242,7 +330,11 @@ export function Notificacoes() {
                   ))}
                 </div>
                 <div className="form-footer">
-                  <button className="button button-primary" type="submit" disabled={salvando}>
+                  <button
+                    className="button button-primary"
+                    type="submit"
+                    disabled={salvando}
+                  >
                     {salvando ? "Salvando..." : "Salvar preferências"}
                   </button>
                 </div>

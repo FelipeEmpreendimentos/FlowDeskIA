@@ -1,21 +1,49 @@
 from collections.abc import Callable
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.security import decode_access_token
 from app.database.database import get_db
 from app.models.enums import CargoUsuario
 from app.models.models import Empresa, Usuario
 from app.models.platform import EmpresaPlataforma
+from app.services.access_control import user_module_access, user_module_manage
+from app.services.appointment_retention import auto_cancel_stale_appointments
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+ROLE_PERMISSION_PATHS = {
+    "/api/v1/agendamentos": "AGENDA",
+    "/api/v1/chat-interno": "CHAT_INTERNO",
+    "/api/v1/conversas": "CONVERSAS",
+    "/api/v1/clientes": "CLIENTES",
+    "/api/v1/veiculos": "VEICULOS",
+    "/api/v1/servicos": "SERVICOS",
+    "/api/v1/financeiro": "FINANCEIRO",
+    "/api/v1/relatorios": "RELATORIOS",
+    "/api/v1/usuarios": "EQUIPE",
+    "/api/v1/horarios": "EQUIPE",
+    "/api/v1/bloqueios-agenda": "EQUIPE",
+}
+
+READ_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def _module_for_request(request: Request) -> str | None:
+    path = request.url.path.rstrip("/") or "/"
+    for prefix, module in ROLE_PERMISSION_PATHS.items():
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return module
+    return None
+
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Usuario:
@@ -68,7 +96,6 @@ def get_current_user(
     try:
         plataforma = db.get(EmpresaPlataforma, empresa_id)
     except ProgrammingError:
-        # Mantém compatibilidade até a migração do Super Admin ser executada.
         db.rollback()
         plataforma = None
 
@@ -78,6 +105,21 @@ def get_current_user(
             "O acesso da empresa está suspenso. Entre em contato com o suporte.",
         )
 
+    auto_cancel_stale_appointments(
+        db,
+        empresa_id=empresa_id,
+        timezone_name=empresa.timezone,
+    )
+
+    module = _module_for_request(request)
+    if (
+        module
+        and user.cargo == CargoUsuario.FUNCIONARIO
+        and user_module_manage(db, user, module)
+    ):
+        # Elevação apenas durante a requisição para operações autorizadas.
+        set_committed_value(user, "cargo", CargoUsuario.GERENTE)
+
     return user
 
 
@@ -85,13 +127,50 @@ def require_roles(
     *roles: CargoUsuario,
 ) -> Callable[[Usuario], Usuario]:
     def dependency(
+        request: Request,
         current_user: Usuario = Depends(get_current_user),
+        db: Session = Depends(get_db),
     ) -> Usuario:
-        if current_user.cargo not in roles:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "Você não possui permissão para esta operação.",
-            )
-        return current_user
+        if current_user.cargo in roles:
+            return current_user
+
+        module = _module_for_request(request)
+        if module:
+            if request.method in READ_METHODS and user_module_access(
+                db, current_user, module
+            ):
+                return current_user
+            if user_module_manage(db, current_user, module):
+                return current_user
+
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Você não possui permissão para esta operação.",
+        )
+
+    return dependency
+
+
+def require_roles_or_module(
+    module: str,
+    *roles: CargoUsuario,
+) -> Callable[[Usuario], Usuario]:
+    def dependency(
+        request: Request,
+        current_user: Usuario = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> Usuario:
+        if current_user.cargo in roles:
+            return current_user
+        if request.method in READ_METHODS and user_module_access(
+            db, current_user, module
+        ):
+            return current_user
+        if user_module_manage(db, current_user, module):
+            return current_user
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Você não possui permissão para acessar este módulo.",
+        )
 
     return dependency

@@ -1,0 +1,302 @@
+/* Padronização visual dos seletores e refinamentos desta rodada. */
+
+:where(.app-shell, .modal-shell, .modal-content) select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 42px;
+  padding: 9px 38px 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  outline: 0;
+  color: var(--text);
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2367788f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 15px;
+  box-shadow: 0 1px 2px rgba(20, 34, 58, 0.03);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select:hover:not(:disabled) {
+  border-color: #aebad0;
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(49, 87, 213, 0.1);
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  background-color: #f5f7fb;
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select option {
+  color: #22304a;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select option[value="ABERTA"] {
+  color: #3157d5;
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select option[value="EM_ATENDIMENTO"],
+:where(.app-shell, .modal-shell, .modal-content) select option[value="EM_ANDAMENTO"] {
+  color: #a66400;
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select option[value="FINALIZADA"],
+:where(.app-shell, .modal-shell, .modal-content) select option[value="FINALIZADO"],
+:where(.app-shell, .modal-shell, .modal-content) select option[value="CONFIRMADO"] {
+  color: #087a5b;
+}
+
+:where(.app-shell, .modal-shell, .modal-content) select option[value="CANCELADO"] {
+  color: #c43e4d;
+}
+
+/* Navegadores com select customizável: estiliza também a caixa que abre. */
+@supports (appearance: base-select) {
+  :where(.app-shell, .modal-shell, .modal-content) select,
+  :where(.app-shell, .modal-shell, .modal-content) select::picker(select) {
+    appearance: base-select;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select {
+    background-image: none;
+    padding-right: 12px;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select::picker-icon {
+    width: 15px;
+    height: 15px;
+    color: #67788f;
+    transition: rotate 160ms ease;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select::picker(select) {
+    margin-top: 5px;
+    padding: 5px;
+    border: 1px solid #dbe2ee;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 16px 38px rgba(29, 44, 70, 0.15);
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option {
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option:hover,
+  :where(.app-shell, .modal-shell, .modal-content) select option:focus {
+    background: #f4f7fd;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option:checked {
+    background: #eef3ff;
+    color: #2749ba;
+    font-weight: 650;
+  }
+
+  :where(.app-shell, .modal-shell, .modal-content) select option::checkmark {
+    order: 1;
+    margin-left: auto;
+    color: #3157d5;
+  }
+}
+
+/* Conversas: lista mais leve, com menos aspecto de caixas pesadas. */
+.conversation-filters {
+  gap: 10px;
+  align-items: stretch;
+}
+
+.conversation-filters .search-field {
+  min-height: 42px;
+}
+
+.conversation-filters > select {
+  min-width: 174px;
+}
+
+.conversation-list {
+  padding: 5px 7px 10px;
+}
+
+.conversation-list-item {
+  margin: 3px 0;
+  padding: 12px 11px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.conversation-list-item:hover {
+  background: #f7f9fd;
+  border-color: #e8edf6;
+}
+
+.conversation-list-item-active {
+  background: #f1f5ff;
+  border-color: #d5dfff;
+  box-shadow: 0 5px 14px rgba(49, 87, 213, 0.07);
+}
+
+.conversation-list-item .entity-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
+.conversation-list-signals {
+  gap: 6px;
+}
+
+.conversation-list-signals .status-badge {
+  font-size: 10px;
+  padding: 4px 7px;
+  letter-spacing: 0.01em;
+}
+
+.chat-controls {
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-controls select {
+  min-height: 39px;
+  border-radius: 999px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  background-position: right 11px center;
+}
+
+.chat-controls select[title="Responsável"] {
+  min-width: 145px;
+}
+
+.chat-controls select[title="Alterar status"] {
+  min-width: 154px;
+  font-weight: 600;
+}
+
+.conversation-ai-control {
+  min-height: 39px;
+  border-radius: 999px;
+}
+
+/* Chat interno: participantes e ações de grupo. */
+.team-chat-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-chat-participants-button,
+.team-chat-delete-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #dce3ee;
+  border-radius: 10px;
+  background: #fff;
+  color: #526179;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.team-chat-participants-button:hover {
+  border-color: #bfcbe0;
+  background: #f7f9fd;
+  color: #31435f;
+}
+
+.team-chat-delete-group {
+  color: #b43645;
+  border-color: #f0d5da;
+  background: #fffafa;
+}
+
+.team-chat-delete-group:hover {
+  border-color: #e9bfc7;
+  background: #fff3f5;
+}
+
+.team-chat-participant-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-chat-participant {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid #e5eaf2;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.team-chat-participant > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.team-chat-participant strong,
+.team-chat-participant small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-chat-participant small {
+  color: #738198;
+}
+
+@media (max-width: 760px) {
+  .conversation-filters {
+    gap: 8px;
+  }
+
+  .conversation-filters > select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .team-chat-header-actions {
+    gap: 5px;
+  }
+
+  .team-chat-participants-button span,
+  .team-chat-delete-group span {
+    display: none;
+  }
+
+  .team-chat-participants-button,
+  .team-chat-delete-group {
+    width: 36px;
+    padding: 0;
+  }
+}

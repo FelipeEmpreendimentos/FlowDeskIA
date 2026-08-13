@@ -65,6 +65,9 @@ export function Servicos() {
   const [erroConfirmacao, setErroConfirmacao] = useState("");
   const [limpezaAdicionaisAberta, setLimpezaAdicionaisAberta] =
     useState(false);
+  const [servicoExclusao, setServicoExclusao] = useState<Servico | null>(null);
+  const [excluindoServico, setExcluindoServico] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState("");
 
   async function carregar() {
     setCarregando(true);
@@ -267,6 +270,40 @@ export function Servicos() {
     }
   }
 
+  function abrirExclusao(item: Servico) {
+    setServicoExclusao(item);
+    setErroExclusao("");
+  }
+
+  function fecharExclusao() {
+    if (excluindoServico) return;
+    setServicoExclusao(null);
+    setErroExclusao("");
+  }
+
+  async function confirmarExclusao() {
+    if (!servicoExclusao) return;
+
+    setExcluindoServico(true);
+    setErroExclusao("");
+    try {
+      await apiRequest<void>(`/servicos/${servicoExclusao.id}/permanente`, {
+        method: "DELETE",
+      });
+      setServicoExclusao(null);
+      setSucesso("Serviço excluído com sucesso.");
+      await carregar();
+    } catch (error) {
+      setErroExclusao(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir o serviço.",
+      );
+    } finally {
+      setExcluindoServico(false);
+    }
+  }
+
   return (
     <div className="page">
       <PageHeader
@@ -303,7 +340,9 @@ export function Servicos() {
         </div>
       )}
 
-      {erro && !modalAberto && !servicoConfirmacao && <Alert>{erro}</Alert>}
+      {erro && !modalAberto && !servicoConfirmacao && !servicoExclusao && (
+        <Alert>{erro}</Alert>
+      )}
 
       <section className="content-card">
         <div className="toolbar">
@@ -338,19 +377,22 @@ export function Servicos() {
                     <h3>{item.nome}</h3>
                   </div>
                   <div className="row-actions">
-                    <button className="icon-button" type="button" onClick={() => abrirEdicao(item)}><Icon name="edit" size={17} /></button>
+                    <button className="icon-button" type="button" onClick={() => abrirEdicao(item)} title="Editar serviço"><Icon name="edit" size={17} /></button>
                     <button
-                      className={`icon-button ${
-                        item.ativo ? "danger" : "success"
-                      }`}
+                      className={`icon-button ${item.ativo ? "danger" : "success"}`}
                       type="button"
                       onClick={() => abrirConfirmacaoSituacao(item)}
                       title={item.ativo ? "Desativar serviço" : "Reativar serviço"}
                     >
-                      <Icon
-                        name={item.ativo ? "pause" : "refresh"}
-                        size={17}
-                      />
+                      <Icon name={item.ativo ? "pause" : "refresh"} size={17} />
+                    </button>
+                    <button
+                      className="icon-button danger"
+                      type="button"
+                      onClick={() => abrirExclusao(item)}
+                      title="Excluir serviço permanentemente"
+                    >
+                      <Icon name="trash" size={17} />
                     </button>
                   </div>
                 </div>
@@ -423,9 +465,7 @@ export function Servicos() {
                   </span>
                   <span className="vehicle-addon-toggle-copy">
                     <strong>Adicional por tipo de veículo</strong>
-                    <small>
-                      Some um valor ao preço base conforme o porte do veículo.
-                    </small>
+                    <small>Some um valor ao preço base conforme o porte do veículo.</small>
                   </span>
                 </label>
 
@@ -489,100 +529,65 @@ export function Servicos() {
           <span className="confirmation-icon confirmation-icon-danger">
             <Icon name="trash" size={24} />
           </span>
-
           <div className="confirmation-copy">
             <strong>Zerar todos os adicionais deste serviço?</strong>
-            <p>
-              Hatch, Sedã, SUV, Caminhonete e Outro serão definidos como
-              R$ 0,00. A mudança só será aplicada depois de clicar em
-              Salvar serviço.
-            </p>
+            <p>Hatch, Sedã, SUV, Caminhonete e Outro serão definidos como R$ 0,00. A mudança só será aplicada depois de clicar em Salvar serviço.</p>
           </div>
-
           <div className="modal-actions confirmation-actions">
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={fecharLimpezaAdicionais}
-            >
-              Cancelar
-            </button>
-            <button
-              className="button button-danger"
-              type="button"
-              onClick={confirmarLimpezaAdicionais}
-            >
-              Limpar adicionais
-            </button>
+            <button className="button button-secondary" type="button" onClick={fecharLimpezaAdicionais}>Cancelar</button>
+            <button className="button button-danger" type="button" onClick={confirmarLimpezaAdicionais}>Limpar adicionais</button>
           </div>
         </div>
       </Modal>
 
       <Modal
         open={Boolean(servicoConfirmacao)}
-        title={
-          servicoConfirmacao?.ativo
-            ? "Desativar serviço"
-            : "Reativar serviço"
-        }
+        title={servicoConfirmacao?.ativo ? "Desativar serviço" : "Reativar serviço"}
         subtitle="Confirme a alteração antes de continuar."
         onClose={fecharConfirmacaoSituacao}
         size="small"
       >
         {servicoConfirmacao && (
           <div className="confirmation-dialog">
-            <span
-              className={`confirmation-icon ${
-                servicoConfirmacao.ativo
-                  ? "confirmation-icon-danger"
-                  : "confirmation-icon-success"
-              }`}
-            >
-              <Icon
-                name={servicoConfirmacao.ativo ? "pause" : "refresh"}
-                size={24}
-              />
+            <span className={`confirmation-icon ${servicoConfirmacao.ativo ? "confirmation-icon-danger" : "confirmation-icon-success"}`}>
+              <Icon name={servicoConfirmacao.ativo ? "pause" : "refresh"} size={24} />
             </span>
-
             <div className="confirmation-copy">
-              <strong>
-                {servicoConfirmacao.ativo
-                  ? `Desativar ${servicoConfirmacao.nome}?`
-                  : `Reativar ${servicoConfirmacao.nome}?`}
-              </strong>
-              <p>
-                {servicoConfirmacao.ativo
-                  ? "O serviço ficará indisponível para novos agendamentos e poderá ser reativado posteriormente."
-                  : "O serviço voltará a ficar disponível para novos agendamentos."}
-              </p>
+              <strong>{servicoConfirmacao.ativo ? `Desativar ${servicoConfirmacao.nome}?` : `Reativar ${servicoConfirmacao.nome}?`}</strong>
+              <p>{servicoConfirmacao.ativo ? "O serviço ficará indisponível para novos agendamentos e poderá ser reativado posteriormente." : "O serviço voltará a ficar disponível para novos agendamentos."}</p>
             </div>
-
             {erroConfirmacao && <Alert>{erroConfirmacao}</Alert>}
-
             <div className="modal-actions confirmation-actions">
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={fecharConfirmacaoSituacao}
-                disabled={alterandoSituacao}
-              >
-                Cancelar
+              <button className="button button-secondary" type="button" onClick={fecharConfirmacaoSituacao} disabled={alterandoSituacao}>Cancelar</button>
+              <button className={servicoConfirmacao.ativo ? "button button-danger" : "button button-primary"} type="button" onClick={() => void confirmarAlteracaoSituacao()} disabled={alterandoSituacao}>
+                {alterandoSituacao ? "Processando..." : servicoConfirmacao.ativo ? "Desativar serviço" : "Reativar serviço"}
               </button>
-              <button
-                className={
-                  servicoConfirmacao.ativo
-                    ? "button button-danger"
-                    : "button button-primary"
-                }
-                type="button"
-                onClick={() => void confirmarAlteracaoSituacao()}
-                disabled={alterandoSituacao}
-              >
-                {alterandoSituacao
-                  ? "Processando..."
-                  : servicoConfirmacao.ativo
-                    ? "Desativar serviço"
-                    : "Reativar serviço"}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(servicoExclusao)}
+        title="Excluir serviço"
+        subtitle="Esta ação é permanente."
+        onClose={fecharExclusao}
+        size="small"
+      >
+        {servicoExclusao && (
+          <div className="confirmation-dialog">
+            <span className="confirmation-icon confirmation-icon-danger">
+              <Icon name="trash" size={24} />
+            </span>
+            <div className="confirmation-copy">
+              <strong>Excluir {servicoExclusao.nome} permanentemente?</strong>
+              <p>Serviços sem histórico podem ser removidos definitivamente. Se houver agendamentos vinculados, a exclusão será bloqueada para preservar o histórico e você poderá apenas desativá-lo.</p>
+            </div>
+            {erroExclusao && <Alert>{erroExclusao}</Alert>}
+            <div className="modal-actions confirmation-actions">
+              <button className="button button-secondary" type="button" onClick={fecharExclusao} disabled={excluindoServico}>Cancelar</button>
+              <button className="button button-danger" type="button" onClick={() => void confirmarExclusao()} disabled={excluindoServico}>
+                {excluindoServico ? "Excluindo..." : "Excluir serviço"}
               </button>
             </div>
           </div>

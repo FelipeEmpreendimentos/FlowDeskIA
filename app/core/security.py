@@ -23,10 +23,13 @@ def verify_password(password: str, password_hash_value: str) -> bool:
         return False
 
 
-def _encode_access_token(payload: dict[str, Any]) -> tuple[str, int]:
-    expires_minutes = settings.access_token_minutes
+def _encode_token(
+    payload: dict[str, Any],
+    *,
+    expires_delta: timedelta,
+) -> tuple[str, int]:
     now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(minutes=expires_minutes)
+    expires_at = now + expires_delta
     payload = {
         **payload,
         "iat": now,
@@ -37,7 +40,14 @@ def _encode_access_token(payload: dict[str, Any]) -> tuple[str, int]:
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
-    return token, expires_minutes * 60
+    return token, int(expires_delta.total_seconds())
+
+
+def _encode_access_token(payload: dict[str, Any]) -> tuple[str, int]:
+    return _encode_token(
+        payload,
+        expires_delta=timedelta(minutes=settings.access_token_minutes),
+    )
 
 
 def create_access_token(
@@ -53,6 +63,22 @@ def create_access_token(
             "cargo": cargo,
             "kind": "company_user",
         }
+    )
+
+
+def create_refresh_token(
+    *,
+    user_id: int,
+    empresa_id: int,
+    days: int = 30,
+) -> tuple[str, int]:
+    return _encode_token(
+        {
+            "sub": str(user_id),
+            "empresa_id": empresa_id,
+            "kind": "company_refresh",
+        },
+        expires_delta=timedelta(days=days),
     )
 
 

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useOutletContext } from "react-router";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
+import { PeriodShortcuts } from "../components/PeriodShortcuts";
 import { Alert, EmptyState, LoadingState, PageHeader } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type { AppOutletContext, FormaPagamento } from "../types";
 import {
   formatCurrency,
@@ -142,7 +145,6 @@ export function Financeiro() {
   const [fechamentos, setFechamentos] = useState<FechamentoListaItem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
 
   const [detalhe, setDetalhe] = useState<FechamentoDetalhe | null>(null);
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
@@ -161,6 +163,10 @@ export function Financeiro() {
     cortesia: false,
     observacoes: "",
   });
+  const [pagamentoEstorno, setPagamentoEstorno] = useState<Pagamento | null>(
+    null,
+  );
+  const [estornando, setEstornando] = useState(false);
 
   const podeAjustar = ["ADMIN", "GERENTE"].includes(usuario.cargo);
 
@@ -199,12 +205,6 @@ export function Financeiro() {
     void carregar();
   }, [dataInicio, dataFim, statusFiltro]);
 
-  useEffect(() => {
-    if (!sucesso) return;
-    const timer = window.setTimeout(() => setSucesso(""), 4000);
-    return () => window.clearTimeout(timer);
-  }, [sucesso]);
-
   const resumoSituacoes = useMemo(
     () => `${resumo.pagos} pagos · ${resumo.parciais} parciais · ${resumo.pendentes} pendentes`,
     [resumo],
@@ -236,10 +236,11 @@ export function Financeiro() {
   }
 
   function fecharDetalhe() {
-    if (salvandoPagamento || salvandoAjuste) return;
+    if (salvandoPagamento || salvandoAjuste || estornando) return;
     setDetalhe(null);
     setModalPagamento(false);
     setModalAjuste(false);
+    setPagamentoEstorno(null);
   }
 
   function abrirPagamento(item?: FechamentoListaItem) {
@@ -273,7 +274,7 @@ export function Financeiro() {
       );
       setDetalhe(atualizado);
       setModalPagamento(false);
-      setSucesso("Pagamento registrado com sucesso.");
+      showAppToast("Pagamento registrado com sucesso.");
       await carregar();
     } catch (error) {
       setErro(
@@ -309,7 +310,7 @@ export function Financeiro() {
       );
       setDetalhe(atualizado);
       setModalAjuste(false);
-      setSucesso("Fechamento atualizado com sucesso.");
+      showAppToast("Fechamento atualizado com sucesso.");
       await carregar();
     } catch (error) {
       setErro(
@@ -322,16 +323,30 @@ export function Financeiro() {
     }
   }
 
-  async function estornarPagamento(pagamento: Pagamento) {
-    if (!window.confirm(`Estornar ${formatCurrency(pagamento.valor)}?`)) return;
+  function solicitarEstorno(pagamento: Pagamento) {
+    setErro("");
+    setPagamentoEstorno(pagamento);
+  }
+
+  function fecharEstorno() {
+    if (estornando) return;
+    setPagamentoEstorno(null);
+    setErro("");
+  }
+
+  async function confirmarEstorno() {
+    if (!pagamentoEstorno) return;
+
+    setEstornando(true);
     setErro("");
     try {
       const atualizado = await apiRequest<FechamentoDetalhe>(
-        `/financeiro/pagamentos/${pagamento.id}/estornar`,
+        `/financeiro/pagamentos/${pagamentoEstorno.id}/estornar`,
         { method: "POST" },
       );
       setDetalhe(atualizado);
-      setSucesso("Pagamento estornado.");
+      setPagamentoEstorno(null);
+      showAppToast("Pagamento estornado com sucesso.");
       await carregar();
     } catch (error) {
       setErro(
@@ -339,7 +354,14 @@ export function Financeiro() {
           ? error.message
           : "Não foi possível estornar o pagamento.",
       );
+    } finally {
+      setEstornando(false);
     }
+  }
+
+  function alterarPeriodo(inicio: string, fim: string) {
+    setDataInicio(inicio);
+    setDataFim(fim);
   }
 
   return (
@@ -350,8 +372,10 @@ export function Financeiro() {
         description="Acompanhe recebimentos, pendências, descontos e pagamentos dos atendimentos."
       />
 
-      {sucesso && <Alert type="success">{sucesso}</Alert>}
-      {erro && !modalPagamento && !modalAjuste && <Alert>{erro}</Alert>}
+      {erro &&
+        !modalPagamento &&
+        !modalAjuste &&
+        !pagamentoEstorno && <Alert>{erro}</Alert>}
 
       <section className="finance-metrics-grid">
         <article className="metric-card">
@@ -412,6 +436,7 @@ export function Financeiro() {
               <option value="ESTORNADO">Estornados</option>
             </select>
           </label>
+          <PeriodShortcuts onChange={alterarPeriodo} />
           <button
             className="button button-secondary finance-refresh"
             type="button"
@@ -503,7 +528,12 @@ export function Financeiro() {
       </section>
 
       <Modal
-        open={Boolean(detalhe) && !modalPagamento && !modalAjuste}
+        open={
+          Boolean(detalhe) &&
+          !modalPagamento &&
+          !modalAjuste &&
+          !pagamentoEstorno
+        }
         title={`Fechamento #${detalhe?.id ?? ""}`}
         subtitle={`Agendamento #${detalhe?.agendamento_id ?? ""}`}
         onClose={fecharDetalhe}
@@ -579,7 +609,7 @@ export function Financeiro() {
                       <button
                         className="button button-small button-danger"
                         type="button"
-                        onClick={() => void estornarPagamento(pagamento)}
+                        onClick={() => solicitarEstorno(pagamento)}
                       >
                         Estornar
                       </button>
@@ -791,6 +821,22 @@ export function Financeiro() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmationModal
+        open={Boolean(pagamentoEstorno)}
+        title="Estornar pagamento"
+        heading="Confirmar o estorno deste pagamento?"
+        description={`O valor de ${formatCurrency(
+          pagamentoEstorno?.valor,
+        )} voltará a constar como pendente no fechamento.`}
+        confirmLabel="Estornar pagamento"
+        onClose={fecharEstorno}
+        onConfirm={() => void confirmarEstorno()}
+        loading={estornando}
+        error={erro}
+        tone="danger"
+        icon="finance"
+      />
     </div>
   );
 }

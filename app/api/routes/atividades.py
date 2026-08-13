@@ -36,6 +36,17 @@ ACOES = {
     "DESATIVOU_USUARIO": "desativou um usuário",
 }
 
+AREAS = {
+    "agendamentos": "agendamentos agenda atendimento",
+    "fechamentos_financeiros": "financeiro fechamento",
+    "pagamentos_atendimento": "pagamentos recebimentos",
+    "clientes": "clientes",
+    "veiculos": "veículos veiculos carros",
+    "servicos": "serviços servicos",
+    "usuarios": "equipe usuários usuarios funcionários funcionarios",
+    "conversas": "conversas atendimento mensagens",
+}
+
 
 def _descricao(log: Log, usuario: Usuario | None) -> str:
     ator = usuario.nome if usuario else "Sistema"
@@ -80,15 +91,38 @@ def listar_atividades(
         query = query.where(Log.ator_id == usuario_id)
     if entidade:
         query = query.where(Log.entidade == entidade)
-    if busca:
-        termo = f"%{busca.strip()}%"
-        query = query.where(
-            or_(
-                Log.acao.ilike(termo),
-                Log.entidade.ilike(termo),
-                Usuario.nome.ilike(termo),
-            )
-        )
+    if busca and busca.strip():
+        texto = busca.strip()
+        termo = f"%{texto}%"
+        normalizado = texto.casefold()
+        condicoes = [
+            Log.acao.ilike(termo),
+            Log.entidade.ilike(termo),
+            Usuario.nome.ilike(termo),
+        ]
+
+        acoes_correspondentes = [
+            codigo
+            for codigo, descricao in ACOES.items()
+            if normalizado in descricao.casefold()
+            or normalizado in codigo.replace("_", " ").casefold()
+        ]
+        if acoes_correspondentes:
+            condicoes.append(Log.acao.in_(acoes_correspondentes))
+
+        areas_correspondentes = [
+            codigo
+            for codigo, termos in AREAS.items()
+            if normalizado in termos.casefold()
+        ]
+        if areas_correspondentes:
+            condicoes.append(Log.entidade.in_(areas_correspondentes))
+
+        identificador = texto.removeprefix("#")
+        if identificador.isdigit():
+            condicoes.append(Log.entidade_id == int(identificador))
+
+        query = query.where(or_(*condicoes))
 
     rows = db.execute(
         query.order_by(Log.created_at.desc()).offset(offset).limit(limit)

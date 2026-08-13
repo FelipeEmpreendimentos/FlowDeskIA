@@ -219,6 +219,9 @@ export function Equipe() {
   const [editandoUsuario, setEditandoUsuario] = useState<Usuario | null>(null);
   const [editandoHorario, setEditandoHorario] = useState<Horario | null>(null);
   const [usuarioSituacao, setUsuarioSituacao] = useState<Usuario | null>(null);
+  const [usuarioExclusao, setUsuarioExclusao] = useState<Usuario | null>(null);
+  const [excluindoUsuario, setExcluindoUsuario] = useState(false);
+  const [erroExclusaoUsuario, setErroExclusaoUsuario] = useState("");
 
   const [usuarioForm, setUsuarioForm] = useState<UsuarioForm>(usuarioVazio);
   const [horarioForm, setHorarioForm] = useState<HorarioForm>(horarioVazio);
@@ -246,6 +249,11 @@ export function Equipe() {
   const [alterandoSituacao, setAlterandoSituacao] = useState(false);
 
   const podeGerenciar = ["ADMIN", "GERENTE"].includes(usuarioAtual.cargo);
+
+  function podeAdministrarUsuario(item: Usuario): boolean {
+    if (!podeGerenciar || item.id === usuarioAtual.id) return false;
+    return usuarioAtual.cargo === "ADMIN" || item.cargo === "FUNCIONARIO";
+  }
 
   async function carregar() {
     setCarregando(true);
@@ -329,7 +337,6 @@ export function Equipe() {
     });
   }, [buscaUsuario, campoBuscaUsuario, filtroStatusUsuario, usuarios]);
 
-
   const bloqueiosAtivos = useMemo(
     () =>
       bloqueios
@@ -370,7 +377,6 @@ export function Equipe() {
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }, [horarios, usuarios]);
-
 
   function abrirNovoUsuario() {
     setEditandoUsuario(null);
@@ -473,6 +479,40 @@ export function Equipe() {
       );
     } finally {
       setAlterandoSituacao(false);
+    }
+  }
+
+  function abrirExclusaoUsuario(item: Usuario) {
+    setUsuarioExclusao(item);
+    setErroExclusaoUsuario("");
+  }
+
+  function fecharExclusaoUsuario() {
+    if (excluindoUsuario) return;
+    setUsuarioExclusao(null);
+    setErroExclusaoUsuario("");
+  }
+
+  async function confirmarExclusaoUsuario() {
+    if (!usuarioExclusao) return;
+
+    setExcluindoUsuario(true);
+    setErroExclusaoUsuario("");
+    try {
+      await apiRequest<void>(`/usuarios/${usuarioExclusao.id}/permanente`, {
+        method: "DELETE",
+      });
+      setUsuarioExclusao(null);
+      setSucesso("Usuário excluído com sucesso.");
+      await carregar();
+    } catch (error) {
+      setErroExclusaoUsuario(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir o usuário.",
+      );
+    } finally {
+      setExcluindoUsuario(false);
     }
   }
 
@@ -927,6 +967,7 @@ export function Equipe() {
         !modalSemana &&
         !modalBloqueio &&
         !usuarioSituacao &&
+        !usuarioExclusao &&
         !bloqueioExclusao && (
         <Alert>{erro}</Alert>
       )}
@@ -936,24 +977,9 @@ export function Equipe() {
       )}
 
       <div className="tabs">
-        <button
-          className={aba === "usuarios" ? "tab-active" : ""}
-          onClick={() => setAba("usuarios")}
-        >
-          Usuários
-        </button>
-        <button
-          className={aba === "jornadas" ? "tab-active" : ""}
-          onClick={() => setAba("jornadas")}
-        >
-          Jornadas
-        </button>
-        <button
-          className={aba === "bloqueios" ? "tab-active" : ""}
-          onClick={() => setAba("bloqueios")}
-        >
-          Bloqueios
-        </button>
+        <button className={aba === "usuarios" ? "tab-active" : ""} onClick={() => setAba("usuarios")}>Usuários</button>
+        <button className={aba === "jornadas" ? "tab-active" : ""} onClick={() => setAba("jornadas")}>Jornadas</button>
+        <button className={aba === "bloqueios" ? "tab-active" : ""} onClick={() => setAba("bloqueios")}>Bloqueios</button>
       </div>
 
       <section className="content-card">
@@ -962,45 +988,16 @@ export function Equipe() {
             <div className="toolbar-search-group">
               <label className="search-field">
                 <Icon name="search" size={18} />
-                <input
-                  value={buscaUsuario}
-                  onChange={(event) => setBuscaUsuario(event.target.value)}
-                  placeholder={placeholdersBusca[campoBuscaUsuario]}
-                />
+                <input value={buscaUsuario} onChange={(event) => setBuscaUsuario(event.target.value)} placeholder={placeholdersBusca[campoBuscaUsuario]} />
               </label>
-
               <label className="search-filter">
                 <Icon name="filter" size={17} />
-                <select
-                  value={campoBuscaUsuario}
-                  onChange={(event) =>
-                    setCampoBuscaUsuario(
-                      event.target.value as CampoBuscaUsuario,
-                    )
-                  }
-                  aria-label="Campo da busca"
-                >
-                  {(Object.keys(campoBuscaLabels) as CampoBuscaUsuario[]).map(
-                    (campo) => (
-                      <option key={campo} value={campo}>
-                        {campoBuscaLabels[campo]}
-                      </option>
-                    ),
-                  )}
+                <select value={campoBuscaUsuario} onChange={(event) => setCampoBuscaUsuario(event.target.value as CampoBuscaUsuario)} aria-label="Campo da busca">
+                  {(Object.keys(campoBuscaLabels) as CampoBuscaUsuario[]).map((campo) => <option key={campo} value={campo}>{campoBuscaLabels[campo]}</option>)}
                 </select>
               </label>
             </div>
-
-            <select
-              className="team-status-filter"
-              value={filtroStatusUsuario}
-              onChange={(event) =>
-                setFiltroStatusUsuario(
-                  event.target.value as FiltroStatusUsuario,
-                )
-              }
-              aria-label="Status dos usuários"
-            >
+            <select className="team-status-filter" value={filtroStatusUsuario} onChange={(event) => setFiltroStatusUsuario(event.target.value as FiltroStatusUsuario)} aria-label="Status dos usuários">
               <option value="ATIVOS">Ativos</option>
               <option value="INATIVOS">Inativos</option>
               <option value="TODOS">Todos</option>
@@ -1012,82 +1009,32 @@ export function Equipe() {
           <LoadingState label="Carregando equipe..." />
         ) : aba === "usuarios" ? (
           usuariosFiltrados.length === 0 ? (
-            <EmptyState
-              icon="team"
-              title="Nenhum usuário encontrado"
-              description="Altere a busca ou os filtros para visualizar outros usuários."
-            />
+            <EmptyState icon="team" title="Nenhum usuário encontrado" description="Altere a busca ou os filtros para visualizar outros usuários." />
           ) : (
             <div className="table-wrap">
               <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Usuário</th>
-                    <th>Contato</th>
-                    <th>Cargo</th>
-                    <th>Último acesso</th>
-                    <th>Status</th>
-                    <th className="actions-column">Ações</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Usuário</th><th>Contato</th><th>Cargo</th><th>Último acesso</th><th>Status</th><th className="actions-column">Ações</th></tr></thead>
                 <tbody>
                   {usuariosFiltrados.map((item) => (
                     <tr key={item.id}>
-                      <td>
-                        <div className="entity-cell">
-                          <span className="entity-avatar">
-                            {item.nome.charAt(0).toUpperCase()}
-                          </span>
-                          <div>
-                            <strong>{item.nome}</strong>
-                            <small>{item.email}</small>
-                          </div>
-                        </div>
-                      </td>
+                      <td><div className="entity-cell"><span className="entity-avatar">{item.nome.charAt(0).toUpperCase()}</span><div><strong>{item.nome}</strong><small>{item.email}</small></div></div></td>
                       <td>{item.telefone ?? "—"}</td>
-                      <td>
-                        <StatusBadge value={item.cargo} />
-                      </td>
-                      <td>
-                        {item.ultimo_login
-                          ? new Date(item.ultimo_login).toLocaleString("pt-BR")
-                          : "Nunca"}
-                      </td>
-                      <td>
-                        <StatusBadge value={item.ativo ? "ATIVO" : "INATIVO"} />
-                      </td>
+                      <td><StatusBadge value={item.cargo} /></td>
+                      <td>{item.ultimo_login ? new Date(item.ultimo_login).toLocaleString("pt-BR") : "Nunca"}</td>
+                      <td><StatusBadge value={item.ativo ? "ATIVO" : "INATIVO"} /></td>
                       <td>
                         <div className="row-actions">
-                          <button
-                            className="icon-button"
-                            type="button"
-                            onClick={() => abrirEditarUsuario(item)}
-                            disabled={!podeGerenciar}
-                            title="Editar usuário"
-                          >
-                            <Icon name="edit" size={17} />
-                          </button>
-
-                          {item.id !== usuarioAtual.id &&
-                            usuarioAtual.cargo === "ADMIN" && (
-                              <button
-                                className={`icon-button ${
-                                  item.ativo ? "danger" : "success"
-                                }`}
-                                type="button"
-                                onClick={() => setUsuarioSituacao(item)}
-                                title={
-                                  item.ativo
-                                    ? "Desativar usuário"
-                                    : "Reativar usuário"
-                                }
-                              >
-                                <Icon
-                                  name={item.ativo ? "pause" : "refresh"}
-                                  size={17}
-                                />
+                          <button className="icon-button" type="button" onClick={() => abrirEditarUsuario(item)} disabled={!podeGerenciar} title="Editar usuário"><Icon name="edit" size={17} /></button>
+                          {podeAdministrarUsuario(item) && (
+                            <>
+                              <button className={`icon-button ${item.ativo ? "danger" : "success"}`} type="button" onClick={() => setUsuarioSituacao(item)} title={item.ativo ? "Desativar usuário" : "Reativar usuário"}>
+                                <Icon name={item.ativo ? "pause" : "refresh"} size={17} />
                               </button>
-                            )}
+                              <button className="icon-button danger" type="button" onClick={() => abrirExclusaoUsuario(item)} title="Excluir usuário permanentemente">
+                                <Icon name="trash" size={17} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1098,204 +1045,40 @@ export function Equipe() {
           )
         ) : aba === "jornadas" ? (
           jornadasPorFuncionario.length === 0 ? (
-            <EmptyState
-              icon="clock"
-              title="Nenhuma jornada cadastrada"
-              description="Configure a jornada e o horário de almoço de cada funcionário."
-            />
+            <EmptyState icon="clock" title="Nenhuma jornada cadastrada" description="Configure a jornada e o horário de almoço de cada funcionário." />
           ) : (
             <div className="employee-schedule-list">
               {jornadasPorFuncionario.map((grupo) => {
-                const porDia = new Map<number, Horario>(
-                  grupo.horarios.map(
-                    (item) => [item.dia_semana, item] as [number, Horario],
-                  ),
-                );
-                const uteis = diasUteis
-                  .map((dia) => porDia.get(dia))
-                  .filter((item): item is Horario => Boolean(item));
-                const todosUteisIguais =
-                  uteis.length === 5 &&
-                  uteis.every(
-                    (item) =>
-                      formatTime(item.hora_inicio) ===
-                        formatTime(uteis[0].hora_inicio) &&
-                      formatTime(item.hora_fim) ===
-                        formatTime(uteis[0].hora_fim) &&
-                      formatTime(item.pausa_inicio ?? "") ===
-                        formatTime(uteis[0].pausa_inicio ?? "") &&
-                      formatTime(item.pausa_fim ?? "") ===
-                        formatTime(uteis[0].pausa_fim ?? ""),
-                  );
+                const porDia = new Map<number, Horario>(grupo.horarios.map((item) => [item.dia_semana, item] as [number, Horario]));
+                const uteis = diasUteis.map((dia) => porDia.get(dia)).filter((item): item is Horario => Boolean(item));
+                const todosUteisIguais = uteis.length === 5 && uteis.every((item) => formatTime(item.hora_inicio) === formatTime(uteis[0].hora_inicio) && formatTime(item.hora_fim) === formatTime(uteis[0].hora_fim) && formatTime(item.pausa_inicio ?? "") === formatTime(uteis[0].pausa_inicio ?? "") && formatTime(item.pausa_fim ?? "") === formatTime(uteis[0].pausa_fim ?? ""));
                 const sabado = porDia.get(6);
                 const domingo = porDia.get(0);
                 const aberto = jornadasAbertas.has(grupo.funcionario_id);
-
-                const resumoUteis =
-                  uteis.length === 0
-                    ? "Não configurado"
-                    : todosUteisIguais
-                      ? `${formatTime(uteis[0].hora_inicio)} — ${formatTime(
-                          uteis[0].hora_fim,
-                        )}`
-                      : `${uteis.length} dias com horários personalizados`;
-
-                const resumoIntervalo =
-                  todosUteisIguais &&
-                  uteis[0].pausa_inicio &&
-                  uteis[0].pausa_fim
-                    ? `${formatTime(uteis[0].pausa_inicio)} — ${formatTime(
-                        uteis[0].pausa_fim,
-                      )}`
-                    : todosUteisIguais
-                      ? "Sem intervalo"
-                      : "Consultar detalhes";
-
-                const resumoFimSemana = [
-                  sabado ? `Sáb ${formatTime(sabado.hora_inicio)}–${formatTime(sabado.hora_fim)}` : null,
-                  domingo ? `Dom ${formatTime(domingo.hora_inicio)}–${formatTime(domingo.hora_fim)}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || "Não trabalha";
-
+                const resumoUteis = uteis.length === 0 ? "Não configurado" : todosUteisIguais ? `${formatTime(uteis[0].hora_inicio)} — ${formatTime(uteis[0].hora_fim)}` : `${uteis.length} dias com horários personalizados`;
+                const resumoIntervalo = todosUteisIguais && uteis[0].pausa_inicio && uteis[0].pausa_fim ? `${formatTime(uteis[0].pausa_inicio)} — ${formatTime(uteis[0].pausa_fim)}` : todosUteisIguais ? "Sem intervalo" : "Consultar detalhes";
+                const resumoFimSemana = [sabado ? `Sáb ${formatTime(sabado.hora_inicio)}–${formatTime(sabado.hora_fim)}` : null, domingo ? `Dom ${formatTime(domingo.hora_inicio)}–${formatTime(domingo.hora_fim)}` : null].filter(Boolean).join(" · ") || "Não trabalha";
                 return (
-                  <article
-                    className={`employee-schedule-card ${
-                      aberto ? "employee-schedule-card-open" : ""
-                    }`}
-                    key={grupo.funcionario_id}
-                  >
+                  <article className={`employee-schedule-card ${aberto ? "employee-schedule-card-open" : ""}`} key={grupo.funcionario_id}>
                     <div className="employee-schedule-header">
-                      <div className="entity-cell">
-                        <span className="entity-avatar">
-                          {grupo.nome.charAt(0).toUpperCase()}
-                        </span>
-                        <div>
-                          <strong>{grupo.nome}</strong>
-                          <small>
-                            {grupo.usuario?.cargo === "ADMIN"
-                              ? "Administrador"
-                              : grupo.usuario?.cargo === "GERENTE"
-                                ? "Gerente"
-                                : "Funcionário"}
-                          </small>
-                        </div>
-                      </div>
-
+                      <div className="entity-cell"><span className="entity-avatar">{grupo.nome.charAt(0).toUpperCase()}</span><div><strong>{grupo.nome}</strong><small>{grupo.usuario?.cargo === "ADMIN" ? "Administrador" : grupo.usuario?.cargo === "GERENTE" ? "Gerente" : "Funcionário"}</small></div></div>
                       <div className="employee-schedule-actions">
-                        <button
-                          className="button button-secondary button-small"
-                          type="button"
-                          onClick={() =>
-                            abrirConfigurarSemana(grupo.funcionario_id)
-                          }
-                          disabled={!podeGerenciar}
-                        >
-                          <Icon name="edit" size={15} />
-                          Editar jornada
-                        </button>
-                        <button
-                          className="schedule-expand-button"
-                          type="button"
-                          onClick={() =>
-                            alternarDetalhesJornada(grupo.funcionario_id)
-                          }
-                          aria-expanded={aberto}
-                        >
-                          <span>{aberto ? "Ocultar" : "Ver detalhes"}</span>
-                          <strong aria-hidden="true">{aberto ? "−" : "+"}</strong>
-                        </button>
+                        <button className="button button-secondary button-small" type="button" onClick={() => abrirConfigurarSemana(grupo.funcionario_id)} disabled={!podeGerenciar}><Icon name="edit" size={15} />Editar jornada</button>
+                        <button className="schedule-expand-button" type="button" onClick={() => alternarDetalhesJornada(grupo.funcionario_id)} aria-expanded={aberto}><span>{aberto ? "Ocultar" : "Ver detalhes"}</span><strong aria-hidden="true">{aberto ? "−" : "+"}</strong></button>
                       </div>
                     </div>
-
-                    <div className="employee-schedule-summary">
-                      <span>
-                        <small>Segunda a sexta</small>
-                        <strong>{resumoUteis}</strong>
-                      </span>
-                      <span>
-                        <small>Intervalo</small>
-                        <strong>{resumoIntervalo}</strong>
-                      </span>
-                      <span>
-                        <small>Fim de semana</small>
-                        <strong>{resumoFimSemana}</strong>
-                      </span>
-                    </div>
-
+                    <div className="employee-schedule-summary"><span><small>Segunda a sexta</small><strong>{resumoUteis}</strong></span><span><small>Intervalo</small><strong>{resumoIntervalo}</strong></span><span><small>Fim de semana</small><strong>{resumoFimSemana}</strong></span></div>
                     {aberto && (
                       <div className="employee-schedule-details">
                         {ordemDiasJornada.map((dia) => {
                           const item = porDia.get(dia);
                           return (
                             <div className="schedule-day-row" key={dia}>
-                              <div>
-                                <strong>{diasSemana[dia]}</strong>
-                                <small>
-                                  {item
-                                    ? item.ativo
-                                      ? "Jornada ativa"
-                                      : "Jornada inativa"
-                                    : "Não trabalha"}
-                                </small>
-                              </div>
-
-                              <span>
-                                {item
-                                  ? `${formatTime(item.hora_inicio)} — ${formatTime(
-                                      item.hora_fim,
-                                    )}`
-                                  : "—"}
-                              </span>
-
-                              <span>
-                                {item?.pausa_inicio && item?.pausa_fim
-                                  ? `${formatTime(item.pausa_inicio)} — ${formatTime(
-                                      item.pausa_fim,
-                                    )}`
-                                  : item
-                                    ? "Sem intervalo"
-                                    : "—"}
-                              </span>
-
+                              <div><strong>{diasSemana[dia]}</strong><small>{item ? item.ativo ? "Jornada ativa" : "Jornada inativa" : "Não trabalha"}</small></div>
+                              <span>{item ? `${formatTime(item.hora_inicio)} — ${formatTime(item.hora_fim)}` : "—"}</span>
+                              <span>{item?.pausa_inicio && item?.pausa_fim ? `${formatTime(item.pausa_inicio)} — ${formatTime(item.pausa_fim)}` : item ? "Sem intervalo" : "—"}</span>
                               <div className="row-actions">
-                                {item ? (
-                                  <>
-                                    <button
-                                      className="icon-button"
-                                      type="button"
-                                      onClick={() => abrirEditarHorario(item)}
-                                      disabled={!podeGerenciar}
-                                      title={`Editar ${diasSemana[dia]}`}
-                                    >
-                                      <Icon name="edit" size={16} />
-                                    </button>
-                                    <button
-                                      className="icon-button danger"
-                                      type="button"
-                                      onClick={() => void excluirHorario(item)}
-                                      disabled={!podeGerenciar}
-                                      title={`Excluir ${diasSemana[dia]}`}
-                                    >
-                                      <Icon name="trash" size={16} />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    className="button button-ghost button-small"
-                                    type="button"
-                                    onClick={() =>
-                                      abrirNovoHorarioIndividual(
-                                        grupo.funcionario_id,
-                                        dia,
-                                      )
-                                    }
-                                    disabled={!podeGerenciar}
-                                  >
-                                    <Icon name="plus" size={14} />
-                                    Adicionar
-                                  </button>
-                                )}
+                                {item ? <><button className="icon-button" type="button" onClick={() => abrirEditarHorario(item)} disabled={!podeGerenciar} title={`Editar ${diasSemana[dia]}`}><Icon name="edit" size={16} /></button><button className="icon-button danger" type="button" onClick={() => void excluirHorario(item)} disabled={!podeGerenciar} title={`Excluir ${diasSemana[dia]}`}><Icon name="trash" size={16} /></button></> : <button className="button button-ghost button-small" type="button" onClick={() => abrirNovoHorarioIndividual(grupo.funcionario_id, dia)} disabled={!podeGerenciar}><Icon name="plus" size={14} />Adicionar</button>}
                               </div>
                             </div>
                           );
@@ -1310,1121 +1093,55 @@ export function Equipe() {
         ) : (
           <div className="schedule-blocks-section">
             <div className="schedule-blocks-tabs" role="tablist">
-              <button
-                className={
-                  visualizacaoBloqueio === "ATIVOS"
-                    ? "schedule-blocks-tab-active"
-                    : ""
-                }
-                type="button"
-                onClick={() => setVisualizacaoBloqueio("ATIVOS")}
-              >
-                <Icon name="calendar" size={16} />
-                Ativos
-                <span>{bloqueiosAtivos.length}</span>
-              </button>
-              <button
-                className={
-                  visualizacaoBloqueio === "HISTORICO"
-                    ? "schedule-blocks-tab-active"
-                    : ""
-                }
-                type="button"
-                onClick={() => setVisualizacaoBloqueio("HISTORICO")}
-              >
-                <Icon name="clock" size={16} />
-                Histórico
-                <span>{bloqueiosHistorico.length}</span>
-              </button>
+              <button className={visualizacaoBloqueio === "ATIVOS" ? "schedule-blocks-tab-active" : ""} type="button" onClick={() => setVisualizacaoBloqueio("ATIVOS")}><Icon name="calendar" size={16} />Ativos<span>{bloqueiosAtivos.length}</span></button>
+              <button className={visualizacaoBloqueio === "HISTORICO" ? "schedule-blocks-tab-active" : ""} type="button" onClick={() => setVisualizacaoBloqueio("HISTORICO")}><Icon name="clock" size={16} />Histórico<span>{bloqueiosHistorico.length}</span></button>
             </div>
-
             {bloqueiosExibidos.length === 0 ? (
-              <EmptyState
-                icon="calendar"
-                title={
-                  visualizacaoBloqueio === "ATIVOS"
-                    ? "Nenhum bloqueio ativo"
-                    : "Nenhum bloqueio no histórico"
-                }
-                description={
-                  visualizacaoBloqueio === "ATIVOS"
-                    ? "Bloqueios atuais e futuros aparecerão aqui."
-                    : "Os bloqueios encerrados serão organizados automaticamente nesta aba."
-                }
-              />
+              <EmptyState icon="calendar" title={visualizacaoBloqueio === "ATIVOS" ? "Nenhum bloqueio ativo" : "Nenhum bloqueio no histórico"} description={visualizacaoBloqueio === "ATIVOS" ? "Bloqueios atuais e futuros aparecerão aqui." : "Os bloqueios encerrados serão organizados automaticamente nesta aba."} />
             ) : (
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Responsável</th>
-                      <th>Tipo</th>
-                      <th>Período</th>
-                      <th>Motivo</th>
-                      <th>Status</th>
-                      <th className="actions-column">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bloqueiosExibidos.map((item) => {
-                      const encerrado = bloqueioJaTerminou(
-                        item,
-                        agoraBloqueios,
-                      );
-
-                      return (
-                        <tr key={item.id}>
-                          <td>{nomeUsuario(item.funcionario_id)}</td>
-                          <td>
-                            <span
-                              className={`status-badge ${
-                                item.hora_inicio && item.hora_fim
-                                  ? "status-timed-block"
-                                  : "status-full-day-block"
-                              }`}
-                            >
-                              {item.hora_inicio && item.hora_fim
-                                ? "Horário"
-                                : "Dia inteiro"}
-                            </span>
-                          </td>
-                          <td>{periodoBloqueio(item)}</td>
-                          <td>{item.motivo ?? "Sem motivo informado"}</td>
-                          <td>
-                            <span
-                              className={`status-badge ${
-                                encerrado
-                                  ? "status-block-ended"
-                                  : "status-block-active"
-                              }`}
-                            >
-                              {encerrado ? "Encerrado" : "Ativo"}
-                            </span>
-                          </td>
-                          <td>
-                            {encerrado ? (
-                              <span className="table-action-placeholder">—</span>
-                            ) : (
-                              <button
-                                className="icon-button danger"
-                                type="button"
-                                onClick={() => abrirExclusaoBloqueio(item)}
-                                disabled={!podeGerenciar}
-                                title="Excluir bloqueio"
-                              >
-                                <Icon name="trash" size={17} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <div className="table-wrap"><table className="data-table"><thead><tr><th>Responsável</th><th>Tipo</th><th>Período</th><th>Motivo</th><th>Status</th><th className="actions-column">Ações</th></tr></thead><tbody>{bloqueiosExibidos.map((item) => { const encerrado = bloqueioJaTerminou(item, agoraBloqueios); return <tr key={item.id}><td>{nomeUsuario(item.funcionario_id)}</td><td><span className={`status-badge ${item.hora_inicio && item.hora_fim ? "status-timed-block" : "status-full-day-block"}`}>{item.hora_inicio && item.hora_fim ? "Horário" : "Dia inteiro"}</span></td><td>{periodoBloqueio(item)}</td><td>{item.motivo ?? "Sem motivo informado"}</td><td><span className={`status-badge ${encerrado ? "status-block-ended" : "status-block-active"}`}>{encerrado ? "Encerrado" : "Ativo"}</span></td><td>{encerrado ? <span className="table-action-placeholder">—</span> : <button className="icon-button danger" type="button" onClick={() => abrirExclusaoBloqueio(item)} disabled={!podeGerenciar} title="Excluir bloqueio"><Icon name="trash" size={17} /></button>}</td></tr>; })}</tbody></table></div>
             )}
           </div>
         )}
       </section>
 
-      <Modal
-        open={modalUsuario}
-        title={editandoUsuario ? "Editar usuário" : "Novo usuário"}
-        subtitle="Defina os dados de acesso e o nível de permissão."
-        onClose={() => setModalUsuario(false)}
-      >
+      <Modal open={modalUsuario} title={editandoUsuario ? "Editar usuário" : "Novo usuário"} subtitle="Defina os dados de acesso e o nível de permissão." onClose={() => setModalUsuario(false)}>
         <form onSubmit={salvarUsuario}>
           {erro && <Alert>{erro}</Alert>}
           <div className="form-grid form-grid-2">
-            <label className="field field-span-2">
-              Nome
-              <input
-                value={usuarioForm.nome}
-                onChange={(event) =>
-                  setUsuarioForm({ ...usuarioForm, nome: event.target.value })
-                }
-                required
-              />
-            </label>
-            <label className="field">
-              E-mail
-              <input
-                type="email"
-                value={usuarioForm.email}
-                onChange={(event) =>
-                  setUsuarioForm({ ...usuarioForm, email: event.target.value })
-                }
-                required
-              />
-            </label>
-            <label className="field">
-              Telefone
-              <input
-                value={usuarioForm.telefone}
-                onChange={(event) =>
-                  setUsuarioForm({
-                    ...usuarioForm,
-                    telefone: event.target.value,
-                  })
-                }
-              />
-            </label>
-
-            {!editandoUsuario && (
-              <>
-                <label className="field">
-                  Senha inicial
-                  <div className="password-field">
-                    <input
-                      type={mostrarSenha ? "text" : "password"}
-                      minLength={8}
-                      value={usuarioForm.senha}
-                      onChange={(event) =>
-                        setUsuarioForm({
-                          ...usuarioForm,
-                          senha: event.target.value,
-                        })
-                      }
-                      required
-                    />
-                    <button
-                      className="password-toggle"
-                      type="button"
-                      onClick={() => setMostrarSenha((valor) => !valor)}
-                      aria-label="Mostrar ou ocultar senha"
-                    >
-                      <Icon name="eye" size={18} />
-                    </button>
-                  </div>
-                </label>
-
-                <label className="field">
-                  Confirmar senha
-                  <div className="password-field">
-                    <input
-                      type={mostrarConfirmacaoSenha ? "text" : "password"}
-                      minLength={8}
-                      value={usuarioForm.confirmar_senha}
-                      onChange={(event) =>
-                        setUsuarioForm({
-                          ...usuarioForm,
-                          confirmar_senha: event.target.value,
-                        })
-                      }
-                      required
-                    />
-                    <button
-                      className="password-toggle"
-                      type="button"
-                      onClick={() =>
-                        setMostrarConfirmacaoSenha((valor) => !valor)
-                      }
-                      aria-label="Mostrar ou ocultar confirmação da senha"
-                    >
-                      <Icon name="eye" size={18} />
-                    </button>
-                  </div>
-                </label>
-              </>
-            )}
-
-            <label className="field">
-              Cargo
-              <select
-                value={usuarioForm.cargo}
-                onChange={(event) =>
-                  setUsuarioForm({
-                    ...usuarioForm,
-                    cargo: event.target.value as CargoUsuario,
-                  })
-                }
-              >
-                <option value="FUNCIONARIO">Funcionário</option>
-                <option value="GERENTE">Gerente</option>
-                {usuarioAtual.cargo === "ADMIN" && (
-                  <option value="ADMIN">Administrador</option>
-                )}
-              </select>
-            </label>
-
-            {editandoUsuario && (
-              <label className="field checkbox-field">
-                <input
-                  type="checkbox"
-                  checked={usuarioForm.ativo}
-                  onChange={(event) =>
-                    setUsuarioForm({
-                      ...usuarioForm,
-                      ativo: event.target.checked,
-                    })
-                  }
-                />
-                Usuário ativo
-              </label>
-            )}
+            <label className="field field-span-2">Nome<input value={usuarioForm.nome} onChange={(event) => setUsuarioForm({ ...usuarioForm, nome: event.target.value })} required /></label>
+            <label className="field">E-mail<input type="email" value={usuarioForm.email} onChange={(event) => setUsuarioForm({ ...usuarioForm, email: event.target.value })} required /></label>
+            <label className="field">Telefone<input value={usuarioForm.telefone} inputMode="numeric" maxLength={15} onChange={(event) => setUsuarioForm({ ...usuarioForm, telefone: event.target.value })} /></label>
+            {!editandoUsuario && <><label className="field">Senha inicial<div className="password-field"><input type={mostrarSenha ? "text" : "password"} minLength={8} value={usuarioForm.senha} onChange={(event) => setUsuarioForm({ ...usuarioForm, senha: event.target.value })} required /><button className="password-toggle" type="button" onClick={() => setMostrarSenha((valor) => !valor)} aria-label="Mostrar ou ocultar senha"><Icon name="eye" size={18} /></button></div></label><label className="field">Confirmar senha<div className="password-field"><input type={mostrarConfirmacaoSenha ? "text" : "password"} minLength={8} value={usuarioForm.confirmar_senha} onChange={(event) => setUsuarioForm({ ...usuarioForm, confirmar_senha: event.target.value })} required /><button className="password-toggle" type="button" onClick={() => setMostrarConfirmacaoSenha((valor) => !valor)} aria-label="Mostrar ou ocultar confirmação da senha"><Icon name="eye" size={18} /></button></div></label></>}
+            <label className="field">Cargo<select value={usuarioForm.cargo} onChange={(event) => setUsuarioForm({ ...usuarioForm, cargo: event.target.value as CargoUsuario })}><option value="FUNCIONARIO">Funcionário</option><option value="GERENTE">Gerente</option>{usuarioAtual.cargo === "ADMIN" && <option value="ADMIN">Administrador</option>}</select></label>
+            {editandoUsuario && <label className="field checkbox-field"><input type="checkbox" checked={usuarioForm.ativo} onChange={(event) => setUsuarioForm({ ...usuarioForm, ativo: event.target.checked })} />Usuário ativo</label>}
           </div>
-          <div className="modal-actions">
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => setModalUsuario(false)}
-            >
-              Cancelar
-            </button>
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={salvando}
-            >
-              {salvando ? "Salvando..." : "Salvar usuário"}
-            </button>
-          </div>
+          <div className="modal-actions"><button className="button button-secondary" type="button" onClick={() => setModalUsuario(false)}>Cancelar</button><button className="button button-primary" type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar usuário"}</button></div>
         </form>
       </Modal>
 
-      <Modal
-        open={modalSemana}
-        title="Configurar jornada semanal"
-        subtitle="Defina os horários de segunda a sexta e, se necessário, personalize dias específicos."
-        onClose={() => !salvando && setModalSemana(false)}
-        size="large"
-      >
-        <form onSubmit={salvarSemana}>
-          {erro && <Alert>{erro}</Alert>}
-
-          <div className="form-grid form-grid-2">
-            <label className="field field-span-2">
-              Funcionário
-              <select
-                value={semanaForm.funcionario_id}
-                onChange={(event) =>
-                  selecionarFuncionarioSemana(event.target.value)
-                }
-                required
-              >
-                <option value="">Selecione</option>
-                {usuariosAtivos.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="schedule-mode-card field-span-2">
-              <div>
-                <strong>Forma de configuração</strong>
-                <small>
-                  Use um horário único para os dias úteis ou personalize cada dia.
-                </small>
-              </div>
-              <div className="schedule-mode-buttons">
-                <button
-                  className={!semanaPersonalizada ? "schedule-mode-active" : ""}
-                  type="button"
-                  onClick={() => alternarPersonalizacaoSemana(false)}
-                >
-                  Segunda a sexta
-                </button>
-                <button
-                  className={semanaPersonalizada ? "schedule-mode-active" : ""}
-                  type="button"
-                  onClick={() => alternarPersonalizacaoSemana(true)}
-                >
-                  Personalizar dias
-                </button>
-              </div>
-            </div>
-
-            {!semanaPersonalizada ? (
-              <>
-                <div className="weekday-settings field-span-2">
-                  <div className="weekday-settings-header">
-                    <div>
-                      <strong>Segunda a sexta</strong>
-                      <small>O mesmo horário será aplicado aos cinco dias.</small>
-                    </div>
-                    <label className="checkbox-field compact-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={semanaForm.dias[1].ativo}
-                        onChange={(event) =>
-                          atualizarDiasUteis({ ativo: event.target.checked })
-                        }
-                      />
-                      Trabalha nos dias úteis
-                    </label>
-                  </div>
-
-                  {semanaForm.dias[1].ativo && (
-                    <>
-                      <div className="schedule-time-grid">
-                        <label className="field">
-                          Início da jornada
-                          <input
-                            type="time"
-                            value={semanaForm.dias[1].hora_inicio}
-                            onChange={(event) =>
-                              atualizarDiasUteis({
-                                hora_inicio: event.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </label>
-                        <label className="field">
-                          Fim da jornada
-                          <input
-                            type="time"
-                            value={semanaForm.dias[1].hora_fim}
-                            onChange={(event) =>
-                              atualizarDiasUteis({
-                                hora_fim: event.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </label>
-                      </div>
-
-                      <div className="lunch-settings">
-                        <label className="lunch-toggle">
-                          <span className="switch-control">
-                            <input
-                              type="checkbox"
-                              checked={semanaForm.dias[1].pausa_ativa}
-                              onChange={(event) =>
-                                atualizarDiasUteis({
-                                  pausa_ativa: event.target.checked,
-                                })
-                              }
-                            />
-                            <span className="switch-slider" />
-                          </span>
-                          <span>
-                            <strong>Horário de almoço</strong>
-                            <small>
-                              O funcionário não ficará disponível nesse período.
-                            </small>
-                          </span>
-                        </label>
-
-                        {semanaForm.dias[1].pausa_ativa && (
-                          <div className="lunch-time-grid">
-                            <label className="field">
-                              Início do almoço
-                              <input
-                                type="time"
-                                value={semanaForm.dias[1].pausa_inicio}
-                                onChange={(event) =>
-                                  atualizarDiasUteis({
-                                    pausa_inicio: event.target.value,
-                                  })
-                                }
-                                required
-                              />
-                            </label>
-                            <label className="field">
-                              Fim do almoço
-                              <input
-                                type="time"
-                                value={semanaForm.dias[1].pausa_fim}
-                                onChange={(event) =>
-                                  atualizarDiasUteis({
-                                    pausa_fim: event.target.value,
-                                  })
-                                }
-                                required
-                              />
-                            </label>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {[6, 0].map((dia) => (
-                  <div className="weekend-settings" key={dia}>
-                    <div className="weekend-settings-header">
-                      <div>
-                        <strong>{diasSemana[dia]}</strong>
-                        <small>Configuração opcional.</small>
-                      </div>
-                      <label className="checkbox-field compact-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={semanaForm.dias[dia].ativo}
-                          onChange={(event) =>
-                            atualizarDiaSemana(dia, {
-                              ativo: event.target.checked,
-                            })
-                          }
-                        />
-                        Trabalha
-                      </label>
-                    </div>
-
-                    {semanaForm.dias[dia].ativo && (
-                      <div className="weekend-time-grid">
-                        <label className="field">
-                          Início
-                          <input
-                            type="time"
-                            value={semanaForm.dias[dia].hora_inicio}
-                            onChange={(event) =>
-                              atualizarDiaSemana(dia, {
-                                hora_inicio: event.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </label>
-                        <label className="field">
-                          Fim
-                          <input
-                            type="time"
-                            value={semanaForm.dias[dia].hora_fim}
-                            onChange={(event) =>
-                              atualizarDiaSemana(dia, {
-                                hora_fim: event.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </label>
-                        <label className="checkbox-field compact-checkbox field-span-2">
-                          <input
-                            type="checkbox"
-                            checked={semanaForm.dias[dia].pausa_ativa}
-                            onChange={(event) =>
-                              atualizarDiaSemana(dia, {
-                                pausa_ativa: event.target.checked,
-                              })
-                            }
-                          />
-                          Possui intervalo
-                        </label>
-                        {semanaForm.dias[dia].pausa_ativa && (
-                          <>
-                            <label className="field">
-                              Início do intervalo
-                              <input
-                                type="time"
-                                value={semanaForm.dias[dia].pausa_inicio}
-                                onChange={(event) =>
-                                  atualizarDiaSemana(dia, {
-                                    pausa_inicio: event.target.value,
-                                  })
-                                }
-                                required
-                              />
-                            </label>
-                            <label className="field">
-                              Fim do intervalo
-                              <input
-                                type="time"
-                                value={semanaForm.dias[dia].pausa_fim}
-                                onChange={(event) =>
-                                  atualizarDiaSemana(dia, {
-                                    pausa_fim: event.target.value,
-                                  })
-                                }
-                                required
-                              />
-                            </label>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div className="custom-days-list field-span-2">
-                {ordemDiasJornada.map((dia) => (
-                  <div className="custom-day-card" key={dia}>
-                    <div className="custom-day-header">
-                      <div>
-                        <strong>{diasSemana[dia]}</strong>
-                        <small>
-                          {semanaForm.dias[dia].ativo
-                            ? "Jornada configurada"
-                            : "Não trabalha"}
-                        </small>
-                      </div>
-                      <label className="checkbox-field compact-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={semanaForm.dias[dia].ativo}
-                          onChange={(event) =>
-                            atualizarDiaSemana(dia, {
-                              ativo: event.target.checked,
-                            })
-                          }
-                        />
-                        Trabalha
-                      </label>
-                    </div>
-
-                    {semanaForm.dias[dia].ativo && (
-                      <div className="custom-day-fields">
-                        <label className="field">
-                          Início
-                          <input
-                            type="time"
-                            value={semanaForm.dias[dia].hora_inicio}
-                            onChange={(event) =>
-                              atualizarDiaSemana(dia, {
-                                hora_inicio: event.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </label>
-                        <label className="field">
-                          Fim
-                          <input
-                            type="time"
-                            value={semanaForm.dias[dia].hora_fim}
-                            onChange={(event) =>
-                              atualizarDiaSemana(dia, {
-                                hora_fim: event.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </label>
-                        <label className="checkbox-field compact-checkbox custom-day-break-toggle">
-                          <input
-                            type="checkbox"
-                            checked={semanaForm.dias[dia].pausa_ativa}
-                            onChange={(event) =>
-                              atualizarDiaSemana(dia, {
-                                pausa_ativa: event.target.checked,
-                              })
-                            }
-                          />
-                          Intervalo
-                        </label>
-                        {semanaForm.dias[dia].pausa_ativa && (
-                          <>
-                            <label className="field">
-                              Início do intervalo
-                              <input
-                                type="time"
-                                value={semanaForm.dias[dia].pausa_inicio}
-                                onChange={(event) =>
-                                  atualizarDiaSemana(dia, {
-                                    pausa_inicio: event.target.value,
-                                  })
-                                }
-                                required
-                              />
-                            </label>
-                            <label className="field">
-                              Fim do intervalo
-                              <input
-                                type="time"
-                                value={semanaForm.dias[dia].pausa_fim}
-                                onChange={(event) =>
-                                  atualizarDiaSemana(dia, {
-                                    pausa_fim: event.target.value,
-                                  })
-                                }
-                                required
-                              />
-                            </label>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="modal-actions">
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => setModalSemana(false)}
-              disabled={salvando}
-            >
-              Cancelar
-            </button>
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={salvando}
-            >
-              {salvando ? "Salvando..." : "Salvar jornada semanal"}
-            </button>
-          </div>
-        </form>
+      <Modal open={modalSemana} title="Configurar jornada semanal" subtitle="Defina os horários de segunda a sexta e, se necessário, personalize dias específicos." onClose={() => !salvando && setModalSemana(false)} size="large">
+        <form onSubmit={salvarSemana}>{erro && <Alert>{erro}</Alert>}<div className="form-grid form-grid-2"><label className="field field-span-2">Funcionário<select value={semanaForm.funcionario_id} onChange={(event) => selecionarFuncionarioSemana(event.target.value)} required><option value="">Selecione</option>{usuariosAtivos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label><div className="schedule-mode-card field-span-2"><div><strong>Forma de configuração</strong><small>Use um horário único para os dias úteis ou personalize cada dia.</small></div><div className="schedule-mode-buttons"><button className={!semanaPersonalizada ? "schedule-mode-active" : ""} type="button" onClick={() => alternarPersonalizacaoSemana(false)}>Segunda a sexta</button><button className={semanaPersonalizada ? "schedule-mode-active" : ""} type="button" onClick={() => alternarPersonalizacaoSemana(true)}>Personalizar dias</button></div></div>{!semanaPersonalizada ? <><div className="weekday-settings field-span-2"><div className="weekday-settings-header"><div><strong>Segunda a sexta</strong><small>O mesmo horário será aplicado aos cinco dias.</small></div><label className="checkbox-field compact-checkbox"><input type="checkbox" checked={semanaForm.dias[1].ativo} onChange={(event) => atualizarDiasUteis({ ativo: event.target.checked })} />Trabalha nos dias úteis</label></div>{semanaForm.dias[1].ativo && <><div className="schedule-time-grid"><label className="field">Início da jornada<input type="time" value={semanaForm.dias[1].hora_inicio} onChange={(event) => atualizarDiasUteis({ hora_inicio: event.target.value })} required /></label><label className="field">Fim da jornada<input type="time" value={semanaForm.dias[1].hora_fim} onChange={(event) => atualizarDiasUteis({ hora_fim: event.target.value })} required /></label></div><div className="lunch-settings"><label className="lunch-toggle"><span className="switch-control"><input type="checkbox" checked={semanaForm.dias[1].pausa_ativa} onChange={(event) => atualizarDiasUteis({ pausa_ativa: event.target.checked })} /><span className="switch-slider" /></span><span><strong>Horário de almoço</strong><small>O funcionário não ficará disponível nesse período.</small></span></label>{semanaForm.dias[1].pausa_ativa && <div className="lunch-time-grid"><label className="field">Início do almoço<input type="time" value={semanaForm.dias[1].pausa_inicio} onChange={(event) => atualizarDiasUteis({ pausa_inicio: event.target.value })} required /></label><label className="field">Fim do almoço<input type="time" value={semanaForm.dias[1].pausa_fim} onChange={(event) => atualizarDiasUteis({ pausa_fim: event.target.value })} required /></label></div>}</div></>}</div>{[6,0].map((dia) => <div className="weekend-settings" key={dia}><div className="weekend-settings-header"><div><strong>{diasSemana[dia]}</strong><small>Configuração opcional.</small></div><label className="checkbox-field compact-checkbox"><input type="checkbox" checked={semanaForm.dias[dia].ativo} onChange={(event) => atualizarDiaSemana(dia, { ativo: event.target.checked })} />Trabalha</label></div>{semanaForm.dias[dia].ativo && <div className="weekend-time-grid"><label className="field">Início<input type="time" value={semanaForm.dias[dia].hora_inicio} onChange={(event) => atualizarDiaSemana(dia, { hora_inicio: event.target.value })} required /></label><label className="field">Fim<input type="time" value={semanaForm.dias[dia].hora_fim} onChange={(event) => atualizarDiaSemana(dia, { hora_fim: event.target.value })} required /></label><label className="checkbox-field compact-checkbox field-span-2"><input type="checkbox" checked={semanaForm.dias[dia].pausa_ativa} onChange={(event) => atualizarDiaSemana(dia, { pausa_ativa: event.target.checked })} />Possui intervalo</label>{semanaForm.dias[dia].pausa_ativa && <><label className="field">Início do intervalo<input type="time" value={semanaForm.dias[dia].pausa_inicio} onChange={(event) => atualizarDiaSemana(dia, { pausa_inicio: event.target.value })} required /></label><label className="field">Fim do intervalo<input type="time" value={semanaForm.dias[dia].pausa_fim} onChange={(event) => atualizarDiaSemana(dia, { pausa_fim: event.target.value })} required /></label></>}</div>}</div>)}</> : <div className="custom-days-list field-span-2">{ordemDiasJornada.map((dia) => <div className="custom-day-card" key={dia}><div className="custom-day-header"><div><strong>{diasSemana[dia]}</strong><small>{semanaForm.dias[dia].ativo ? "Jornada configurada" : "Não trabalha"}</small></div><label className="checkbox-field compact-checkbox"><input type="checkbox" checked={semanaForm.dias[dia].ativo} onChange={(event) => atualizarDiaSemana(dia, { ativo: event.target.checked })} />Trabalha</label></div>{semanaForm.dias[dia].ativo && <div className="custom-day-fields"><label className="field">Início<input type="time" value={semanaForm.dias[dia].hora_inicio} onChange={(event) => atualizarDiaSemana(dia, { hora_inicio: event.target.value })} required /></label><label className="field">Fim<input type="time" value={semanaForm.dias[dia].hora_fim} onChange={(event) => atualizarDiaSemana(dia, { hora_fim: event.target.value })} required /></label><label className="checkbox-field compact-checkbox custom-day-break-toggle"><input type="checkbox" checked={semanaForm.dias[dia].pausa_ativa} onChange={(event) => atualizarDiaSemana(dia, { pausa_ativa: event.target.checked })} />Intervalo</label>{semanaForm.dias[dia].pausa_ativa && <><label className="field">Início do intervalo<input type="time" value={semanaForm.dias[dia].pausa_inicio} onChange={(event) => atualizarDiaSemana(dia, { pausa_inicio: event.target.value })} required /></label><label className="field">Fim do intervalo<input type="time" value={semanaForm.dias[dia].pausa_fim} onChange={(event) => atualizarDiaSemana(dia, { pausa_fim: event.target.value })} required /></label></>}</div>}</div>)}</div>}</div><div className="modal-actions"><button className="button button-secondary" type="button" onClick={() => setModalSemana(false)} disabled={salvando}>Cancelar</button><button className="button button-primary" type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar jornada semanal"}</button></div></form>
       </Modal>
 
-      <Modal
-        open={modalHorario}
-        title={editandoHorario ? "Editar jornada" : "Nova jornada"}
-        subtitle="Configure o período de trabalho e o intervalo do funcionário."
-        onClose={() => setModalHorario(false)}
-      >
-        <form onSubmit={salvarHorario}>
-          {erro && <Alert>{erro}</Alert>}
-          <div className="form-grid form-grid-2">
-            <label className="field field-span-2">
-              Funcionário
-              <select
-                value={horarioForm.funcionario_id}
-                onChange={(event) =>
-                  setHorarioForm({
-                    ...horarioForm,
-                    funcionario_id: event.target.value,
-                  })
-                }
-                required
-                disabled={Boolean(editandoHorario)}
-              >
-                <option value="">Selecione</option>
-                {usuariosAtivos.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              Dia da semana
-              <select
-                value={horarioForm.dia_semana}
-                onChange={(event) =>
-                  setHorarioForm({
-                    ...horarioForm,
-                    dia_semana: event.target.value,
-                  })
-                }
-              >
-                {diasSemana.map((dia, index) => (
-                  <option key={dia} value={index}>
-                    {dia}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field checkbox-field">
-              <input
-                type="checkbox"
-                checked={horarioForm.ativo}
-                onChange={(event) =>
-                  setHorarioForm({
-                    ...horarioForm,
-                    ativo: event.target.checked,
-                  })
-                }
-              />
-              Jornada ativa
-            </label>
-
-            <label className="field">
-              Início da jornada
-              <input
-                type="time"
-                value={horarioForm.hora_inicio}
-                onChange={(event) =>
-                  setHorarioForm({
-                    ...horarioForm,
-                    hora_inicio: event.target.value,
-                  })
-                }
-                required
-              />
-            </label>
-
-            <label className="field">
-              Fim da jornada
-              <input
-                type="time"
-                value={horarioForm.hora_fim}
-                onChange={(event) =>
-                  setHorarioForm({
-                    ...horarioForm,
-                    hora_fim: event.target.value,
-                  })
-                }
-                required
-              />
-            </label>
-
-            <div className="lunch-settings field-span-2">
-              <label className="lunch-toggle">
-                <span className="switch-control">
-                  <input
-                    type="checkbox"
-                    checked={horarioForm.pausa_ativa}
-                    onChange={(event) =>
-                      setHorarioForm({
-                        ...horarioForm,
-                        pausa_ativa: event.target.checked,
-                      })
-                    }
-                  />
-                  <span className="switch-slider" />
-                </span>
-                <span>
-                  <strong>Horário de almoço</strong>
-                  <small>
-                    O funcionário não ficará disponível durante esse intervalo.
-                  </small>
-                </span>
-              </label>
-
-              {horarioForm.pausa_ativa && (
-                <div className="lunch-time-grid">
-                  <label className="field">
-                    Início do almoço
-                    <input
-                      type="time"
-                      value={horarioForm.pausa_inicio}
-                      onChange={(event) =>
-                        setHorarioForm({
-                          ...horarioForm,
-                          pausa_inicio: event.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="field">
-                    Fim do almoço
-                    <input
-                      type="time"
-                      value={horarioForm.pausa_fim}
-                      onChange={(event) =>
-                        setHorarioForm({
-                          ...horarioForm,
-                          pausa_fim: event.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="modal-actions">
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => setModalHorario(false)}
-            >
-              Cancelar
-            </button>
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={salvando}
-            >
-              {salvando ? "Salvando..." : "Salvar jornada"}
-            </button>
-          </div>
-        </form>
+      <Modal open={modalHorario} title={editandoHorario ? "Editar jornada" : "Nova jornada"} subtitle="Configure o período de trabalho e o intervalo do funcionário." onClose={() => setModalHorario(false)}>
+        <form onSubmit={salvarHorario}>{erro && <Alert>{erro}</Alert>}<div className="form-grid form-grid-2"><label className="field field-span-2">Funcionário<select value={horarioForm.funcionario_id} onChange={(event) => setHorarioForm({ ...horarioForm, funcionario_id: event.target.value })} required disabled={Boolean(editandoHorario)}><option value="">Selecione</option>{usuariosAtivos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label><label className="field">Dia da semana<select value={horarioForm.dia_semana} onChange={(event) => setHorarioForm({ ...horarioForm, dia_semana: event.target.value })}>{diasSemana.map((dia,index) => <option key={dia} value={index}>{dia}</option>)}</select></label><label className="field checkbox-field"><input type="checkbox" checked={horarioForm.ativo} onChange={(event) => setHorarioForm({ ...horarioForm, ativo: event.target.checked })} />Jornada ativa</label><label className="field">Início da jornada<input type="time" value={horarioForm.hora_inicio} onChange={(event) => setHorarioForm({ ...horarioForm, hora_inicio: event.target.value })} required /></label><label className="field">Fim da jornada<input type="time" value={horarioForm.hora_fim} onChange={(event) => setHorarioForm({ ...horarioForm, hora_fim: event.target.value })} required /></label><div className="lunch-settings field-span-2"><label className="lunch-toggle"><span className="switch-control"><input type="checkbox" checked={horarioForm.pausa_ativa} onChange={(event) => setHorarioForm({ ...horarioForm, pausa_ativa: event.target.checked })} /><span className="switch-slider" /></span><span><strong>Horário de almoço</strong><small>O funcionário não ficará disponível durante esse intervalo.</small></span></label>{horarioForm.pausa_ativa && <div className="lunch-time-grid"><label className="field">Início do almoço<input type="time" value={horarioForm.pausa_inicio} onChange={(event) => setHorarioForm({ ...horarioForm, pausa_inicio: event.target.value })} required /></label><label className="field">Fim do almoço<input type="time" value={horarioForm.pausa_fim} onChange={(event) => setHorarioForm({ ...horarioForm, pausa_fim: event.target.value })} required /></label></div>}</div></div><div className="modal-actions"><button className="button button-secondary" type="button" onClick={() => setModalHorario(false)}>Cancelar</button><button className="button button-primary" type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar jornada"}</button></div></form>
       </Modal>
 
-      <Modal
-        open={modalBloqueio}
-        title="Novo bloqueio"
-        subtitle="Bloqueie um horário específico ou um período de dias."
-        onClose={() => setModalBloqueio(false)}
-      >
-        <form onSubmit={salvarBloqueio}>
-          {erro && <Alert>{erro}</Alert>}
-          <div className="form-grid form-grid-2">
-            <label className="field field-span-2">
-              Funcionário
-              <select
-                value={bloqueioForm.funcionario_id}
-                onChange={(event) =>
-                  setBloqueioForm({
-                    ...bloqueioForm,
-                    funcionario_id: event.target.value,
-                  })
-                }
-              >
-                <option value="">Toda a empresa</option>
-                {usuariosAtivos.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="block-type-selector field-span-2">
-              <button
-                className={
-                  bloqueioForm.tipo === "HORARIO" ? "block-type-active" : ""
-                }
-                type="button"
-                onClick={() =>
-                  setBloqueioForm({ ...bloqueioForm, tipo: "HORARIO" })
-                }
-              >
-                <Icon name="clock" size={18} />
-                <span>
-                  <strong>Horário específico</strong>
-                  <small>Bloqueie parte de um único dia.</small>
-                </span>
-              </button>
-              <button
-                className={
-                  bloqueioForm.tipo === "DIA_INTEIRO"
-                    ? "block-type-active"
-                    : ""
-                }
-                type="button"
-                onClick={() =>
-                  setBloqueioForm({ ...bloqueioForm, tipo: "DIA_INTEIRO" })
-                }
-              >
-                <Icon name="calendar" size={18} />
-                <span>
-                  <strong>Dia inteiro</strong>
-                  <small>Bloqueie um dia ou um período de dias.</small>
-                </span>
-              </button>
-            </div>
-
-            {bloqueioForm.tipo === "HORARIO" ? (
-              <>
-                <label className="field field-span-2">
-                  Data
-                  <input
-                    type="date"
-                    value={bloqueioForm.data_inicio}
-                    onChange={(event) =>
-                      setBloqueioForm({
-                        ...bloqueioForm,
-                        data_inicio: event.target.value,
-                        data_fim: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-                <label className="field">
-                  Horário inicial
-                  <input
-                    type="time"
-                    value={bloqueioForm.hora_inicio}
-                    onChange={(event) =>
-                      setBloqueioForm({
-                        ...bloqueioForm,
-                        hora_inicio: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-                <label className="field">
-                  Horário final
-                  <input
-                    type="time"
-                    value={bloqueioForm.hora_fim}
-                    onChange={(event) =>
-                      setBloqueioForm({
-                        ...bloqueioForm,
-                        hora_fim: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-              </>
-            ) : (
-              <>
-                <label className="field">
-                  Data inicial
-                  <input
-                    type="date"
-                    value={bloqueioForm.data_inicio}
-                    onChange={(event) =>
-                      setBloqueioForm({
-                        ...bloqueioForm,
-                        data_inicio: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-                <label className="field">
-                  Data final
-                  <input
-                    type="date"
-                    min={bloqueioForm.data_inicio}
-                    value={bloqueioForm.data_fim}
-                    onChange={(event) =>
-                      setBloqueioForm({
-                        ...bloqueioForm,
-                        data_fim: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-              </>
-            )}
-
-            <label className="field field-span-2">
-              Motivo
-              <input
-                value={bloqueioForm.motivo}
-                onChange={(event) =>
-                  setBloqueioForm({
-                    ...bloqueioForm,
-                    motivo: event.target.value,
-                  })
-                }
-                placeholder="Folga, consulta, manutenção, reunião..."
-              />
-            </label>
-          </div>
-
-          <div className="modal-actions">
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => setModalBloqueio(false)}
-            >
-              Cancelar
-            </button>
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={salvando}
-            >
-              {salvando ? "Salvando..." : "Criar bloqueio"}
-            </button>
-          </div>
-        </form>
+      <Modal open={modalBloqueio} title="Novo bloqueio" subtitle="Bloqueie um horário específico ou um período de dias." onClose={() => setModalBloqueio(false)}>
+        <form onSubmit={salvarBloqueio}>{erro && <Alert>{erro}</Alert>}<div className="form-grid form-grid-2"><label className="field field-span-2">Funcionário<select value={bloqueioForm.funcionario_id} onChange={(event) => setBloqueioForm({ ...bloqueioForm, funcionario_id: event.target.value })}><option value="">Toda a empresa</option>{usuariosAtivos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label><div className="block-type-selector field-span-2"><button className={bloqueioForm.tipo === "HORARIO" ? "block-type-active" : ""} type="button" onClick={() => setBloqueioForm({ ...bloqueioForm, tipo: "HORARIO" })}><Icon name="clock" size={18} /><span><strong>Horário específico</strong><small>Bloqueie parte de um único dia.</small></span></button><button className={bloqueioForm.tipo === "DIA_INTEIRO" ? "block-type-active" : ""} type="button" onClick={() => setBloqueioForm({ ...bloqueioForm, tipo: "DIA_INTEIRO" })}><Icon name="calendar" size={18} /><span><strong>Dia inteiro</strong><small>Bloqueie um dia ou um período de dias.</small></span></button></div>{bloqueioForm.tipo === "HORARIO" ? <><label className="field field-span-2">Data<input type="date" value={bloqueioForm.data_inicio} onChange={(event) => setBloqueioForm({ ...bloqueioForm, data_inicio: event.target.value, data_fim: event.target.value })} required /></label><label className="field">Horário inicial<input type="time" value={bloqueioForm.hora_inicio} onChange={(event) => setBloqueioForm({ ...bloqueioForm, hora_inicio: event.target.value })} required /></label><label className="field">Horário final<input type="time" value={bloqueioForm.hora_fim} onChange={(event) => setBloqueioForm({ ...bloqueioForm, hora_fim: event.target.value })} required /></label></> : <><label className="field">Data inicial<input type="date" value={bloqueioForm.data_inicio} onChange={(event) => setBloqueioForm({ ...bloqueioForm, data_inicio: event.target.value })} required /></label><label className="field">Data final<input type="date" min={bloqueioForm.data_inicio} value={bloqueioForm.data_fim} onChange={(event) => setBloqueioForm({ ...bloqueioForm, data_fim: event.target.value })} required /></label></>}<label className="field field-span-2">Motivo<input value={bloqueioForm.motivo} onChange={(event) => setBloqueioForm({ ...bloqueioForm, motivo: event.target.value })} placeholder="Folga, consulta, manutenção, reunião..." /></label></div><div className="modal-actions"><button className="button button-secondary" type="button" onClick={() => setModalBloqueio(false)}>Cancelar</button><button className="button button-primary" type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Criar bloqueio"}</button></div></form>
       </Modal>
 
-      <Modal
-        open={Boolean(bloqueioExclusao)}
-        title="Excluir bloqueio"
-        subtitle="Confirme a remoção antes de continuar."
-        onClose={fecharExclusaoBloqueio}
-        size="small"
-      >
-        {bloqueioExclusao && (
-          <div className="confirmation-dialog">
-            <span className="confirmation-icon confirmation-icon-danger">
-              <Icon name="trash" size={24} />
-            </span>
-
-            <div className="confirmation-copy">
-              <strong>Excluir este bloqueio da agenda?</strong>
-              <p>
-                O bloqueio de {nomeUsuario(bloqueioExclusao.funcionario_id)},
-                no período {periodoBloqueio(bloqueioExclusao)}, será removido e
-                deixará de impedir novos agendamentos. Esta ação não poderá ser
-                desfeita.
-              </p>
-            </div>
-
-            {erro && <Alert>{erro}</Alert>}
-
-            <div className="modal-actions confirmation-actions">
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={fecharExclusaoBloqueio}
-                disabled={excluindoBloqueio}
-              >
-                Cancelar
-              </button>
-              <button
-                className="button button-danger"
-                type="button"
-                onClick={() => void confirmarExclusaoBloqueio()}
-                disabled={excluindoBloqueio}
-              >
-                {excluindoBloqueio
-                  ? "Excluindo..."
-                  : "Excluir bloqueio"}
-              </button>
-            </div>
-          </div>
-        )}
+      <Modal open={Boolean(bloqueioExclusao)} title="Excluir bloqueio" subtitle="Confirme a remoção antes de continuar." onClose={fecharExclusaoBloqueio} size="small">
+        {bloqueioExclusao && <div className="confirmation-dialog"><span className="confirmation-icon confirmation-icon-danger"><Icon name="trash" size={24} /></span><div className="confirmation-copy"><strong>Excluir este bloqueio da agenda?</strong><p>O bloqueio de {nomeUsuario(bloqueioExclusao.funcionario_id)}, no período {periodoBloqueio(bloqueioExclusao)}, será removido e deixará de impedir novos agendamentos. Esta ação não poderá ser desfeita.</p></div>{erro && <Alert>{erro}</Alert>}<div className="modal-actions confirmation-actions"><button className="button button-secondary" type="button" onClick={fecharExclusaoBloqueio} disabled={excluindoBloqueio}>Cancelar</button><button className="button button-danger" type="button" onClick={() => void confirmarExclusaoBloqueio()} disabled={excluindoBloqueio}>{excluindoBloqueio ? "Excluindo..." : "Excluir bloqueio"}</button></div></div>}
       </Modal>
 
-      <Modal
-        open={Boolean(usuarioSituacao)}
-        title={usuarioSituacao?.ativo ? "Desativar usuário" : "Reativar usuário"}
-        subtitle="Confirme a alteração antes de continuar."
-        onClose={() => !alterandoSituacao && setUsuarioSituacao(null)}
-        size="small"
-      >
-        {usuarioSituacao && (
-          <div className="confirmation-dialog">
-            <span
-              className={`confirmation-icon ${
-                usuarioSituacao.ativo
-                  ? "confirmation-icon-danger"
-                  : "confirmation-icon-success"
-              }`}
-            >
-              <Icon
-                name={usuarioSituacao.ativo ? "pause" : "refresh"}
-                size={24}
-              />
-            </span>
-            <div className="confirmation-copy">
-              <strong>
-                {usuarioSituacao.ativo
-                  ? `Desativar ${usuarioSituacao.nome}?`
-                  : `Reativar ${usuarioSituacao.nome}?`}
-              </strong>
-              <p>
-                {usuarioSituacao.ativo
-                  ? "O usuário deixará de acessar o sistema e poderá ser reativado posteriormente."
-                  : "O usuário voltará a acessar o sistema com as permissões cadastradas."}
-              </p>
-            </div>
-            {erro && <Alert>{erro}</Alert>}
-            <div className="modal-actions confirmation-actions">
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => setUsuarioSituacao(null)}
-                disabled={alterandoSituacao}
-              >
-                Cancelar
-              </button>
-              <button
-                className={
-                  usuarioSituacao.ativo
-                    ? "button button-danger"
-                    : "button button-primary"
-                }
-                type="button"
-                onClick={() => void confirmarSituacaoUsuario()}
-                disabled={alterandoSituacao}
-              >
-                {alterandoSituacao
-                  ? "Processando..."
-                  : usuarioSituacao.ativo
-                    ? "Desativar usuário"
-                    : "Reativar usuário"}
-              </button>
-            </div>
-          </div>
-        )}
+      <Modal open={Boolean(usuarioSituacao)} title={usuarioSituacao?.ativo ? "Desativar usuário" : "Reativar usuário"} subtitle="Confirme a alteração antes de continuar." onClose={() => !alterandoSituacao && setUsuarioSituacao(null)} size="small">
+        {usuarioSituacao && <div className="confirmation-dialog"><span className={`confirmation-icon ${usuarioSituacao.ativo ? "confirmation-icon-danger" : "confirmation-icon-success"}`}><Icon name={usuarioSituacao.ativo ? "pause" : "refresh"} size={24} /></span><div className="confirmation-copy"><strong>{usuarioSituacao.ativo ? `Desativar ${usuarioSituacao.nome}?` : `Reativar ${usuarioSituacao.nome}?`}</strong><p>{usuarioSituacao.ativo ? "O usuário deixará de acessar o sistema e poderá ser reativado posteriormente." : "O usuário voltará a acessar o sistema com as permissões cadastradas."}</p></div>{erro && <Alert>{erro}</Alert>}<div className="modal-actions confirmation-actions"><button className="button button-secondary" type="button" onClick={() => setUsuarioSituacao(null)} disabled={alterandoSituacao}>Cancelar</button><button className={usuarioSituacao.ativo ? "button button-danger" : "button button-primary"} type="button" onClick={() => void confirmarSituacaoUsuario()} disabled={alterandoSituacao}>{alterandoSituacao ? "Processando..." : usuarioSituacao.ativo ? "Desativar usuário" : "Reativar usuário"}</button></div></div>}
+      </Modal>
+
+      <Modal open={Boolean(usuarioExclusao)} title="Excluir usuário" subtitle="Esta ação é permanente." onClose={fecharExclusaoUsuario} size="small">
+        {usuarioExclusao && <div className="confirmation-dialog"><span className="confirmation-icon confirmation-icon-danger"><Icon name="trash" size={24} /></span><div className="confirmation-copy"><strong>Excluir {usuarioExclusao.nome} permanentemente?</strong><p>Usuários sem histórico operacional podem ser removidos definitivamente. Se houver agendamentos, conversas, mensagens ou auditoria vinculados, a exclusão será bloqueada e você poderá apenas desativá-lo.</p></div>{erroExclusaoUsuario && <Alert>{erroExclusaoUsuario}</Alert>}<div className="modal-actions confirmation-actions"><button className="button button-secondary" type="button" onClick={fecharExclusaoUsuario} disabled={excluindoUsuario}>Cancelar</button><button className="button button-danger" type="button" onClick={() => void confirmarExclusaoUsuario()} disabled={excluindoUsuario}>{excluindoUsuario ? "Excluindo..." : "Excluir usuário"}</button></div></div>}
       </Modal>
     </div>
   );

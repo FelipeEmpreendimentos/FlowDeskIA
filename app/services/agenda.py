@@ -1,11 +1,28 @@
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.agenda_settings import ConfiguracaoAgenda
 from app.models.enums import StatusAgendamento
-from app.models.models import Agendamento, BloqueioAgenda, Horario, Servico
+from app.models.models import (
+    Agendamento,
+    BloqueioAgenda,
+    Empresa,
+    Horario,
+    Servico,
+    Usuario,
+)
+
+
+INTERVALOS_PERMITIDOS = {15, 30, 60}
+STATUS_QUE_OCUPAM_AGENDA = {
+    StatusAgendamento.PENDENTE,
+    StatusAgendamento.CONFIRMADO,
+    StatusAgendamento.EM_ANDAMENTO,
+}
 
 
 def add_minutes(value: time, minutes: int) -> time:
@@ -27,6 +44,61 @@ def _employee_block_filter(funcionario_id: int | None):
     return or_(
         BloqueioAgenda.funcionario_id.is_(None),
         BloqueioAgenda.funcionario_id == funcionario_id,
+    )
+
+
+def _company_now(db: Session, empresa_id: int) -> datetime:
+    empresa = db.get(Empresa, empresa_id)
+    timezone_name = empresa.timezone if empresa and empresa.timezone else "America/Sao_Paulo"
+
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        timezone = ZoneInfo("America/Sao_Paulo")
+
+    return datetime.now(timezone)
+
+
+def _configured_interval(
+    db: Session,
+    empresa_id: int,
+    fallback: int,
+) -> int:
+    configuracao = db.get(ConfiguracaoAgenda, empresa_id)
+    intervalo = configuracao.intervalo_minutos if configuracao else fallback
+    return intervalo if intervalo in INTERVALOS_PERMITIDOS else 30
+
+
+def active_employee_ids(db: Session, empresa_id: int) -> list[int]:
+    return list(
+        db.scalars(
+            select(Usuario.id)
+            .where(
+                Usuario.empresa_id == empresa_id,
+                Usuario.ativo.is_(True),
+            )
+            .order_by(Usuario.nome, Usuario.id)
+        )
+    )
+
+
+def employee_daily_workload(
+    db: Session,
+    *,
+    empresa_id: int,
+    target_date: date,
+    funcionario_id: int,
+) -> int:
+    return int(
+        db.scalar(
+            select(func.count(Agendamento.id)).where(
+                Agendamento.empresa_id == empresa_id,
+                Agendamento.funcionario_id == funcionario_id,
+                Agendamento.data == target_date,
+                Agendamento.status.in_(STATUS_QUE_OCUPAM_AGENDA),
+            )
+        )
+        or 0
     )
 
 
@@ -91,7 +163,7 @@ def has_conflict(
         Agendamento.empresa_id == empresa_id,
         Agendamento.funcionario_id == funcionario_id,
         Agendamento.data == target_date,
-        Agendamento.status != StatusAgendamento.CANCELADO,
+        Agendamento.status.in_(STATUS_QUE_OCUPAM_AGENDA),
         Agendamento.hora_inicio < end,
         Agendamento.hora_fim > start,
     )
@@ -188,6 +260,51 @@ def ensure_available(
         )
 
 
+def choose_available_employee(
+    db: Session,
+    *,
+    empresa_id: int,
+    target_date: date,
+    start: time,
+    end: time,
+    ignore_id: int | None = None,
+) -> int:
+    candidates: list[tuple[int, int]] = []
+
+    for funcionario_id in active_employee_ids(db, empresa_id):
+        try:
+            ensure_available(
+                db,
+                empresa_id=empresa_id,
+                target_date=target_date,
+                start=start,
+                end=end,
+                funcionario_id=funcionario_id,
+                ignore_id=ignore_id,
+            )
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_409_CONFLICT:
+                continue
+            raise
+
+        workload = employee_daily_workload(
+            db,
+            empresa_id=empresa_id,
+            target_date=target_date,
+            funcionario_id=funcionario_id,
+        )
+        candidates.append((workload, funcionario_id))
+
+    if not candidates:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Nenhum funcionário está disponível nesse horário.",
+        )
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return candidates[0][1]
+
+
 def available_slots(
     db: Session,
     *,
@@ -197,6 +314,21 @@ def available_slots(
     service: Servico,
     interval_minutes: int,
 ) -> list[tuple[time, time]]:
+    now_local = _company_now(db, empresa_id)
+    if target_date < now_local.date():
+        return []
+
+    minimum_start = (
+        now_local.time().replace(tzinfo=None)
+        if target_date == now_local.date()
+        else None
+    )
+    interval_minutes = _configured_interval(
+        db,
+        empresa_id,
+        interval_minutes,
+    )
+
     weekday = (target_date.weekday() + 1) % 7
     schedules = db.scalars(
         select(Horario).where(
@@ -224,8 +356,10 @@ def available_slots(
             if end > schedule.hora_fim or end <= cursor:
                 break
 
+            horario_passado = minimum_start is not None and cursor < minimum_start
             indisponivel = (
-                _overlaps_pause(schedule, cursor, end)
+                horario_passado
+                or _overlaps_pause(schedule, cursor, end)
                 or has_blockage_conflict(
                     db,
                     empresa_id=empresa_id,
@@ -253,3 +387,40 @@ def available_slots(
             cursor = next_cursor
 
     return sorted(slots.keys(), key=lambda item: item[0])
+
+
+def available_slots_for_any_employee(
+    db: Session,
+    *,
+    empresa_id: int,
+    target_date: date,
+    service: Servico,
+    interval_minutes: int,
+) -> list[tuple[time, time, int]]:
+    selected: dict[tuple[time, time], tuple[int, int]] = {}
+
+    for funcionario_id in active_employee_ids(db, empresa_id):
+        workload = employee_daily_workload(
+            db,
+            empresa_id=empresa_id,
+            target_date=target_date,
+            funcionario_id=funcionario_id,
+        )
+        for start, end in available_slots(
+            db,
+            empresa_id=empresa_id,
+            target_date=target_date,
+            funcionario_id=funcionario_id,
+            service=service,
+            interval_minutes=interval_minutes,
+        ):
+            key = (start, end)
+            current = selected.get(key)
+            candidate = (workload, funcionario_id)
+            if current is None or candidate < current:
+                selected[key] = candidate
+
+    return [
+        (start, end, selected[(start, end)][1])
+        for start, end in sorted(selected, key=lambda item: item[0])
+    ]

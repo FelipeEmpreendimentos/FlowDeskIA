@@ -73,7 +73,12 @@ export function SuperAdminLogin() {
       </section>
 
       <section className="super-admin-login-form-area">
-        <form className="super-admin-login-card" onSubmit={entrar}>
+        <form
+          className="super-admin-login-card"
+          onSubmit={entrar}
+          autoComplete="on"
+          method="post"
+        >
           <header>
             <span>Painel proprietário</span>
             <h2>Super Admin</h2>
@@ -86,9 +91,10 @@ export function SuperAdminLogin() {
             E-mail
             <input
               type="email"
+              name="username"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
+              autoComplete="username"
               required
             />
           </label>
@@ -98,6 +104,7 @@ export function SuperAdminLogin() {
             <div className="super-admin-password-field">
               <input
                 type={mostrarSenha ? "text" : "password"}
+                name="password"
                 value={senha}
                 onChange={(event) => setSenha(event.target.value)}
                 autoComplete="current-password"

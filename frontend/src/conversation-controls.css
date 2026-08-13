@@ -1,0 +1,87 @@
+/* Conversas: preserva o padrão visual global e controla apenas o alinhamento. */
+
+.route-conversas .chat-controls {
+  display: flex !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  flex: 0 0 auto;
+  align-self: center !important;
+  align-items: center !important;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 !important;
+}
+
+.route-conversas .chat-controls > * {
+  align-self: center !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.route-conversas .chat-controls select[title="Responsável"],
+.route-conversas .chat-controls select[title="Status da conversa"] {
+  box-sizing: border-box;
+  width: 154px !important;
+  min-width: 154px !important;
+  max-width: 154px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  flex: 0 0 154px;
+  align-self: center !important;
+}
+
+@supports (appearance: base-select) {
+  .route-conversas .chat-controls select[title="Responsável"],
+  .route-conversas .chat-controls select[title="Status da conversa"] {
+    display: flex !important;
+    align-items: center !important;
+  }
+}
+
+.route-conversas .conversation-ai-control {
+  box-sizing: border-box;
+  width: 104px;
+  min-width: 104px;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  flex: 0 0 104px;
+  align-self: center !important;
+}
+
+@media (min-width: 761px) {
+  .route-conversas .chat-controls {
+    position: relative;
+    top: 2px;
+  }
+}
+
+@media (max-width: 760px) {
+  .route-conversas .chat-controls {
+    display: grid !important;
+    width: 100%;
+    height: auto !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: center !important;
+    margin-left: 0 !important;
+  }
+
+  .route-conversas .chat-controls select[title="Responsável"],
+  .route-conversas .chat-controls select[title="Status da conversa"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .route-conversas .chat-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .route-conversas .conversation-ai-control {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}

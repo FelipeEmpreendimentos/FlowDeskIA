@@ -5,12 +5,18 @@ import { SuperAdminLayout } from "./components/SuperAdminLayout";
 import { SuperAdminProtectedRoute } from "./components/SuperAdminProtectedRoute";
 import { Agenda } from "./pages/Agenda";
 import { Atividades } from "./pages/Atividades";
+import { ChatInterno } from "./pages/ChatInterno";
 import { Clientes } from "./pages/Clientes";
+import { ConfiguracaoAcessos } from "./pages/ConfiguracaoAcessos";
+import { ConfiguracaoAgenda } from "./pages/ConfiguracaoAgenda";
+import { ConfiguracaoRelatorios } from "./pages/ConfiguracaoRelatorios";
 import { Configuracoes } from "./pages/Configuracoes";
+import { ConfiguracoesHub } from "./pages/ConfiguracoesHub";
 import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
 import { Equipe } from "./pages/Equipe";
 import { Financeiro } from "./pages/Financeiro";
+import { HistoricoConversas } from "./pages/HistoricoConversas";
 import { Login } from "./pages/Login";
 import { Notificacoes } from "./pages/Notificacoes";
 import { PlanoConsumo } from "./pages/PlanoConsumo";
@@ -59,6 +65,7 @@ function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/agenda" element={<Agenda />} />
+        <Route path="/chat-interno" element={<ChatInterno />} />
         <Route path="/financeiro" element={<Financeiro />} />
         <Route path="/relatorios" element={<Relatorios />} />
         <Route path="/atividades" element={<Atividades />} />
@@ -68,8 +75,13 @@ function App() {
         <Route path="/veiculos" element={<Veiculos />} />
         <Route path="/servicos" element={<Servicos />} />
         <Route path="/conversas" element={<Conversas />} />
+        <Route path="/historico-conversas" element={<HistoricoConversas />} />
         <Route path="/equipe" element={<Equipe />} />
-        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/configuracoes" element={<ConfiguracoesHub />} />
+        <Route path="/configuracoes/dados" element={<Configuracoes />} />
+        <Route path="/configuracoes/agenda" element={<ConfiguracaoAgenda />} />
+        <Route path="/configuracoes/acessos" element={<ConfiguracaoAcessos />} />
+        <Route path="/configuracoes/relatorios" element={<ConfiguracaoRelatorios />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

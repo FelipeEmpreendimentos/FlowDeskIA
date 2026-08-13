@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useOutletContext } from "react-router";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import {
@@ -9,7 +10,9 @@ import {
   StatusBadge,
 } from "../components/UI";
 import { apiRequest, buildQuery } from "../services/api";
+import { showAppToast } from "../services/feedback";
 import type {
+  AppOutletContext,
   Cliente,
   Conversa,
   Mensagem,
@@ -20,6 +23,7 @@ import type {
 import { formatDateTime } from "../utils/format";
 
 type VisualizacaoConversa = "ATUAIS" | "HISTORICO";
+type EscopoAtendimento = "MEUS" | "IA" | "GERAL";
 type FiltroAvaliacao = "TODAS" | "RESPONDIDA" | "PENDENTE" | "SEM_AVALIACAO";
 
 interface NovaConversaForm {
@@ -45,6 +49,7 @@ const finalizacaoVazia: FinalizacaoForm = {
 };
 
 export function Conversas() {
+  const { usuario } = useOutletContext<AppOutletContext>();
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -52,6 +57,8 @@ export function Conversas() {
   const [selecionada, setSelecionada] = useState<Conversa | null>(null);
   const [visualizacao, setVisualizacao] =
     useState<VisualizacaoConversa>("ATUAIS");
+  const [escopoAtendimento, setEscopoAtendimento] =
+    useState<EscopoAtendimento>("MEUS");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroAvaliacao, setFiltroAvaliacao] =
     useState<FiltroAvaliacao>("TODAS");
@@ -60,6 +67,7 @@ export function Conversas() {
   const [carregando, setCarregando] = useState(true);
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [assumindoConversa, setAssumindoConversa] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [modalFinalizacao, setModalFinalizacao] = useState(false);
   const [modalReabertura, setModalReabertura] = useState(false);
@@ -68,6 +76,7 @@ export function Conversas() {
     useState<NovaConversaForm>(novaConversaVazia);
   const [finalizacao, setFinalizacao] =
     useState<FinalizacaoForm>(finalizacaoVazia);
+  const [conversaExistenteId, setConversaExistenteId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
 
@@ -83,8 +92,7 @@ export function Conversas() {
         apiRequest<Conversa[]>(
           `/conversas${buildQuery({
             grupo,
-            status_conversa:
-              grupo === "ATUAIS" ? filtroStatus : undefined,
+            status_conversa: grupo === "ATUAIS" ? filtroStatus : undefined,
             limit: 100,
           })}`,
         ),
@@ -173,6 +181,15 @@ export function Conversas() {
     return () => window.clearTimeout(timer);
   }, [sucesso]);
 
+  const totaisAtendimento = useMemo(
+    () => ({
+      MEUS: conversas.filter((item) => item.responsavel_id === usuario.id).length,
+      IA: conversas.filter((item) => item.ia_ativa).length,
+      GERAL: conversas.length,
+    }),
+    [conversas, usuario.id],
+  );
+
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
@@ -191,7 +208,16 @@ export function Conversas() {
         String(conversa.id).includes(termo);
 
       if (!correspondeBusca) return false;
-      if (visualizacao !== "HISTORICO") return true;
+
+      if (visualizacao === "ATUAIS") {
+        if (escopoAtendimento === "MEUS") {
+          return conversa.responsavel_id === usuario.id;
+        }
+        if (escopoAtendimento === "IA") {
+          return conversa.ia_ativa;
+        }
+        return true;
+      }
 
       if (filtroAvaliacao === "RESPONDIDA") {
         return conversa.avaliacao_nota !== null;
@@ -208,10 +234,23 @@ export function Conversas() {
     busca,
     clientes,
     conversas,
+    escopoAtendimento,
     filtroAvaliacao,
+    usuario.id,
     usuarios,
     visualizacao,
   ]);
+
+  useEffect(() => {
+    if (carregando) return;
+    const proxima =
+      filtradas.find((item) => item.id === selecionada?.id) ??
+      filtradas[0] ??
+      null;
+    if (proxima?.id !== selecionada?.id) {
+      setSelecionada(proxima);
+    }
+  }, [carregando, filtradas, selecionada?.id]);
 
   const clienteNome = (id: number) =>
     clientes.find((item) => item.id === id)?.nome ?? `Cliente #${id}`;
@@ -236,6 +275,7 @@ export function Conversas() {
   async function criarConversa(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro("");
+    setConversaExistenteId(null);
 
     try {
       const criada = await apiRequest<Conversa>("/conversas", {
@@ -253,14 +293,44 @@ export function Conversas() {
       setNovaConversa(novaConversaVazia);
       setSucesso("Conversa criada com sucesso.");
       setVisualizacao("ATUAIS");
+      setEscopoAtendimento(
+        criada.responsavel_id === usuario.id
+          ? "MEUS"
+          : criada.ia_ativa
+            ? "IA"
+            : "GERAL",
+      );
       await carregarConversas(criada.id, "ATUAIS");
     } catch (error) {
-      setErro(
+      const mensagem =
         error instanceof Error
           ? error.message
-          : "Não foi possível criar a conversa.",
-      );
+          : "Não foi possível criar a conversa.";
+      const match = mensagem.match(/conversa\s+#(\d+)/i);
+
+      if (match) {
+        showAppToast(
+          "Este cliente já possui uma conversa ativa. Abrindo o atendimento existente.",
+          { type: "warning" },
+        );
+        await abrirConversaExistente(Number(match[1]));
+        return;
+      }
+
+      setErro(mensagem);
     }
+  }
+
+  async function abrirConversaExistente(idRecebido?: number) {
+    const id = idRecebido ?? conversaExistenteId;
+    if (!id) return;
+    setModalAberto(false);
+    setConversaExistenteId(null);
+    setErro("");
+    setVisualizacao("ATUAIS");
+    setFiltroStatus("");
+    setEscopoAtendimento("GERAL");
+    await carregarConversas(id, "ATUAIS");
   }
 
   async function enviarMensagem(event: FormEvent<HTMLFormElement>) {
@@ -315,6 +385,11 @@ export function Conversas() {
       );
       setSelecionada(atualizada);
       setSucesso("Conversa atualizada com sucesso.");
+      if (atualizada.responsavel_id === usuario.id) {
+        setEscopoAtendimento("MEUS");
+      } else if (atualizada.ia_ativa) {
+        setEscopoAtendimento("IA");
+      }
       await carregarConversas(atualizada.id, "ATUAIS");
     } catch (error) {
       setErro(
@@ -325,8 +400,36 @@ export function Conversas() {
     }
   }
 
+  async function assumirConversa() {
+    if (!selecionada || selecionada.responsavel_id !== null) return;
+
+    setAssumindoConversa(true);
+    setErro("");
+    try {
+      const atualizada = await apiRequest<Conversa>(
+        `/conversas/${selecionada.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ responsavel_id: usuario.id }),
+        },
+      );
+      setSelecionada(atualizada);
+      setEscopoAtendimento("MEUS");
+      setSucesso("Conversa assumida com sucesso.");
+      await carregarConversas(atualizada.id, "ATUAIS");
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível assumir a conversa.",
+      );
+    } finally {
+      setAssumindoConversa(false);
+    }
+  }
+
   function escolherAcaoStatus(value: string) {
-    if (!selecionada || !value) return;
+    if (!selecionada || !value || value === selecionada.status) return;
 
     if (value === "FINALIZADA") {
       setFinalizacao(finalizacaoVazia);
@@ -388,14 +491,32 @@ export function Conversas() {
       setModalReabertura(false);
       setSucesso("Conversa reaberta e colocada em atendimento.");
       setVisualizacao("ATUAIS");
+      setEscopoAtendimento("MEUS");
       setFiltroStatus("EM_ATENDIMENTO");
       await carregarConversas(reaberta.id, "ATUAIS");
     } catch (error) {
-      setErro(
+      const mensagem =
         error instanceof Error
           ? error.message
-          : "Não foi possível reabrir a conversa.",
-      );
+          : "Não foi possível reabrir a conversa.";
+      const match = mensagem.match(/conversa\s+#(\d+)/i);
+
+      if (match) {
+        const existenteId = Number(match[1]);
+        setModalReabertura(false);
+        setErro("");
+        setVisualizacao("ATUAIS");
+        setFiltroStatus("");
+        setEscopoAtendimento("GERAL");
+        showAppToast(
+          "Este cliente já possui uma conversa ativa. Abrindo o atendimento existente.",
+          { type: "warning" },
+        );
+        await carregarConversas(existenteId, "ATUAIS");
+        return;
+      }
+
+      setErro(mensagem);
     } finally {
       setProcessandoStatus(false);
     }
@@ -413,6 +534,8 @@ export function Conversas() {
             type="button"
             onClick={() => {
               setNovaConversa(novaConversaVazia);
+              setConversaExistenteId(null);
+              setErro("");
               setModalAberto(true);
             }}
           >
@@ -459,7 +582,7 @@ export function Conversas() {
           }}
         >
           <Icon name="chat" size={17} />
-          Em atendimento
+          Atendimentos
         </button>
         <button
           className={visualizacao === "HISTORICO" ? "conversation-view-tab-active" : ""}
@@ -473,6 +596,30 @@ export function Conversas() {
           Histórico
         </button>
       </div>
+
+      {visualizacao === "ATUAIS" && (
+        <div className="conversation-scope-switch" aria-label="Tipo de atendimento">
+          {(
+            [
+              ["MEUS", "Meus", "team"],
+              ["IA", "IA", "bot"],
+              ["GERAL", "Geral", "chat"],
+            ] as const
+          ).map(([value, label, icon]) => (
+            <button
+              className={escopoAtendimento === value ? "active" : ""}
+              type="button"
+              key={value}
+              onClick={() => setEscopoAtendimento(value)}
+              aria-pressed={escopoAtendimento === value}
+            >
+              <Icon name={icon} size={16} />
+              <span>{label}</span>
+              <strong>{totaisAtendimento[value]}</strong>
+            </button>
+          ))}
+        </div>
+      )}
 
       <section className="conversation-shell">
         <aside className="conversation-list-panel">
@@ -517,12 +664,12 @@ export function Conversas() {
               icon={visualizacao === "ATUAIS" ? "chat" : "clock"}
               title={
                 visualizacao === "ATUAIS"
-                  ? "Nenhuma conversa atual"
+                  ? "Nenhuma conversa neste grupo"
                   : "Nenhuma conversa no histórico"
               }
               description={
                 visualizacao === "ATUAIS"
-                  ? "Conversas abertas e em atendimento aparecerão aqui."
+                  ? "Troque entre Meus, IA e Geral ou ajuste os filtros."
                   : "Conversas finalizadas serão organizadas nesta aba."
               }
             />
@@ -594,6 +741,18 @@ export function Conversas() {
                     <small>
                       {selecionada.origem} · {usuarioNome(selecionada.responsavel_id)}
                     </small>
+                    {selecionada.status !== "FINALIZADA" &&
+                      selecionada.responsavel_id === null && (
+                        <button
+                          className="button button-secondary button-small conversation-assume-button"
+                          type="button"
+                          onClick={() => void assumirConversa()}
+                          disabled={assumindoConversa}
+                        >
+                          <Icon name="team" size={15} />
+                          {assumindoConversa ? "Assumindo..." : "Assumir conversa"}
+                        </button>
+                      )}
                   </div>
                 </div>
 
@@ -643,13 +802,12 @@ export function Conversas() {
                     </select>
 
                     <select
-                      value=""
+                      value={selecionada.status}
                       onChange={(event) => escolherAcaoStatus(event.target.value)}
-                      title="Alterar status"
+                      title="Status da conversa"
                     >
-                      <option value="">Alterar status</option>
-                      <option value="ABERTA">Marcar como aberta</option>
-                      <option value="EM_ATENDIMENTO">Colocar em atendimento</option>
+                      <option value="ABERTA">Aberta</option>
+                      <option value="EM_ATENDIMENTO">Em atendimento</option>
                       <option value="FINALIZADA">Finalizar conversa</option>
                     </select>
 
@@ -777,21 +935,45 @@ export function Conversas() {
         open={modalAberto}
         title="Nova conversa"
         subtitle="Escolha o cliente, a origem e o responsável inicial."
-        onClose={() => setModalAberto(false)}
+        onClose={() => {
+          setModalAberto(false);
+          setConversaExistenteId(null);
+          setErro("");
+        }}
       >
         <form onSubmit={criarConversa}>
-          {erro && <Alert>{erro}</Alert>}
+          {erro && (
+            conversaExistenteId ? (
+              <Alert>
+                <div className="conversation-existing-alert">
+                  <span>{erro}</span>
+                  <button
+                    className="button button-secondary button-small"
+                    type="button"
+                    onClick={() => void abrirConversaExistente()}
+                  >
+                    <Icon name="chat" size={16} />
+                    Abrir conversa existente
+                  </button>
+                </div>
+              </Alert>
+            ) : (
+              <Alert>{erro}</Alert>
+            )
+          )}
           <div className="form-grid">
             <label className="field">
               Cliente
               <select
                 value={novaConversa.cliente_id}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setConversaExistenteId(null);
+                  setErro("");
                   setNovaConversa({
                     ...novaConversa,
                     cliente_id: event.target.value,
-                  })
-                }
+                  });
+                }}
                 required
               >
                 <option value="">Selecione</option>
@@ -829,12 +1011,14 @@ export function Conversas() {
               Origem
               <select
                 value={novaConversa.origem}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setConversaExistenteId(null);
+                  setErro("");
                   setNovaConversa({
                     ...novaConversa,
                     origem: event.target.value as OrigemConversa,
-                  })
-                }
+                  });
+                }}
               >
                 <option value="WHATSAPP">WhatsApp</option>
                 <option value="INSTAGRAM">Instagram</option>
@@ -846,7 +1030,11 @@ export function Conversas() {
             <button
               className="button button-secondary"
               type="button"
-              onClick={() => setModalAberto(false)}
+              onClick={() => {
+                setModalAberto(false);
+                setConversaExistenteId(null);
+                setErro("");
+              }}
             >
               Cancelar
             </button>

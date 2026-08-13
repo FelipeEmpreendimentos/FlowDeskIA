@@ -1,0 +1,105 @@
+/* Comportamentos visuais guiados pelas permissões efetivas do usuário. */
+
+/* Chat interno: gerenciar libera criação e exclusão de grupos. */
+.app-shell:not(.can-manage-chat-interno).route-chat-interno
+  .team-chat-create-button,
+.app-shell:not(.can-manage-chat-interno).route-chat-interno
+  .team-chat-delete-group {
+  display: none;
+}
+
+/*
+ * Agenda:
+ * Visualizar representa a agenda pessoal. O funcionário pode criar, editar,
+ * avançar status e cancelar os próprios atendimentos, mas não escolhe outro
+ * profissional nem filtra a agenda por funcionário.
+ * Gerenciar libera o escopo global e a escolha de qualquer profissional.
+ */
+.app-shell:not(.can-manage-agenda).route-agenda
+  .agenda-toolbar
+  > label.field.compact-field:last-of-type,
+.app-shell:not(.can-manage-agenda).route-agenda
+  .modal-body
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"]) {
+  display: none !important;
+}
+
+/* Conversas: gerenciar libera exclusivamente o início de nova conversa. */
+.app-shell:not(.can-manage-conversas).route-conversas
+  .page-header
+  .page-actions {
+  display: none;
+}
+
+/*
+ * Clientes:
+ * Visualizar permite consultar e editar dados cadastrais simples. Cadastro,
+ * mudança de status, desativação e exclusão continuam exigindo Gerenciar.
+ */
+.app-shell:not(.can-manage-clientes).route-clientes
+  .page-header
+  .page-actions,
+.app-shell:not(.can-manage-clientes).route-clientes
+  .client-table
+  .row-actions
+  .icon-button:nth-child(n + 3),
+.app-shell:not(.can-manage-clientes).route-clientes
+  .empty-state
+  .button,
+.app-shell:not(.can-manage-clientes).route-clientes
+  .modal-body
+  label.field:has(> select) {
+  display: none;
+}
+
+/*
+ * Veículos:
+ * Visualizar permite editar o cadastro existente. Criar e excluir continuam
+ * restritos a Gerenciar.
+ */
+.app-shell:not(.can-manage-veiculos).route-veiculos
+  .page-header
+  .page-actions,
+.app-shell:not(.can-manage-veiculos).route-veiculos
+  .entity-card
+  .row-actions
+  .icon-button.danger,
+.app-shell:not(.can-manage-veiculos).route-veiculos
+  .empty-state
+  .button {
+  display: none;
+}
+
+/* Serviços: sem gerenciamento, cadastro e alterações ficam ocultos. */
+.app-shell:not(.can-manage-servicos).route-servicos
+  .page-header
+  .page-actions,
+.app-shell:not(.can-manage-servicos).route-servicos
+  .service-card
+  .row-actions,
+.app-shell:not(.can-manage-servicos).route-servicos
+  .empty-state
+  .button {
+  display: none;
+}
+
+/* Equipe: visualizar mostra somente a relação de usuários, sem aviso redundante. */
+.app-shell:not(.can-manage-equipe).route-equipe
+  .page
+  > .tabs
+  button:nth-child(n + 2),
+.app-shell:not(.can-manage-equipe).route-equipe
+  .page
+  > .alert-info {
+  display: none;
+}
+
+/* Relatórios possui somente um nível de permissão. */
+.access-level-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.access-level-grid-single .access-level-control {
+  max-width: none;
+}

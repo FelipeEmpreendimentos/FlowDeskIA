@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    event,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -53,6 +54,13 @@ class PlanoConfiguracao(Base):
         nullable=False,
         server_default=text("NOW()"),
     )
+
+
+@event.listens_for(PlanoConfiguracao, "before_insert")
+@event.listens_for(PlanoConfiguracao, "before_update")
+def normalize_included_ai_for_plan(_mapper, _connection, target: PlanoConfiguracao) -> None:
+    if target.codigo in {"ESSENCIAL", "PROFISSIONAL"}:
+        target.ia_incluida = False
 
 
 class EmpresaPlataforma(Base):

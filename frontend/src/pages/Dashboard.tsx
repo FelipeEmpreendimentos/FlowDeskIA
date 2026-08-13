@@ -22,6 +22,8 @@ const resumoVazio: DashboardResumo = {
   notificacoes_nao_lidas: 0,
 };
 
+const statusProximos = new Set(["PENDENTE", "CONFIRMADO", "EM_ANDAMENTO"]);
+
 export function Dashboard() {
   const { usuario } = useOutletContext<AppOutletContext>();
   const [resumo, setResumo] = useState(resumoVazio);
@@ -33,6 +35,8 @@ export function Dashboard() {
   const [erro, setErro] = useState("");
 
   useEffect(() => {
+    let ativo = true;
+
     async function carregar() {
       try {
         const today = new Date();
@@ -47,7 +51,7 @@ export function Dashboard() {
               `/agendamentos${buildQuery({
                 data_inicio: iso,
                 data_fim: iso,
-                limit: 8,
+                limit: 200,
               })}`,
             ),
             apiRequest<Cliente[]>("/clientes?limit=100"),
@@ -55,19 +59,43 @@ export function Dashboard() {
             apiRequest<Notificacao[]>("/notificacoes?somente_nao_lidas=true"),
           ]);
 
+        if (!ativo) return;
+
+        const proximos = dadosAgenda
+          .filter((item) => statusProximos.has(item.status))
+          .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio))
+          .slice(0, 8);
+
         setResumo(dadosResumo);
-        setAgendamentos(dadosAgenda);
+        setAgendamentos(proximos);
         setClientes(dadosClientes);
         setServicos(dadosServicos);
         setNotificacoes(dadosNotificacoes);
+        setErro("");
       } catch (error) {
+        if (!ativo) return;
         setErro(error instanceof Error ? error.message : "Não foi possível carregar o painel.");
       } finally {
-        setCarregando(false);
+        if (ativo) setCarregando(false);
       }
     }
 
     void carregar();
+
+    function atualizarAoRetornar() {
+      if (document.visibilityState === "visible") {
+        void carregar();
+      }
+    }
+
+    window.addEventListener("focus", atualizarAoRetornar);
+    document.addEventListener("visibilitychange", atualizarAoRetornar);
+
+    return () => {
+      ativo = false;
+      window.removeEventListener("focus", atualizarAoRetornar);
+      document.removeEventListener("visibilitychange", atualizarAoRetornar);
+    };
   }, []);
 
   const clienteNome = (id: number) =>
@@ -135,7 +163,7 @@ export function Dashboard() {
               </div>
 
               {agendamentos.length === 0 ? (
-                <div className="compact-empty">Nenhum agendamento para hoje.</div>
+                <div className="compact-empty">Nenhum próximo atendimento para hoje.</div>
               ) : (
                 <div className="appointment-list">
                   {agendamentos.map((item) => (

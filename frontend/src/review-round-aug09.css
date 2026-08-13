@@ -1,0 +1,452 @@
+/* Ajustes visuais da rodada de revisão de 09/08. */
+
+/* -------------------------------------------------------------------------- */
+/* Chat interno: somente ações do grupo, alinhadas e separadas do sino global. */
+/* -------------------------------------------------------------------------- */
+
+.route-chat-interno .team-chat-conversation-header {
+  min-height: 72px;
+  padding-right: 92px;
+}
+
+.route-chat-interno .team-chat-conversation-header > .team-chat-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.route-chat-interno .team-chat-participants-button,
+.route-chat-interno .team-chat-delete-group {
+  display: grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  place-items: center;
+  flex: 0 0 34px;
+  padding: 0;
+  margin: 0;
+  border-radius: 10px;
+}
+
+.route-chat-interno .team-chat-participants-button span,
+.route-chat-interno .team-chat-delete-group span {
+  display: none;
+}
+
+.route-chat-interno .team-chat-live-status,
+.route-chat-interno .team-chat-page-refined .team-chat-live-status {
+  display: none !important;
+  margin: 0 !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Conversas: responsável, situação e IA compartilham exatamente o mesmo eixo. */
+/* -------------------------------------------------------------------------- */
+
+.route-conversas .chat-header {
+  position: relative;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 72px;
+  align-items: center !important;
+  column-gap: 18px;
+  overflow: visible;
+}
+
+.route-conversas .chat-header .entity-cell {
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  align-self: center;
+}
+
+.route-conversas .chat-header .entity-cell > div {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+.route-conversas .chat-header .entity-cell > div > strong,
+.route-conversas .chat-header .entity-cell > div > small {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.route-conversas .conversation-assume-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: max-content;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.route-conversas .chat-controls {
+  position: relative;
+  z-index: 21;
+  display: flex;
+  height: 40px;
+  flex: 0 0 auto;
+  align-self: center;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  overflow: visible;
+}
+
+.route-conversas .chat-controls select,
+.route-conversas .conversation-ai-control {
+  box-sizing: border-box;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  align-self: stretch;
+  margin: 0 !important;
+  vertical-align: top;
+}
+
+.route-conversas .chat-controls select[title="Responsável"],
+.route-conversas .chat-controls select[title="Status da conversa"] {
+  position: relative;
+  z-index: 22;
+  width: 154px;
+  min-width: 154px;
+  max-width: 154px;
+  flex: 0 0 154px;
+  padding: 0 32px 0 12px !important;
+  overflow: visible;
+  line-height: 1.2 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-conversas .chat-controls select[title="Responsável"] option,
+.route-conversas .chat-controls select[title="Status da conversa"] option {
+  line-height: normal;
+}
+
+.route-conversas .conversation-ai-control {
+  min-width: 104px;
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Agenda: o Modal real usa .modal-body. Funcionário e Data iniciam no topo.  */
+/* -------------------------------------------------------------------------- */
+
+.route-agenda .agenda-info {
+  display: none;
+}
+
+.route-agenda .modal-body .form-grid-2 {
+  align-items: start;
+}
+
+.route-agenda .modal-body .form-grid-2 > .field {
+  align-self: start !important;
+}
+
+.route-agenda .modal-body label.field {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  margin: 0;
+}
+
+.route-agenda .modal-body label.field > input,
+.route-agenda .modal-body label.field > select,
+.route-agenda .modal-body label.field > textarea {
+  margin-top: 0;
+}
+
+.route-agenda
+  .modal-body
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"]),
+.route-agenda
+  .modal-body
+  .form-grid-2
+  > label.field:has(> input[type="date"]) {
+  display: grid !important;
+  grid-template-rows: 17px 44px auto;
+  align-content: start;
+  align-items: start;
+  align-self: start !important;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+}
+
+.route-agenda
+  .modal-body
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"])
+  > select,
+.route-agenda
+  .modal-body
+  .form-grid-2
+  > label.field:has(> input[type="date"])
+  > input[type="date"] {
+  grid-row: 2;
+  width: 100%;
+  height: 44px !important;
+  min-height: 44px !important;
+  align-self: stretch;
+  margin: 0 !important;
+}
+
+.route-agenda
+  .modal-body
+  .form-grid-2
+  > label.field:has(+ label.field > input[type="date"])
+  > small {
+  grid-row: 3;
+  align-self: start;
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Configuração da Agenda: vínculo claro entre serviço e equipe habilitada.   */
+/* -------------------------------------------------------------------------- */
+
+.agenda-settings-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.agenda-service-team-card {
+  display: grid;
+  gap: 18px;
+}
+
+.agenda-service-team-intro {
+  max-width: 900px;
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.agenda-service-team-list {
+  display: grid;
+  gap: 12px;
+}
+
+.agenda-service-team-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.8fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 18px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f9fbff;
+}
+
+.agenda-service-team-service {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.agenda-service-team-color {
+  width: 10px;
+  height: 42px;
+  flex: 0 0 10px;
+  border-radius: 999px;
+}
+
+.agenda-service-team-service > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.agenda-service-team-service strong {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-service-team-service small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.agenda-service-team-users {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.agenda-service-team-user {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: #53617a;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+  transition: border-color 0.16s, color 0.16s, background 0.16s;
+}
+
+.agenda-service-team-user input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.agenda-service-team-user-active {
+  border-color: #9fb1ef;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.agenda-service-team-user:has(input:disabled) {
+  cursor: default;
+  opacity: 0.76;
+}
+
+.agenda-settings-save {
+  margin-top: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Configurações e mensagens já aprovadas na rodada.                           */
+/* -------------------------------------------------------------------------- */
+
+/* A antiga aba interna de notificações permanece inacessível. A central única
+ * é a página aberta pelo sino no topo e o Dashboard mantém somente o resumo. */
+.route-configuracoes .tabs button:nth-child(2) {
+  display: none;
+}
+
+.access-settings-page .access-settings-tabs button:nth-child(2) {
+  display: inline-flex !important;
+}
+
+.route-configuracoes .company-logo-editor-copy > p {
+  display: none;
+}
+
+.route-configuracoes .company-logo-editor-copy {
+  gap: 8px;
+}
+
+.conversation-existing-alert {
+  display: grid;
+  gap: 10px;
+}
+
+.conversation-existing-alert .button {
+  width: fit-content;
+}
+
+.client-history-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1050px) {
+  .route-chat-interno .team-chat-conversation-header {
+    padding-right: 82px;
+  }
+
+  .agenda-service-team-row {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-service-team-users {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .route-chat-interno .team-chat-conversation-header {
+    min-height: 68px;
+    padding-right: 72px;
+  }
+}
+
+@media (max-width: 760px) {
+  .route-chat-interno .team-chat-conversation-header > .team-chat-header-actions {
+    gap: 6px;
+  }
+
+  .route-conversas .chat-header {
+    display: flex;
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+  }
+
+  .route-conversas .chat-header .entity-cell > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .route-conversas .conversation-assume-button {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: 6px;
+  }
+
+  .route-conversas .chat-controls {
+    display: grid;
+    width: 100%;
+    height: auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .route-conversas .chat-controls select[title="Responsável"],
+  .route-conversas .chat-controls select[title="Status da conversa"] {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex-basis: auto;
+  }
+
+  .agenda-service-team-user {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .client-history-actions .button {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .route-conversas .chat-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .route-conversas .conversation-ai-control {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .agenda-service-team-user {
+    flex-basis: 100%;
+  }
+}

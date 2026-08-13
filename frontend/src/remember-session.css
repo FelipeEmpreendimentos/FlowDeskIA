@@ -1,0 +1,85 @@
+.login-card .login-options {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin: -5px 0 18px;
+}
+
+.login-card .remember-device-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #46536a;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.login-card .remember-device-option .remember-device-input {
+  position: absolute !important;
+  width: 1px !important;
+  min-width: 1px !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  opacity: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+.remember-device-box {
+  position: relative;
+  display: inline-block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  border: 1px solid #aebbd0;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.remember-device-box::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 9px;
+  height: 5px;
+  border-bottom: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  content: "";
+  opacity: 0;
+  transform: rotate(-45deg);
+}
+
+.remember-device-input:checked + .remember-device-box {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.remember-device-input:checked + .remember-device-box::after {
+  opacity: 1;
+}
+
+.remember-device-input:focus + .remember-device-box,
+.remember-device-input:focus-visible + .remember-device-box,
+.login-card .remember-device-option:focus-within {
+  outline: 0;
+  box-shadow: none;
+}
+
+.remember-device-option > span:last-child {
+  line-height: 1;
+}
+
+@media (max-width: 520px) {
+  .login-card .login-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

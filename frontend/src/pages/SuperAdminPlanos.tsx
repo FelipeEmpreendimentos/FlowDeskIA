@@ -20,6 +20,8 @@ const recursosDisponiveis = [
   ["SUPORTE_PRIORITARIO", "Suporte prioritário"],
 ] as const;
 
+const planosSomenteAdicional = new Set(["ESSENCIAL", "PROFISSIONAL"]);
+
 type PlanoForm = {
   codigo: string;
   nome: string;
@@ -42,6 +44,10 @@ type PlanoForm = {
 
 function emptyResources(): Record<string, boolean> {
   return Object.fromEntries(recursosDisponiveis.map(([key]) => [key, false]));
+}
+
+function onlyAiAddon(code: string): boolean {
+  return planosSomenteAdicional.has(code.trim().toUpperCase());
 }
 
 function newPlanForm(): PlanoForm {
@@ -86,7 +92,7 @@ function formFromPlan(plan: PlanoSuperAdmin): PlanoForm {
     limite_canais: plan.limite_canais == null ? "" : String(plan.limite_canais),
     limite_armazenamento_mb:
       plan.limite_armazenamento_mb == null ? "" : String(plan.limite_armazenamento_mb),
-    ia_incluida: plan.ia_incluida,
+    ia_incluida: onlyAiAddon(plan.codigo) ? false : plan.ia_incluida,
     ia_adicional_disponivel: plan.ia_adicional_disponivel,
     recursos: { ...emptyResources(), ...plan.recursos },
   };
@@ -111,7 +117,11 @@ export function SuperAdminPlanos() {
       setPlanos(await superAdminApiRequest<PlanoSuperAdmin[]>("/planos"));
       setErro("");
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível carregar os planos.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível carregar os planos.",
+      );
     } finally {
       setCarregando(false);
     }
@@ -127,7 +137,16 @@ export function SuperAdminPlanos() {
     return () => window.clearTimeout(timer);
   }, [sucesso]);
 
-  const ativos = useMemo(() => planos.filter((item) => item.ativo).length, [planos]);
+  const ativos = useMemo(
+    () => planos.filter((item) => item.ativo).length,
+    [planos],
+  );
+  const adicionaisDisponiveis = useMemo(
+    () => planos.filter((item) => item.ia_adicional_disponivel).length,
+    [planos],
+  );
+  const codigoAtual = (editando?.codigo ?? form.codigo).trim().toUpperCase();
+  const somenteAdicional = onlyAiAddon(codigoAtual);
 
   function abrirNovo() {
     setEditando(null);
@@ -156,7 +175,7 @@ export function SuperAdminPlanos() {
     setErro("");
 
     const payload = {
-      ...(!editando ? { codigo: form.codigo.trim().toUpperCase() } : {}),
+      ...(!editando ? { codigo: codigoAtual } : {}),
       nome: form.nome.trim(),
       descricao: form.descricao.trim() || null,
       preco: Number(form.preco.replace(",", ".")),
@@ -173,7 +192,7 @@ export function SuperAdminPlanos() {
       limite_mensagens_ia_mes: nullableNumber(form.limite_mensagens_ia_mes),
       limite_canais: nullableNumber(form.limite_canais),
       limite_armazenamento_mb: nullableNumber(form.limite_armazenamento_mb),
-      ia_incluida: form.ia_incluida,
+      ia_incluida: somenteAdicional ? false : form.ia_incluida,
       ia_adicional_disponivel: form.ia_adicional_disponivel,
       recursos: form.recursos,
     };
@@ -195,7 +214,11 @@ export function SuperAdminPlanos() {
       setModalAberto(false);
       await carregar();
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível salvar o plano.");
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar o plano.",
+      );
     } finally {
       setSalvando(false);
     }
@@ -209,7 +232,11 @@ export function SuperAdminPlanos() {
           <h1>Planos</h1>
           <p>Os planos padrão já estão criados e podem ser alterados a qualquer momento.</p>
         </div>
-        <button className="super-admin-primary-button" type="button" onClick={abrirNovo}>
+        <button
+          className="super-admin-primary-button"
+          type="button"
+          onClick={abrirNovo}
+        >
           <Icon name="plus" size={18} />
           Novo plano
         </button>
@@ -222,43 +249,54 @@ export function SuperAdminPlanos() {
         <article><strong>{planos.length}</strong><span>Planos cadastrados</span></article>
         <article><strong>{ativos}</strong><span>Planos ativos</span></article>
         <article><strong>14</strong><span>Dias de teste padrão</span></article>
-        <article><strong>Todos</strong><span>Permitem adicional de IA</span></article>
+        <article><strong>{adicionaisDisponiveis}</strong><span>Permitem adicional de IA</span></article>
       </section>
 
       {carregando ? (
         <div className="super-admin-state">Carregando planos...</div>
       ) : (
         <section className="super-admin-plan-grid">
-          {planos.map((plan) => (
-            <article className={`super-admin-plan-card ${!plan.ativo ? "inactive" : ""}`} key={plan.id}>
-              <header>
-                <div>
-                  <span>{plan.codigo}</span>
-                  <h2>{plan.nome}</h2>
+          {planos.map((plan) => {
+            const planOnlyAddon = onlyAiAddon(plan.codigo);
+            return (
+              <article
+                className={`super-admin-plan-card ${!plan.ativo ? "inactive" : ""}`}
+                key={plan.id}
+              >
+                <header>
+                  <div>
+                    <span>{plan.codigo}</span>
+                    <h2>{plan.nome}</h2>
+                  </div>
+                  <span className={`super-admin-status ${plan.ativo ? "active" : "inactive"}`}>
+                    {plan.ativo ? "Ativo" : "Inativo"}
+                  </span>
+                </header>
+                <p>{plan.descricao ?? "Sem descrição."}</p>
+                <div className="super-admin-plan-price">
+                  <strong>{formatCurrency(plan.preco)}</strong>
+                  <span>/ mês</span>
                 </div>
-                <span className={`super-admin-status ${plan.ativo ? "active" : "inactive"}`}>
-                  {plan.ativo ? "Ativo" : "Inativo"}
-                </span>
-              </header>
-              <p>{plan.descricao ?? "Sem descrição."}</p>
-              <div className="super-admin-plan-price">
-                <strong>{formatCurrency(plan.preco)}</strong>
-                <span>/ mês</span>
-              </div>
-              <dl>
-                <div><dt>Usuários</dt><dd>{plan.limite_usuarios ?? "Ilimitado"}</dd></div>
-                <div><dt>Clientes</dt><dd>{plan.limite_clientes ?? "Ilimitado"}</dd></div>
-                <div><dt>Agendamentos/mês</dt><dd>{plan.limite_agendamentos_mes ?? "Ilimitado"}</dd></div>
-                <div><dt>Conversas/mês</dt><dd>{plan.limite_conversas_mes ?? "Ilimitado"}</dd></div>
-                <div><dt>IA incluída</dt><dd>{plan.ia_incluida ? "Sim" : "Não"}</dd></div>
-                <div><dt>IA adicional</dt><dd>{plan.ia_adicional_disponivel ? "Disponível" : "Não"}</dd></div>
-              </dl>
-              <button type="button" onClick={() => abrirEdicao(plan)}>
-                <Icon name="edit" size={17} />
-                Editar plano
-              </button>
-            </article>
-          ))}
+                <dl>
+                  <div><dt>Usuários</dt><dd>{plan.limite_usuarios ?? "Ilimitado"}</dd></div>
+                  <div><dt>Clientes</dt><dd>{plan.limite_clientes ?? "Ilimitado"}</dd></div>
+                  <div><dt>Agendamentos/mês</dt><dd>{plan.limite_agendamentos_mes ?? "Ilimitado"}</dd></div>
+                  <div><dt>Conversas/mês</dt><dd>{plan.limite_conversas_mes ?? "Ilimitado"}</dd></div>
+                  {!planOnlyAddon && (
+                    <div><dt>IA incluída</dt><dd>{plan.ia_incluida ? "Sim" : "Não"}</dd></div>
+                  )}
+                  <div>
+                    <dt>IA adicional</dt>
+                    <dd>{plan.ia_adicional_disponivel ? "Disponível" : "Não"}</dd>
+                  </div>
+                </dl>
+                <button type="button" onClick={() => abrirEdicao(plan)}>
+                  <Icon name="edit" size={17} />
+                  Editar plano
+                </button>
+              </article>
+            );
+          })}
         </section>
       )}
 
@@ -266,41 +304,103 @@ export function SuperAdminPlanos() {
         <div className="super-admin-modal-backdrop" role="presentation">
           <section className="super-admin-modal large" role="dialog" aria-modal="true">
             <header>
-              <div><span>Configuração comercial</span><h2>{editando ? `Editar ${editando.nome}` : "Novo plano"}</h2></div>
-              <button type="button" onClick={fecharModal} aria-label="Fechar"><Icon name="close" /></button>
+              <div>
+                <span>Configuração comercial</span>
+                <h2>{editando ? `Editar ${editando.nome}` : "Novo plano"}</h2>
+              </div>
+              <button type="button" onClick={fecharModal} aria-label="Fechar">
+                <Icon name="close" />
+              </button>
             </header>
+
             <form onSubmit={salvar}>
               {erro && <div className="super-admin-alert error">{erro}</div>}
               <div className="super-admin-form-grid two-columns">
                 {!editando && (
-                  <label>Código<input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value.toUpperCase().replace(/\s+/g, "_") })} required /></label>
+                  <label>
+                    Código
+                    <input
+                      value={form.codigo}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          codigo: event.target.value.toUpperCase().replace(/\s+/g, "_"),
+                          ia_incluida: onlyAiAddon(event.target.value) ? false : form.ia_incluida,
+                        })
+                      }
+                      required
+                    />
+                  </label>
                 )}
-                <label>Nome<input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></label>
-                <label className="full">Descrição<textarea rows={3} value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></label>
-                <label>Preço mensal<input type="number" min="0" step="0.01" value={form.preco} onChange={(e) => setForm({ ...form, preco: e.target.value })} required /></label>
-                <label>Preço anual<input type="number" min="0" step="0.01" value={form.preco_anual} onChange={(e) => setForm({ ...form, preco_anual: e.target.value })} placeholder="Opcional" /></label>
-                <label>Dias de teste<input type="number" min="0" max="90" value={form.periodo_teste_dias} onChange={(e) => setForm({ ...form, periodo_teste_dias: e.target.value })} required /></label>
-                <label>Usuários<input type="number" min="1" value={form.limite_usuarios} onChange={(e) => setForm({ ...form, limite_usuarios: e.target.value })} placeholder="Vazio = ilimitado" /></label>
-                <label>Clientes<input type="number" min="1" value={form.limite_clientes} onChange={(e) => setForm({ ...form, limite_clientes: e.target.value })} placeholder="Vazio = ilimitado" /></label>
-                <label>Agendamentos/mês<input type="number" min="1" value={form.limite_agendamentos_mes} onChange={(e) => setForm({ ...form, limite_agendamentos_mes: e.target.value })} placeholder="Vazio = ilimitado" /></label>
-                <label>Conversas/mês<input type="number" min="1" value={form.limite_conversas_mes} onChange={(e) => setForm({ ...form, limite_conversas_mes: e.target.value })} placeholder="Vazio = ilimitado" /></label>
-                <label>Mensagens de IA/mês<input type="number" min="0" value={form.limite_mensagens_ia_mes} onChange={(e) => setForm({ ...form, limite_mensagens_ia_mes: e.target.value })} placeholder="Vazio = ilimitado" /></label>
-                <label>Canais<input type="number" min="1" value={form.limite_canais} onChange={(e) => setForm({ ...form, limite_canais: e.target.value })} placeholder="Vazio = ilimitado" /></label>
-                <label>Armazenamento (MB)<input type="number" min="1" value={form.limite_armazenamento_mb} onChange={(e) => setForm({ ...form, limite_armazenamento_mb: e.target.value })} placeholder="Vazio = ilimitado" /></label>
+                <label>
+                  Nome
+                  <input
+                    value={form.nome}
+                    onChange={(event) => setForm({ ...form, nome: event.target.value })}
+                    required
+                  />
+                </label>
+                <label className="full">
+                  Descrição
+                  <textarea
+                    rows={3}
+                    value={form.descricao}
+                    onChange={(event) => setForm({ ...form, descricao: event.target.value })}
+                  />
+                </label>
+                <label>Preço mensal<input type="number" min="0" step="0.01" value={form.preco} onChange={(event) => setForm({ ...form, preco: event.target.value })} required /></label>
+                <label>Preço anual<input type="number" min="0" step="0.01" value={form.preco_anual} onChange={(event) => setForm({ ...form, preco_anual: event.target.value })} placeholder="Opcional" /></label>
+                <label>Dias de teste<input type="number" min="0" max="90" value={form.periodo_teste_dias} onChange={(event) => setForm({ ...form, periodo_teste_dias: event.target.value })} required /></label>
+                <label>Usuários<input type="number" min="1" value={form.limite_usuarios} onChange={(event) => setForm({ ...form, limite_usuarios: event.target.value })} placeholder="Vazio = ilimitado" /></label>
+                <label>Clientes<input type="number" min="1" value={form.limite_clientes} onChange={(event) => setForm({ ...form, limite_clientes: event.target.value })} placeholder="Vazio = ilimitado" /></label>
+                <label>Agendamentos/mês<input type="number" min="1" value={form.limite_agendamentos_mes} onChange={(event) => setForm({ ...form, limite_agendamentos_mes: event.target.value })} placeholder="Vazio = ilimitado" /></label>
+                <label>Conversas/mês<input type="number" min="1" value={form.limite_conversas_mes} onChange={(event) => setForm({ ...form, limite_conversas_mes: event.target.value })} placeholder="Vazio = ilimitado" /></label>
+                <label>Mensagens de IA/mês<input type="number" min="0" value={form.limite_mensagens_ia_mes} onChange={(event) => setForm({ ...form, limite_mensagens_ia_mes: event.target.value })} placeholder="Vazio = ilimitado" /></label>
+                <label>Canais<input type="number" min="1" value={form.limite_canais} onChange={(event) => setForm({ ...form, limite_canais: event.target.value })} placeholder="Vazio = ilimitado" /></label>
+                <label>Armazenamento (MB)<input type="number" min="1" value={form.limite_armazenamento_mb} onChange={(event) => setForm({ ...form, limite_armazenamento_mb: event.target.value })} placeholder="Vazio = ilimitado" /></label>
               </div>
 
               <div className="super-admin-toggle-grid">
-                <label><input type="checkbox" checked={form.ativo} onChange={(e) => setForm({ ...form, ativo: e.target.checked })} /><span><strong>Plano ativo</strong><small>Disponível para novas empresas</small></span></label>
-                <label><input type="checkbox" checked={form.ia_incluida} onChange={(e) => setForm({ ...form, ia_incluida: e.target.checked })} /><span><strong>IA incluída</strong><small>Franquia já faz parte do plano</small></span></label>
-                <label><input type="checkbox" checked={form.ia_adicional_disponivel} onChange={(e) => setForm({ ...form, ia_adicional_disponivel: e.target.checked })} /><span><strong>IA como adicional</strong><small>Pode ser contratada separadamente</small></span></label>
+                <label>
+                  <input type="checkbox" checked={form.ativo} onChange={(event) => setForm({ ...form, ativo: event.target.checked })} />
+                  <span><strong>Plano ativo</strong><small>Disponível para novas empresas</small></span>
+                </label>
+                {!somenteAdicional && (
+                  <label>
+                    <input type="checkbox" checked={form.ia_incluida} onChange={(event) => setForm({ ...form, ia_incluida: event.target.checked })} />
+                    <span><strong>IA incluída</strong><small>Franquia já faz parte do plano</small></span>
+                  </label>
+                )}
+                <label>
+                  <input type="checkbox" checked={form.ia_adicional_disponivel} onChange={(event) => setForm({ ...form, ia_adicional_disponivel: event.target.checked })} />
+                  <span><strong>IA como adicional</strong><small>Pode ser contratada separadamente</small></span>
+                </label>
               </div>
+
+              {somenteAdicional && (
+                <div className="super-admin-alert info">
+                  Neste plano, a IA é oferecida somente como adicional e não pode fazer parte da franquia.
+                </div>
+              )}
 
               <div className="super-admin-resource-section">
                 <h3>Recursos liberados</h3>
                 <div>
                   {recursosDisponiveis.map(([key, label]) => (
                     <label key={key}>
-                      <input type="checkbox" checked={Boolean(form.recursos[key])} onChange={(e) => setForm({ ...form, recursos: { ...form.recursos, [key]: e.target.checked } })} />
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form.recursos[key])}
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            recursos: {
+                              ...form.recursos,
+                              [key]: event.target.checked,
+                            },
+                          })
+                        }
+                      />
                       {label}
                     </label>
                   ))}
@@ -308,8 +408,12 @@ export function SuperAdminPlanos() {
               </div>
 
               <footer>
-                <button className="super-admin-secondary-button" type="button" onClick={fecharModal} disabled={salvando}>Cancelar</button>
-                <button className="super-admin-primary-button" type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar plano"}</button>
+                <button className="super-admin-secondary-button" type="button" onClick={fecharModal} disabled={salvando}>
+                  Cancelar
+                </button>
+                <button className="super-admin-primary-button" type="submit" disabled={salvando}>
+                  {salvando ? "Salvando..." : "Salvar plano"}
+                </button>
               </footer>
             </form>
           </section>
