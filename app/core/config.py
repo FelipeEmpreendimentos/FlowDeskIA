@@ -9,6 +9,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 DEFAULT_JWT_SECRET = "ALTERE_ESTA_CHAVE_ANTES_DE_PUBLICAR_O_SISTEMA"
 PRODUCTION_ENVIRONMENTS = {"production", "prod"}
+VALID_DB_SSLMODES = {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
 
 
 def _required(name: str, default: str | None = None) -> str:
@@ -18,6 +19,14 @@ def _required(name: str, default: str | None = None) -> str:
             f"A variável {name} não foi preenchida no arquivo .env."
         )
     return value.strip()
+
+
+def _optional(name: str, default: str | None = None) -> str | None:
+    value = os.getenv(name, default)
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 def _boolean(name: str, default: bool = False) -> bool:
@@ -37,11 +46,13 @@ class Settings:
     app_name: str
     environment: str
 
+    database_url: str | None
     db_host: str
     db_port: int
-    db_name: str
+    db_name: str | None
     db_user: str
-    db_password: str
+    db_password: str | None
+    db_sslmode: str | None
     sql_echo: bool
 
     jwt_secret: str
@@ -86,11 +97,13 @@ class Settings:
 settings = Settings(
     app_name=os.getenv("APP_NAME", "FlowDeskIA"),
     environment=os.getenv("APP_ENV", "development").strip().lower(),
-    db_host=_required("DB_HOST", "localhost"),
-    db_port=int(_required("DB_PORT", "5432")),
-    db_name=_required("DB_NAME"),
-    db_user=_required("DB_USER", "postgres"),
-    db_password=_required("DB_PASSWORD"),
+    database_url=_optional("DATABASE_URL"),
+    db_host=os.getenv("DB_HOST", "localhost").strip(),
+    db_port=int(os.getenv("DB_PORT", "5432")),
+    db_name=_optional("DB_NAME"),
+    db_user=os.getenv("DB_USER", "postgres").strip(),
+    db_password=_optional("DB_PASSWORD"),
+    db_sslmode=_optional("DB_SSLMODE"),
     sql_echo=_boolean("SQL_ECHO", False),
     jwt_secret=_required("JWT_SECRET", DEFAULT_JWT_SECRET),
     jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
@@ -119,6 +132,28 @@ settings = Settings(
         "http://localhost:3000,http://localhost:5173",
     ),
 )
+
+if not settings.database_url:
+    missing_db_settings = [
+        name
+        for name, value in (
+            ("DB_NAME", settings.db_name),
+            ("DB_PASSWORD", settings.db_password),
+        )
+        if not value
+    ]
+    if missing_db_settings:
+        raise RuntimeError(
+            "Configure DATABASE_URL ou preencha " + ", ".join(missing_db_settings) + "."
+        )
+
+if settings.db_port <= 0:
+    raise RuntimeError("DB_PORT precisa ser maior que zero.")
+
+if settings.db_sslmode and settings.db_sslmode not in VALID_DB_SSLMODES:
+    raise RuntimeError(
+        "DB_SSLMODE inválido. Use disable, allow, prefer, require, verify-ca ou verify-full."
+    )
 
 if settings.smtp_starttls and settings.smtp_use_ssl:
     raise RuntimeError(
