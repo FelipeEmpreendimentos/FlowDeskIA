@@ -67,6 +67,7 @@ export function Conversas() {
   const [carregando, setCarregando] = useState(true);
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [respondendoComIA, setRespondendoComIA] = useState(false);
   const [assumindoConversa, setAssumindoConversa] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [modalFinalizacao, setModalFinalizacao] = useState(false);
@@ -272,6 +273,14 @@ export function Conversas() {
     return "Sem avaliação";
   }
 
+  const ultimaMensagem = mensagens[mensagens.length - 1] ?? null;
+  const podeResponderComIA = Boolean(
+    selecionada &&
+      selecionada.status !== "FINALIZADA" &&
+      selecionada.ia_ativa &&
+      ultimaMensagem?.remetente === "CLIENTE",
+  );
+
   async function criarConversa(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro("");
@@ -364,6 +373,30 @@ export function Conversas() {
       );
     } finally {
       setEnviando(false);
+    }
+  }
+
+  async function responderComIA() {
+    if (!selecionada || !podeResponderComIA) return;
+
+    setRespondendoComIA(true);
+    setErro("");
+
+    try {
+      await apiRequest<Mensagem>(`/ia/conversas/${selecionada.id}/responder`, {
+        method: "POST",
+      });
+      await carregarMensagens(selecionada);
+      await carregarConversas(selecionada.id, "ATUAIS");
+    } catch (error) {
+      showAppToast(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar a resposta da IA.",
+        { type: "error" },
+      );
+    } finally {
+      setRespondendoComIA(false);
     }
   }
 
@@ -898,28 +931,63 @@ export function Conversas() {
               </div>
 
               {selecionada.status !== "FINALIZADA" ? (
-                <form className="message-form" onSubmit={enviarMensagem}>
-                  <textarea
-                    rows={1}
-                    value={texto}
-                    onChange={(event) => setTexto(event.target.value)}
-                    placeholder="Digite uma mensagem..."
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        event.currentTarget.form?.requestSubmit();
-                      }
-                    }}
-                  />
-                  <button
-                    className="send-button"
-                    type="submit"
-                    disabled={enviando || !texto.trim()}
-                    aria-label="Enviar mensagem"
-                  >
-                    <Icon name="send" size={20} />
-                  </button>
-                </form>
+                <>
+                  {selecionada.ia_ativa && (
+                    <div className="conversation-ai-reply-bar">
+                      <div className="conversation-ai-reply-copy">
+                        <span className="conversation-ai-reply-icon">
+                          <Icon name="bot" size={16} />
+                        </span>
+                        <span>
+                          <strong>IA ativa</strong>
+                          <small>
+                            {ultimaMensagem?.remetente === "CLIENTE"
+                              ? "Pronta para responder à última mensagem do cliente."
+                              : "Aguardando uma nova mensagem do cliente."
+                            }
+                          </small>
+                        </span>
+                      </div>
+                      <button
+                        className="button button-secondary button-small conversation-ai-reply-button"
+                        type="button"
+                        onClick={() => void responderComIA()}
+                        disabled={!podeResponderComIA || respondendoComIA}
+                        title={
+                          podeResponderComIA
+                            ? "Gerar resposta usando o contexto do FlowDeskIA"
+                            : "A IA responde quando a última mensagem é do cliente"
+                        }
+                      >
+                        <Icon name="bot" size={15} />
+                        {respondendoComIA ? "IA respondendo..." : "Responder com IA"}
+                      </button>
+                    </div>
+                  )}
+
+                  <form className="message-form" onSubmit={enviarMensagem}>
+                    <textarea
+                      rows={1}
+                      value={texto}
+                      onChange={(event) => setTexto(event.target.value)}
+                      placeholder="Digite uma mensagem..."
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          event.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                    />
+                    <button
+                      className="send-button"
+                      type="submit"
+                      disabled={enviando || !texto.trim()}
+                      aria-label="Enviar mensagem"
+                    >
+                      <Icon name="send" size={20} />
+                    </button>
+                  </form>
+                </>
               ) : (
                 <div className="conversation-readonly-footer">
                   <Icon name="lock" size={16} />
