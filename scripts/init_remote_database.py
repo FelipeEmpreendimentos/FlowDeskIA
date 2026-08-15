@@ -4,6 +4,7 @@ Cria os enums PostgreSQL usados pelos models, cria as tabelas registradas no
 SQLAlchemy e, em seguida, aplica os ajustes/backfills idempotentes da release.
 """
 
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 
 # Importa todos os modulos de models para registrar as tabelas no metadata.
@@ -46,6 +47,21 @@ def create_base_schema() -> None:
             ).create(connection, checkfirst=True)
 
         Base.metadata.create_all(bind=connection, checkfirst=True)
+
+        # Algumas rotinas legadas de setup usam INSERT SQL direto e dependem
+        # de defaults no servidor. create_all não altera tabelas que já foram
+        # criadas por uma versão anterior do modelo, então normalizamos aqui
+        # antes de executar qualquer backfill da release.
+        connection.execute(
+            text(
+                """
+                ALTER TABLE empresa_plataforma
+                    ALTER COLUMN status SET DEFAULT 'TRIAL',
+                    ALTER COLUMN ia_adicional_ativo SET DEFAULT FALSE,
+                    ALTER COLUMN ia_limite_adicional SET DEFAULT 0;
+                """
+            )
+        )
 
 
 def main() -> None:
