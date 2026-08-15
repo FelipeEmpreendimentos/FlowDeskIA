@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import PROJECT_ROOT, settings
+from app.database.database import warm_database_pool
 from app.middleware.observability import observability_middleware
 from app.middleware.plan_access import plan_access_middleware
 
@@ -14,6 +15,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
+logger = logging.getLogger("flowdesk.startup")
 
 app = FastAPI(
     title=settings.app_name,
@@ -40,6 +42,18 @@ uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 app.include_router(api_router)
+
+
+@app.on_event("startup")
+def aquecer_banco() -> None:
+    try:
+        warmed = warm_database_pool()
+        logger.info("database_pool_warmed connections=%s", warmed)
+    except Exception:
+        # O health endpoint continua podendo subir para observabilidade; se o
+        # banco estiver temporariamente indisponível, as rotas de dados ainda
+        # retornarão o erro real quando forem usadas.
+        logger.exception("database_pool_warmup_failed")
 
 
 @app.get("/", tags=["Sistema"])
