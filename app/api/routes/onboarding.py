@@ -23,30 +23,67 @@ def _estado(db: Session, empresa_id: int) -> EmpresaOnboarding:
     return estado
 
 
-def _quantidade(db: Session, model: type, empresa_id: int, *filtros: object) -> int:
-    return int(db.scalar(select(func.count(model.id)).where(model.empresa_id == empresa_id, *filtros)) or 0)
+def _contagem(model: type, empresa_id: int, *filtros: object):
+    return (
+        select(func.count(model.id))
+        .where(model.empresa_id == empresa_id, *filtros)
+        .scalar_subquery()
+    )
 
 
 def _resultado(db: Session, empresa_id: int) -> OnboardingOut:
-    empresa = db.get(Empresa, empresa_id)
-    estado = _estado(db, empresa_id)
+    # Todo o estado do checklist é calculado em um único round trip. Isso é
+    # especialmente importante em staging/produção, onde API e Postgres podem
+    # estar em regiões diferentes.
+    row = db.execute(
+        select(
+            Empresa,
+            EmpresaOnboarding,
+            _contagem(Servico, empresa_id, Servico.ativo.is_(True)).label("servicos"),
+            _contagem(Usuario, empresa_id, Usuario.ativo.is_(True)).label("usuarios"),
+            _contagem(Horario, empresa_id, Horario.ativo.is_(True)).label("horarios"),
+            _contagem(Cliente, empresa_id).label("clientes"),
+            _contagem(Agendamento, empresa_id).label("agendamentos"),
+            _contagem(
+                Integracao,
+                empresa_id,
+                Integracao.ativo.is_(True),
+                Integracao.tipo == TipoIntegracao.WHATSAPP,
+            ).label("whatsapp"),
+            select(func.count(ConfigIA.id))
+            .where(ConfigIA.empresa_id == empresa_id)
+            .scalar_subquery()
+            .label("config_ia"),
+        )
+        .outerjoin(
+            EmpresaOnboarding,
+            EmpresaOnboarding.empresa_id == Empresa.id,
+        )
+        .where(Empresa.id == empresa_id)
+    ).one()
+
+    empresa = row[0]
+    estado = row[1]
+    if estado is None:
+        estado = EmpresaOnboarding(empresa_id=empresa_id, oculto=False)
+        db.add(estado)
+        db.flush()
+
     dados_empresa = bool(
-        empresa and empresa.nome and empresa.cnpj and empresa.telefone
-        and empresa.email and empresa.cidade and empresa.estado
+        empresa.nome
+        and empresa.cnpj
+        and empresa.telefone
+        and empresa.email
+        and empresa.cidade
+        and empresa.estado
     )
-    servicos = _quantidade(db, Servico, empresa_id, Servico.ativo.is_(True))
-    usuarios = _quantidade(db, Usuario, empresa_id, Usuario.ativo.is_(True))
-    horarios = _quantidade(db, Horario, empresa_id, Horario.ativo.is_(True))
-    clientes = _quantidade(db, Cliente, empresa_id)
-    agendamentos = _quantidade(db, Agendamento, empresa_id)
-    whatsapp = _quantidade(
-        db,
-        Integracao,
-        empresa_id,
-        Integracao.ativo.is_(True),
-        Integracao.tipo == TipoIntegracao.WHATSAPP,
-    )
-    config_ia = db.scalar(select(ConfigIA.id).where(ConfigIA.empresa_id == empresa_id))
+    servicos = int(row.servicos or 0)
+    usuarios = int(row.usuarios or 0)
+    horarios = int(row.horarios or 0)
+    clientes = int(row.clientes or 0)
+    agendamentos = int(row.agendamentos or 0)
+    whatsapp = int(row.whatsapp or 0)
+    config_ia = int(row.config_ia or 0)
 
     etapas = [
         OnboardingEtapaOut(chave="empresa", titulo="Complete os dados da empresa", descricao="Informe telefone, e-mail, cidade e estado.", concluida=dados_empresa, link="/configuracoes"),
@@ -56,7 +93,7 @@ def _resultado(db: Session, empresa_id: int) -> OnboardingOut:
         OnboardingEtapaOut(chave="cliente", titulo="Cadastre o primeiro cliente", descricao="Crie a base inicial de relacionamento da empresa.", concluida=clientes > 0, link="/clientes?novo=1"),
         OnboardingEtapaOut(chave="agendamento", titulo="Crie o primeiro agendamento", descricao="Teste o fluxo completo da agenda.", concluida=agendamentos > 0, link="/agenda?novo=1"),
         OnboardingEtapaOut(chave="whatsapp", titulo="Conecte o WhatsApp", descricao="Prepare o canal principal de atendimento.", concluida=whatsapp > 0, link="/configuracoes"),
-        OnboardingEtapaOut(chave="ia", titulo="Configure a inteligência artificial", descricao="Defina a identidade e as orientações do assistente.", concluida=config_ia is not None, link="/configuracoes"),
+        OnboardingEtapaOut(chave="ia", titulo="Configure a inteligência artificial", descricao="Defina a identidade e as orientações do assistente.", concluida=config_ia > 0, link="/configuracoes"),
     ]
     concluidas = sum(1 for item in etapas if item.concluida)
     concluido = concluidas == len(etapas)
