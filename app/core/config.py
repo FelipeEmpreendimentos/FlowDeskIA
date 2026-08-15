@@ -29,6 +29,11 @@ def _optional(name: str, default: str | None = None) -> str | None:
     return normalized or None
 
 
+def _optional_int(name: str) -> int | None:
+    value = _optional(name)
+    return int(value) if value is not None else None
+
+
 def _boolean(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -53,6 +58,7 @@ class Settings:
     db_user: str
     db_password: str | None
     db_sslmode: str | None
+    db_pooler_port_override: int | None
     sql_echo: bool
 
     jwt_secret: str
@@ -104,6 +110,7 @@ settings = Settings(
     db_user=os.getenv("DB_USER", "postgres").strip(),
     db_password=_optional("DB_PASSWORD"),
     db_sslmode=_optional("DB_SSLMODE"),
+    db_pooler_port_override=_optional_int("DB_POOLER_PORT_OVERRIDE"),
     sql_echo=_boolean("SQL_ECHO", False),
     jwt_secret=_required("JWT_SECRET", DEFAULT_JWT_SECRET),
     jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
@@ -149,6 +156,11 @@ if not settings.database_url:
 
 if settings.db_port <= 0:
     raise RuntimeError("DB_PORT precisa ser maior que zero.")
+
+if settings.db_pooler_port_override is not None and not (
+    1 <= settings.db_pooler_port_override <= 65535
+):
+    raise RuntimeError("DB_POOLER_PORT_OVERRIDE precisa estar entre 1 e 65535.")
 
 if settings.db_sslmode and settings.db_sslmode not in VALID_DB_SSLMODES:
     raise RuntimeError(
