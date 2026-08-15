@@ -20,8 +20,7 @@ from app.schemas.access_control import (
 from app.services.access_control import (
     MODULES,
     VIEW_ONLY_MODULES,
-    effective_management_permissions,
-    effective_permissions,
+    effective_permission_sets,
     validate_module,
 )
 from app.services.audit import add_audit_log
@@ -54,14 +53,15 @@ def _user_permissions_out(
             )
         )
     )
+    permissions, management_permissions = effective_permission_sets(db, user)
     return UserModulePermissionsOut(
         user_id=user.id,
         name=user.nome,
         email=user.email,
         role=user.cargo,
         active=user.ativo,
-        permissions=effective_permissions(db, user),
-        management_permissions=effective_management_permissions(db, user),
+        permissions=permissions,
+        management_permissions=management_permissions,
         overrides={
             item.modulo: item.permitido
             for item in rows
@@ -81,10 +81,8 @@ def current_access(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CurrentAccessOut:
-    return CurrentAccessOut(
-        modules=effective_permissions(db, current_user),
-        management=effective_management_permissions(db, current_user),
-    )
+    modules, management = effective_permission_sets(db, current_user)
+    return CurrentAccessOut(modules=modules, management=management)
 
 
 @router.get("/configuracao", response_model=AccessConfigurationOut)
