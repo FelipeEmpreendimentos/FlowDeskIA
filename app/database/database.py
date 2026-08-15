@@ -1,7 +1,9 @@
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
+from time import sleep
 from typing import Protocol
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -104,6 +106,29 @@ SessionLocal = sessionmaker(
 
 class Base(DeclarativeBase):
     """Classe base para os models do SQLAlchemy."""
+
+
+def warm_database_pool(connections: int | None = None) -> int:
+    """Abre conexões do pool antes da primeira requisição do usuário.
+
+    A conexão TLS com um banco remoto é muito mais cara que um checkout de uma
+    conexão já aberta. Aquecemos algumas conexões em paralelo durante o startup
+    para que o primeiro carregamento da interface não pague esse custo.
+    """
+    target = connections or (6 if IS_SUPABASE_TRANSACTION_POOLER else 3)
+    target = max(1, target)
+
+    def warm_one(_: int) -> None:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            # Mantém o checkout por alguns milissegundos para que os workers
+            # concorrentes realmente preencham mais de uma conexão do QueuePool.
+            sleep(0.05)
+
+    with ThreadPoolExecutor(max_workers=target) as executor:
+        list(executor.map(warm_one, range(target)))
+
+    return target
 
 
 def get_db() -> Generator[Session, None, None]:
