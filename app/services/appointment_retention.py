@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import or_, update
@@ -12,6 +13,7 @@ from app.models.models import Agendamento
 AUTO_CANCEL_AFTER = timedelta(days=7)
 CLEANUP_INTERVAL = timedelta(minutes=30)
 _last_cleanup_by_company: dict[int, datetime] = {}
+_cleanup_reservation_lock = Lock()
 
 
 def auto_cancel_stale_appointments(
@@ -25,11 +27,17 @@ def auto_cancel_stale_appointments(
     A rotina é oportunista: roda no máximo uma vez a cada 30 minutos por empresa
     em cada processo da API. O registro não é excluído; ele passa para CANCELADO,
     deixa a Agenda ativa e permanece disponível no Histórico.
+
+    A reserva é feita antes do acesso ao banco para impedir que o primeiro lote
+    de requisições concorrentes da aplicação execute a mesma manutenção várias
+    vezes em paralelo.
     """
     now_utc = datetime.now(timezone.utc)
-    last_cleanup = _last_cleanup_by_company.get(empresa_id)
-    if last_cleanup and now_utc - last_cleanup < CLEANUP_INTERVAL:
-        return 0
+    with _cleanup_reservation_lock:
+        last_cleanup = _last_cleanup_by_company.get(empresa_id)
+        if last_cleanup and now_utc - last_cleanup < CLEANUP_INTERVAL:
+            return 0
+        _last_cleanup_by_company[empresa_id] = now_utc
 
     try:
         company_timezone = ZoneInfo(timezone_name)
@@ -67,8 +75,6 @@ def auto_cancel_stale_appointments(
         db.commit()
     except SQLAlchemyError:
         db.rollback()
-        _last_cleanup_by_company[empresa_id] = now_utc
         return 0
 
-    _last_cleanup_by_company[empresa_id] = now_utc
     return int(result.rowcount or 0)
