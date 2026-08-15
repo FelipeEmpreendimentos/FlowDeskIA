@@ -48,12 +48,32 @@ def build_connect_args(config: DatabaseSettings = settings) -> dict[str, str]:
     return {"sslmode": config.db_sslmode}
 
 
-DATABASE_URL = build_database_url()
+def _is_supabase_session_pooler(url: URL) -> bool:
+    host = (url.host or "").lower()
+    return host.endswith(".pooler.supabase.com") and (url.port or 5432) == 5432
 
+
+DATABASE_URL = build_database_url()
+IS_SUPABASE_SESSION_POOLER = _is_supabase_session_pooler(DATABASE_URL)
+
+# O Session Pooler do Supabase reserva uma conexão do Postgres para cada
+# conexão cliente. O QueuePool padrão do SQLAlchemy pode chegar a 15
+# conexões por processo (5 + 10 de overflow), exatamente o limite observado
+# no staging. Durante um deploy blue/green duas instâncias podem coexistir,
+# por isso mantemos no máximo 5 por processo e sem overflow.
+#
+# Também evitamos pool_pre_ping no Session Pooler: ele executa um ping a cada
+# checkout e, com API e banco em regiões diferentes, adiciona um round trip
+# desnecessário a praticamente toda requisição. O recycle curto limita o
+# tempo de vida das conexões mantidas pelo processo.
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=1800,
+    pool_pre_ping=not IS_SUPABASE_SESSION_POOLER,
+    pool_recycle=300 if IS_SUPABASE_SESSION_POOLER else 1800,
+    pool_size=5 if IS_SUPABASE_SESSION_POOLER else 5,
+    max_overflow=0 if IS_SUPABASE_SESSION_POOLER else 10,
+    pool_timeout=20,
+    pool_use_lifo=True,
     connect_args=build_connect_args(),
     echo=settings.sql_echo,
 )
