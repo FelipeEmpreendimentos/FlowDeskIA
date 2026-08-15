@@ -5,7 +5,11 @@ import {
   apiRequest,
   type AppToastEventDetail,
 } from "../services/api";
-import { clearSession } from "../services/auth";
+import {
+  clearSession,
+  getSessionContext,
+  saveSessionContext,
+} from "../services/auth";
 import type {
   AppOutletContext,
   CargoUsuario,
@@ -142,11 +146,16 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const rotaAntesNotificacoes = useRef("/dashboard");
-  const [usuario, setUsuario] = useState<UsuarioLogado | null>(null);
-  const [modulos, setModulos] = useState<Partial<Record<ModuleCode, boolean>>>({});
+  const [sessaoInicial] = useState(() => getSessionContext());
+  const [usuario, setUsuario] = useState<UsuarioLogado | null>(
+    () => sessaoInicial?.usuario ?? null,
+  );
+  const [modulos, setModulos] = useState<Partial<Record<ModuleCode, boolean>>>(
+    () => sessaoInicial?.acesso.modules ?? {},
+  );
   const [gerenciamento, setGerenciamento] = useState<
     Partial<Record<ModuleCode, boolean>>
-  >({});
+  >(() => sessaoInicial?.acesso.management ?? {});
   const [erro, setErro] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
   const [toast, setToast] = useState<AppToastEventDetail | null>(null);
@@ -162,6 +171,7 @@ export function AppLayout() {
       setUsuario(dadosUsuario);
       setModulos(dadosAcesso.modules);
       setGerenciamento(dadosAcesso.management);
+      saveSessionContext(dadosUsuario, dadosAcesso);
       setErro("");
     } catch (error) {
       setErro(
@@ -240,7 +250,7 @@ export function AppLayout() {
 
   useEffect(() => {
     if (usuario) void atualizarIndicadores();
-  }, [location.pathname, usuario, atualizarIndicadores]);
+  }, [usuario, atualizarIndicadores]);
 
   function sair() {
     clearSession();
