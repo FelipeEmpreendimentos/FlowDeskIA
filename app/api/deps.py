@@ -32,6 +32,10 @@ ROLE_PERMISSION_PATHS = {
 }
 
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
+STALE_APPOINTMENT_CLEANUP_PATHS = {
+    "/api/v1/agendamentos",
+    "/api/v1/administrativo/dashboard",
+}
 
 
 def _module_for_request(request: Request) -> str | None:
@@ -40,6 +44,14 @@ def _module_for_request(request: Request) -> str | None:
         if path == prefix or path.startswith(f"{prefix}/"):
             return module
     return None
+
+
+def _should_cleanup_stale_appointments(request: Request) -> bool:
+    path = request.url.path.rstrip("/") or "/"
+    return any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in STALE_APPOINTMENT_CLEANUP_PATHS
+    )
 
 
 def _load_user_context(
@@ -191,11 +203,12 @@ def get_current_user(
             "O acesso da empresa está suspenso. Entre em contato com o suporte.",
         )
 
-    auto_cancel_stale_appointments(
-        db,
-        empresa_id=empresa_id,
-        timezone_name=empresa_timezone,
-    )
+    if _should_cleanup_stale_appointments(request):
+        auto_cancel_stale_appointments(
+            db,
+            empresa_id=empresa_id,
+            timezone_name=empresa_timezone,
+        )
 
     module = _module_for_request(request)
     if (
