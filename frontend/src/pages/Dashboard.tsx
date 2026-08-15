@@ -3,14 +3,11 @@ import { Link, useOutletContext } from "react-router";
 import { Icon } from "../components/Icon";
 import { OnboardingChecklist } from "../components/OnboardingChecklist";
 import { Alert, LoadingState, PageHeader, StatusBadge } from "../components/UI";
-import { apiRequest, buildQuery } from "../services/api";
+import { apiRequest } from "../services/api";
 import type {
-  Agendamento,
   AppOutletContext,
-  Cliente,
   DashboardResumo,
   Notificacao,
-  Servico,
 } from "../types";
 import { formatDateTime, formatTime } from "../utils/format";
 
@@ -22,14 +19,33 @@ const resumoVazio: DashboardResumo = {
   notificacoes_nao_lidas: 0,
 };
 
-const statusProximos = new Set(["PENDENTE", "CONFIRMADO", "EM_ANDAMENTO"]);
+interface DashboardReferencia {
+  id: number;
+  nome: string;
+}
+
+interface DashboardAgendamento {
+  id: number;
+  cliente_id: number;
+  servico_id: number;
+  hora_inicio: string;
+  status: string;
+}
+
+interface DashboardBootstrap {
+  resumo: DashboardResumo;
+  agendamentos: DashboardAgendamento[];
+  clientes: DashboardReferencia[];
+  servicos: DashboardReferencia[];
+  notificacoes: Notificacao[];
+}
 
 export function Dashboard() {
   const { usuario } = useOutletContext<AppOutletContext>();
   const [resumo, setResumo] = useState(resumoVazio);
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [servicos, setServicos] = useState<Servico[]>([]);
+  const [agendamentos, setAgendamentos] = useState<DashboardAgendamento[]>([]);
+  const [clientes, setClientes] = useState<DashboardReferencia[]>([]);
+  const [servicos, setServicos] = useState<DashboardReferencia[]>([]);
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -47,34 +63,17 @@ export function Dashboard() {
         const iso = new Date(today.getTime() - today.getTimezoneOffset() * 60_000)
           .toISOString()
           .slice(0, 10);
-
-        const [dadosResumo, dadosAgenda, dadosClientes, dadosServicos, dadosNotificacoes] =
-          await Promise.all([
-            apiRequest<DashboardResumo>("/administrativo/dashboard"),
-            apiRequest<Agendamento[]>(
-              `/agendamentos${buildQuery({
-                data_inicio: iso,
-                data_fim: iso,
-                limit: 200,
-              })}`,
-            ),
-            apiRequest<Cliente[]>("/clientes?limit=100"),
-            apiRequest<Servico[]>("/servicos?ativo=true&limit=100"),
-            apiRequest<Notificacao[]>("/notificacoes?somente_nao_lidas=true"),
-          ]);
+        const dados = await apiRequest<DashboardBootstrap>(
+          `/administrativo/dashboard/bootstrap?data=${iso}`,
+        );
 
         if (!ativo) return;
 
-        const proximos = dadosAgenda
-          .filter((item) => statusProximos.has(item.status))
-          .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio))
-          .slice(0, 8);
-
-        setResumo(dadosResumo);
-        setAgendamentos(proximos);
-        setClientes(dadosClientes);
-        setServicos(dadosServicos);
-        setNotificacoes(dadosNotificacoes);
+        setResumo(dados.resumo);
+        setAgendamentos(dados.agendamentos);
+        setClientes(dados.clientes);
+        setServicos(dados.servicos);
+        setNotificacoes(dados.notificacoes);
         setErro("");
       } catch (error) {
         if (!ativo) return;
@@ -228,7 +227,7 @@ export function Dashboard() {
               <div className="compact-empty">Tudo certo. Nenhuma notificação pendente.</div>
             ) : (
               <div className="notification-list">
-                {notificacoes.slice(0, 4).map((item) => (
+                {notificacoes.map((item) => (
                   <div className="notification-item" key={item.id}>
                     <span className="notification-icon">
                       <Icon name="bell" size={18} />
