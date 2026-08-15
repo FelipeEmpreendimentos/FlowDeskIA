@@ -82,21 +82,32 @@ def _fallback_policy(empresa: Empresa) -> PlanoEfetivo:
 
 
 def get_effective_plan(db: Session, empresa_id: int) -> PlanoEfetivo:
-    empresa = db.get(Empresa, empresa_id)
-    if empresa is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Empresa não encontrada.")
-
+    """Carrega empresa, plano, configuração e overrides em um único round trip."""
     try:
-        plano = db.get(Plano, empresa.plano_id) if empresa.plano_id else None
-        configuracao = (
-            db.get(PlanoConfiguracao, empresa.plano_id)
-            if empresa.plano_id
-            else None
-        )
-        plataforma = db.get(EmpresaPlataforma, empresa_id)
+        row = db.execute(
+            select(Empresa, Plano, PlanoConfiguracao, EmpresaPlataforma)
+            .outerjoin(Plano, Plano.id == Empresa.plano_id)
+            .outerjoin(
+                PlanoConfiguracao,
+                PlanoConfiguracao.plano_id == Empresa.plano_id,
+            )
+            .outerjoin(
+                EmpresaPlataforma,
+                EmpresaPlataforma.empresa_id == Empresa.id,
+            )
+            .where(Empresa.id == empresa_id)
+        ).one_or_none()
     except ProgrammingError:
         db.rollback()
+        empresa = db.get(Empresa, empresa_id)
+        if empresa is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Empresa não encontrada.")
         return _fallback_policy(empresa)
+
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Empresa não encontrada.")
+
+    empresa, plano, configuracao, plataforma = row
 
     recursos = dict(RECURSOS_PADRAO)
     if configuracao and configuracao.recursos:
@@ -146,41 +157,52 @@ def get_effective_plan(db: Session, empresa_id: int) -> PlanoEfetivo:
 
 
 def get_company_usage(db: Session, empresa_id: int) -> dict[str, int]:
+    """Calcula todos os contadores de consumo em uma única consulta SQL."""
     month_start, month_end = _month_bounds()
 
-    usuarios = db.scalar(
-        select(func.count(Usuario.id)).where(
+    usuarios = (
+        select(func.count(Usuario.id))
+        .where(
             Usuario.empresa_id == empresa_id,
             Usuario.ativo.is_(True),
         )
-    ) or 0
-    clientes = db.scalar(
-        select(func.count(Cliente.id)).where(
+        .scalar_subquery()
+    )
+    clientes = (
+        select(func.count(Cliente.id))
+        .where(
             Cliente.empresa_id == empresa_id,
             Cliente.status != StatusCliente.INATIVO,
         )
-    ) or 0
-    agendamentos = db.scalar(
-        select(func.count(Agendamento.id)).where(
+        .scalar_subquery()
+    )
+    agendamentos = (
+        select(func.count(Agendamento.id))
+        .where(
             Agendamento.empresa_id == empresa_id,
             Agendamento.created_at >= month_start,
             Agendamento.created_at <= month_end,
         )
-    ) or 0
-    conversas = db.scalar(
-        select(func.count(Conversa.id)).where(
+        .scalar_subquery()
+    )
+    conversas = (
+        select(func.count(Conversa.id))
+        .where(
             Conversa.empresa_id == empresa_id,
             Conversa.created_at >= month_start,
             Conversa.created_at <= month_end,
         )
-    ) or 0
-    canais = db.scalar(
-        select(func.count(Integracao.id)).where(
+        .scalar_subquery()
+    )
+    canais = (
+        select(func.count(Integracao.id))
+        .where(
             Integracao.empresa_id == empresa_id,
             Integracao.ativo.is_(True),
         )
-    ) or 0
-    mensagens_ia = db.scalar(
+        .scalar_subquery()
+    )
+    mensagens_ia = (
         select(func.count(Mensagem.id))
         .join(Conversa, Conversa.id == Mensagem.conversa_id)
         .where(
@@ -189,15 +211,27 @@ def get_company_usage(db: Session, empresa_id: int) -> dict[str, int]:
             Mensagem.data_envio >= month_start,
             Mensagem.data_envio <= month_end,
         )
-    ) or 0
+        .scalar_subquery()
+    )
+
+    row = db.execute(
+        select(
+            usuarios.label("usuarios"),
+            clientes.label("clientes"),
+            agendamentos.label("agendamentos_mes"),
+            conversas.label("conversas_mes"),
+            canais.label("canais"),
+            mensagens_ia.label("mensagens_ia_mes"),
+        )
+    ).one()
 
     return {
-        "usuarios": int(usuarios),
-        "clientes": int(clientes),
-        "agendamentos_mes": int(agendamentos),
-        "conversas_mes": int(conversas),
-        "canais": int(canais),
-        "mensagens_ia_mes": int(mensagens_ia),
+        "usuarios": int(row.usuarios or 0),
+        "clientes": int(row.clientes or 0),
+        "agendamentos_mes": int(row.agendamentos_mes or 0),
+        "conversas_mes": int(row.conversas_mes or 0),
+        "canais": int(row.canais or 0),
+        "mensagens_ia_mes": int(row.mensagens_ia_mes or 0),
         "armazenamento_mb": 0,
     }
 
