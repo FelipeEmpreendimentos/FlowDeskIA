@@ -65,6 +65,7 @@ const fieldLabels: Record<string, string> = {
 };
 
 let refreshPromise: Promise<boolean> | null = null;
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
 
 function emitAppToast(detail: AppToastEventDetail): void {
   window.dispatchEvent(
@@ -249,7 +250,7 @@ function isContactValidation(statusCode: number, message: string): boolean {
   );
 }
 
-export async function apiRequest<T>(
+async function executeApiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
@@ -328,4 +329,33 @@ export async function apiRequest<T>(
   }
 
   return (await response.json()) as T;
+}
+
+function inFlightKey(endpoint: string, options: RequestInit): string | null {
+  const method = (options.method ?? "GET").toUpperCase();
+  if (method !== "GET" || options.body != null) return null;
+
+  const headers = Array.from(new Headers(options.headers).entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}:${value}`)
+    .join("|");
+
+  return `${getToken() ?? "anon"}|${endpoint}|${headers}`;
+}
+
+export function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const key = inFlightKey(endpoint, options);
+  if (!key) return executeApiRequest<T>(endpoint, options);
+
+  const existing = inFlightGetRequests.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const request = executeApiRequest<T>(endpoint, options).finally(() => {
+    inFlightGetRequests.delete(key);
+  });
+  inFlightGetRequests.set(key, request);
+  return request;
 }
