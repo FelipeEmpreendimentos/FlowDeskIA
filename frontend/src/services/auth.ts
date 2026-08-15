@@ -1,7 +1,16 @@
+import type { UsuarioLogado } from "../types";
+import type { CurrentAccess } from "../types/accessControl";
+
 const TOKEN_KEY = "flowdesk_token";
 const COMPANY_KEY = "flowdesk_empresa_id";
+const SESSION_CONTEXT_KEY = "flowdesk_session_context";
 const API_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+
+export interface SessionContext {
+  usuario: UsuarioLogado;
+  acesso: CurrentAccess;
+}
 
 export function getToken(): string | null {
   const sessionToken = sessionStorage.getItem(TOKEN_KEY);
@@ -22,6 +31,42 @@ export function getCompanyId(): string {
   return localStorage.getItem(COMPANY_KEY) ?? "2";
 }
 
+export function getSessionContext(): SessionContext | null {
+  const raw = sessionStorage.getItem(SESSION_CONTEXT_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as SessionContext;
+    if (
+      !parsed?.usuario?.id ||
+      !parsed?.usuario?.empresa_id ||
+      !parsed?.acesso?.modules ||
+      !parsed?.acesso?.management
+    ) {
+      sessionStorage.removeItem(SESSION_CONTEXT_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    sessionStorage.removeItem(SESSION_CONTEXT_KEY);
+    return null;
+  }
+}
+
+export function saveSessionContext(
+  usuario: UsuarioLogado,
+  acesso: CurrentAccess,
+): void {
+  sessionStorage.setItem(
+    SESSION_CONTEXT_KEY,
+    JSON.stringify({ usuario, acesso } satisfies SessionContext),
+  );
+}
+
+export function clearSessionContext(): void {
+  sessionStorage.removeItem(SESSION_CONTEXT_KEY);
+}
+
 export function saveAccessToken(token: string): void {
   sessionStorage.setItem(TOKEN_KEY, token);
   localStorage.removeItem(TOKEN_KEY);
@@ -35,6 +80,7 @@ export function saveSession(token: string, empresaId: string): void {
 export function clearSession(options: { keepCompanyId?: boolean } = {}): void {
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
+  clearSessionContext();
 
   if (!options.keepCompanyId) {
     localStorage.removeItem(COMPANY_KEY);
