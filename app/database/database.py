@@ -16,6 +16,7 @@ class DatabaseSettings(Protocol):
     db_user: str
     db_password: str | None
     db_sslmode: str | None
+    db_pooler_port_override: int | None
     sql_echo: bool
 
 
@@ -28,11 +29,20 @@ def _normalize_database_url(raw_url: str) -> URL:
     return make_url(value)
 
 
+def _apply_pooler_port_override(url: URL, config: DatabaseSettings) -> URL:
+    override = getattr(config, "db_pooler_port_override", None)
+    host = (url.host or "").lower()
+    if override and host.endswith(".pooler.supabase.com"):
+        return url.set(port=override)
+    return url
+
+
 def build_database_url(config: DatabaseSettings = settings) -> URL:
     if config.database_url:
-        return _normalize_database_url(config.database_url)
+        url = _normalize_database_url(config.database_url)
+        return _apply_pooler_port_override(url, config)
 
-    return URL.create(
+    url = URL.create(
         drivername="postgresql+psycopg2",
         username=config.db_user,
         password=config.db_password,
@@ -40,6 +50,7 @@ def build_database_url(config: DatabaseSettings = settings) -> URL:
         port=config.db_port,
         database=config.db_name,
     )
+    return _apply_pooler_port_override(url, config)
 
 
 def build_connect_args(config: DatabaseSettings = settings) -> dict[str, str]:
@@ -48,30 +59,35 @@ def build_connect_args(config: DatabaseSettings = settings) -> dict[str, str]:
     return {"sslmode": config.db_sslmode}
 
 
-def _is_supabase_session_pooler(url: URL) -> bool:
+def _is_supabase_pooler(url: URL) -> bool:
     host = (url.host or "").lower()
-    return host.endswith(".pooler.supabase.com") and (url.port or 5432) == 5432
+    return host.endswith(".pooler.supabase.com")
+
+
+def _is_supabase_transaction_pooler(url: URL) -> bool:
+    return _is_supabase_pooler(url) and (url.port or 5432) == 6543
 
 
 DATABASE_URL = build_database_url()
-IS_SUPABASE_SESSION_POOLER = _is_supabase_session_pooler(DATABASE_URL)
+IS_SUPABASE_POOLER = _is_supabase_pooler(DATABASE_URL)
+IS_SUPABASE_TRANSACTION_POOLER = _is_supabase_transaction_pooler(DATABASE_URL)
 
-# O Session Pooler do Supabase reserva uma conexão do Postgres para cada
-# conexão cliente. O QueuePool padrão do SQLAlchemy pode chegar a 15
-# conexões por processo (5 + 10 de overflow), exatamente o limite observado
-# no staging. Durante um deploy blue/green duas instâncias podem coexistir,
-# por isso mantemos no máximo 5 por processo e sem overflow.
+# O shared pooler do Supabase deve concentrar o pooling de conexões com o
+# Postgres. No modo Session (5432), cada conexão cliente reserva uma sessão
+# no banco, então limitamos agressivamente o QueuePool local. No modo
+# Transaction (6543), as conexões cliente podem ser reutilizadas entre
+# transações e o Supavisor absorve a concorrência; por isso permitimos um
+# pool local maior para não bloquear as várias chamadas paralelas da UI.
 #
-# Também evitamos pool_pre_ping no Session Pooler: ele executa um ping a cada
-# checkout e, com API e banco em regiões diferentes, adiciona um round trip
-# desnecessário a praticamente toda requisição. O recycle curto limita o
-# tempo de vida das conexões mantidas pelo processo.
+# Evitamos pool_pre_ping em ambos os modos do Supabase porque ele acrescenta
+# um round trip de rede a cada checkout. pool_recycle mantém as conexões
+# cliente renovadas periodicamente sem pagar esse custo em toda requisição.
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=not IS_SUPABASE_SESSION_POOLER,
-    pool_recycle=300 if IS_SUPABASE_SESSION_POOLER else 1800,
-    pool_size=5 if IS_SUPABASE_SESSION_POOLER else 5,
-    max_overflow=0 if IS_SUPABASE_SESSION_POOLER else 10,
+    pool_pre_ping=not IS_SUPABASE_POOLER,
+    pool_recycle=300 if IS_SUPABASE_POOLER else 1800,
+    pool_size=10 if IS_SUPABASE_TRANSACTION_POOLER else 5,
+    max_overflow=10 if IS_SUPABASE_TRANSACTION_POOLER else 0,
     pool_timeout=20,
     pool_use_lifo=True,
     connect_args=build_connect_args(),
