@@ -36,8 +36,12 @@ export function Dashboard() {
 
   useEffect(() => {
     let ativo = true;
+    let carregamentoEmAndamento = false;
 
     async function carregar() {
+      if (carregamentoEmAndamento) return;
+      carregamentoEmAndamento = true;
+
       try {
         const today = new Date();
         const iso = new Date(today.getTime() - today.getTimezoneOffset() * 60_000)
@@ -76,6 +80,7 @@ export function Dashboard() {
         if (!ativo) return;
         setErro(error instanceof Error ? error.message : "Não foi possível carregar o painel.");
       } finally {
+        carregamentoEmAndamento = false;
         if (ativo) setCarregando(false);
       }
     }
