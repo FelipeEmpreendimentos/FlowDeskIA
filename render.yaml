@@ -13,7 +13,7 @@ services:
     branch: staging
     autoDeployTrigger: checksPass
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m scripts.init_remote_database && python -m scripts.seed_staging_remote && python -m scripts.setup_release && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/system/health
     envVars:
       - key: APP_ENV
@@ -24,8 +24,6 @@ services:
           property: connectionString
       - key: DB_SSLMODE
         value: require
-      - key: DB_POOLER_PORT_OVERRIDE
-        value: "6543"
       - key: SQL_ECHO
         value: "false"
       - key: JWT_SECRET
