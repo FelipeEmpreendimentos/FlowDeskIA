@@ -8,6 +8,7 @@ from app.api.routes import (
     auth,
     bloqueios,
     chat_interno,
+    chat_interno_fast,
     clientes,
     configuracao_agenda,
     configuracao_relatorios,
@@ -61,6 +62,8 @@ api_router.include_router(horarios.router)
 api_router.include_router(bloqueios.router)
 api_router.include_router(conversas.router)
 api_router.include_router(ia.router)
+# O endpoint agregado de canais vem primeiro para eliminar o N+1 da listagem.
+api_router.include_router(chat_interno_fast.router)
 api_router.include_router(chat_interno.router)
 api_router.include_router(configuracoes.router)
 api_router.include_router(notificacoes.router)
