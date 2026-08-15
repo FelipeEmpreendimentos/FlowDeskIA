@@ -223,7 +223,6 @@ export function AppLayout() {
   useEffect(() => {
     if (!usuario) return;
 
-    void atualizarIndicadores();
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void atualizarIndicadores();
