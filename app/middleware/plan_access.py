@@ -2,6 +2,7 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -145,6 +146,54 @@ def _agenda_support_read_allowed(
     return user_module_access(db, user, "AGENDA")
 
 
+def _validate_access_sync(
+    *,
+    user_id: int,
+    empresa_id: int,
+    method: str,
+    path: str,
+    feature: str | None,
+    module: str | None,
+    management_module: str | None,
+    limit_key: str | None,
+) -> None:
+    """Executa as consultas síncronas de autorização fora do event loop.
+
+    O backend usa SQLAlchemy/psycopg2 síncronos. Fazer essas consultas dentro
+    do middleware async bloqueava o único event loop do Uvicorn durante cada
+    round trip até o banco remoto, serializando requisições concorrentes do
+    dashboard. O middleware chama esta função via run_in_threadpool.
+    """
+    db = SessionLocal()
+    try:
+        user = db.scalar(
+            select(Usuario).where(
+                Usuario.id == user_id,
+                Usuario.empresa_id == empresa_id,
+                Usuario.ativo.is_(True),
+            )
+        )
+        if user is not None and module:
+            try:
+                require_module_access(db, user, module)
+            except HTTPException:
+                if not _agenda_support_read_allowed(
+                    db,
+                    user,
+                    method,
+                    path,
+                ):
+                    raise
+        if user is not None and management_module:
+            require_module_manage(db, user, management_module)
+        if feature:
+            require_feature(db, empresa_id, feature)
+        if limit_key:
+            enforce_limit(db, empresa_id, limit_key)
+    finally:
+        db.close()
+
+
 async def plan_access_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
@@ -168,39 +217,23 @@ async def plan_access_middleware(
     ):
         return await call_next(request)
 
-    db = SessionLocal()
     try:
-        user = db.scalar(
-            select(Usuario).where(
-                Usuario.id == user_id,
-                Usuario.empresa_id == empresa_id,
-                Usuario.ativo.is_(True),
-            )
+        await run_in_threadpool(
+            _validate_access_sync,
+            user_id=user_id,
+            empresa_id=empresa_id,
+            method=request.method,
+            path=path,
+            feature=feature,
+            module=module,
+            management_module=management_module,
+            limit_key=limit_key,
         )
-        if user is not None and module:
-            try:
-                require_module_access(db, user, module)
-            except HTTPException:
-                if not _agenda_support_read_allowed(
-                    db,
-                    user,
-                    request.method,
-                    path,
-                ):
-                    raise
-        if user is not None and management_module:
-            require_module_manage(db, user, management_module)
-        if feature:
-            require_feature(db, empresa_id, feature)
-        if limit_key:
-            enforce_limit(db, empresa_id, limit_key)
     except HTTPException as exc:
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
             headers=exc.headers,
         )
-    finally:
-        db.close()
 
     return await call_next(request)
