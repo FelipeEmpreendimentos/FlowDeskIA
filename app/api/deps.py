@@ -42,6 +42,50 @@ def _module_for_request(request: Request) -> str | None:
     return None
 
 
+def _load_user_context(
+    db: Session,
+    *,
+    user_id: int,
+    empresa_id: int,
+) -> tuple[Usuario | None, Empresa | None, EmpresaPlataforma | None]:
+    """Carrega usuário, empresa e estado da plataforma em um único round trip.
+
+    O fallback mantém compatibilidade com bancos locais antigos que ainda não
+    possuam a tabela empresa_plataforma.
+    """
+    try:
+        row = db.execute(
+            select(Usuario, Empresa, EmpresaPlataforma)
+            .join(Empresa, Empresa.id == Usuario.empresa_id)
+            .outerjoin(
+                EmpresaPlataforma,
+                EmpresaPlataforma.empresa_id == Empresa.id,
+            )
+            .where(
+                Usuario.id == user_id,
+                Usuario.empresa_id == empresa_id,
+                Usuario.ativo.is_(True),
+            )
+        ).one_or_none()
+        if row is None:
+            return None, None, None
+        user, empresa, plataforma = row
+        return user, empresa, plataforma
+    except ProgrammingError:
+        db.rollback()
+        user = db.scalar(
+            select(Usuario).where(
+                Usuario.id == user_id,
+                Usuario.empresa_id == empresa_id,
+                Usuario.ativo.is_(True),
+            )
+        )
+        if user is None:
+            return None, None, None
+        empresa = db.scalar(select(Empresa).where(Empresa.id == empresa_id))
+        return user, empresa, None
+
+
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
@@ -67,12 +111,10 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
-    user = db.scalar(
-        select(Usuario).where(
-            Usuario.id == user_id,
-            Usuario.empresa_id == empresa_id,
-            Usuario.ativo.is_(True),
-        )
+    user, empresa, plataforma = _load_user_context(
+        db,
+        user_id=user_id,
+        empresa_id=empresa_id,
     )
 
     if user is None:
@@ -81,23 +123,11 @@ def get_current_user(
             "Usuário inválido ou inativo.",
         )
 
-    empresa = db.scalar(
-        select(Empresa).where(
-            Empresa.id == empresa_id,
-            Empresa.ativo.is_(True),
-        )
-    )
-    if empresa is None:
+    if empresa is None or not empresa.ativo:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "A empresa está inativa. Entre em contato com o suporte.",
         )
-
-    try:
-        plataforma = db.get(EmpresaPlataforma, empresa_id)
-    except ProgrammingError:
-        db.rollback()
-        plataforma = None
 
     if plataforma and plataforma.status in {"SUSPENSA", "CANCELADA", "ARQUIVADA"}:
         raise HTTPException(
