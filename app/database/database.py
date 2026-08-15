@@ -74,24 +74,18 @@ DATABASE_URL = build_database_url()
 IS_SUPABASE_POOLER = _is_supabase_pooler(DATABASE_URL)
 IS_SUPABASE_TRANSACTION_POOLER = _is_supabase_transaction_pooler(DATABASE_URL)
 
-# O shared pooler do Supabase deve concentrar o pooling de conexões com o
-# Postgres. No modo Session (5432), cada conexão cliente reserva uma sessão
-# no banco, então limitamos agressivamente o QueuePool local. No modo
-# Transaction (6543), as conexões cliente podem ser reutilizadas entre
-# transações e o Supavisor absorve a concorrência; por isso permitimos um
-# pool local maior para não bloquear as várias chamadas paralelas da UI.
-#
-# Evitamos pool_pre_ping em ambos os modos do Supabase porque ele acrescenta
-# um round trip de rede a cada checkout. pool_recycle mantém as conexões
-# cliente renovadas periodicamente sem pagar esse custo em toda requisição.
+# No Transaction Pooler, conexões cliente persistentes são baratas de reutilizar,
+# enquanto abrir uma nova conexão TLS durante um clique é caro. Mantemos dez
+# conexões estáveis e pré-aquecidas, sem overflow efêmero. Em outros cenários,
+# preservamos o pool mais conservador.
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=not IS_SUPABASE_POOLER,
-    pool_recycle=300 if IS_SUPABASE_POOLER else 1800,
+    pool_recycle=1800,
     pool_size=10 if IS_SUPABASE_TRANSACTION_POOLER else 5,
-    max_overflow=10 if IS_SUPABASE_TRANSACTION_POOLER else 0,
-    pool_timeout=20,
-    pool_use_lifo=True,
+    max_overflow=0,
+    pool_timeout=10,
+    pool_use_lifo=not IS_SUPABASE_TRANSACTION_POOLER,
     connect_args=build_connect_args(),
     echo=settings.sql_echo,
 )
@@ -109,20 +103,14 @@ class Base(DeclarativeBase):
 
 
 def warm_database_pool(connections: int | None = None) -> int:
-    """Abre conexões do pool antes da primeira requisição do usuário.
-
-    A conexão TLS com um banco remoto é muito mais cara que um checkout de uma
-    conexão já aberta. Aquecemos algumas conexões em paralelo durante o startup
-    para que o primeiro carregamento da interface não pague esse custo.
-    """
-    target = connections or (6 if IS_SUPABASE_TRANSACTION_POOLER else 3)
+    """Abre conexões do pool antes da primeira requisição do usuário."""
+    target = connections or (10 if IS_SUPABASE_TRANSACTION_POOLER else 3)
     target = max(1, target)
 
     def warm_one(_: int) -> None:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-            # Mantém o checkout por alguns milissegundos para que os workers
-            # concorrentes realmente preencham mais de uma conexão do QueuePool.
+            # Segura brevemente o checkout para preencher conexões distintas.
             sleep(0.05)
 
     with ThreadPoolExecutor(max_workers=target) as executor:
