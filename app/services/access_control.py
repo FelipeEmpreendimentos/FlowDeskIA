@@ -64,11 +64,131 @@ def default_manage(cargo: CargoUsuario, module: str) -> bool:
     return cargo in {CargoUsuario.ADMIN, CargoUsuario.GERENTE}
 
 
+def _module_state(
+    db: Session,
+    user: Usuario,
+    module: str,
+) -> tuple[bool, bool | None, bool | None]:
+    """Carrega estado da empresa e overrides do usuário em um único round trip."""
+    module = validate_module(module)
+    company_enabled = (
+        select(EmpresaModulo.ativo)
+        .where(
+            EmpresaModulo.empresa_id == user.empresa_id,
+            EmpresaModulo.modulo == module,
+        )
+        .limit(1)
+        .scalar_subquery()
+    )
+    view_override = (
+        select(UsuarioPermissaoModulo.permitido)
+        .where(
+            UsuarioPermissaoModulo.empresa_id == user.empresa_id,
+            UsuarioPermissaoModulo.usuario_id == user.id,
+            UsuarioPermissaoModulo.modulo == module,
+        )
+        .limit(1)
+        .scalar_subquery()
+    )
+    manage_override = (
+        select(UsuarioPermissaoModulo.pode_gerenciar)
+        .where(
+            UsuarioPermissaoModulo.empresa_id == user.empresa_id,
+            UsuarioPermissaoModulo.usuario_id == user.id,
+            UsuarioPermissaoModulo.modulo == module,
+        )
+        .limit(1)
+        .scalar_subquery()
+    )
+
+    try:
+        row = db.execute(
+            select(company_enabled, view_override, manage_override)
+        ).one()
+    except ProgrammingError:
+        db.rollback()
+        return True, None, None
+
+    enabled_value, view_value, manage_value = row
+    return (
+        True if enabled_value is None else bool(enabled_value),
+        view_value,
+        manage_value,
+    )
+
+
+def _permission_sets_from_rows(
+    user: Usuario,
+    company_rows: dict[str, bool],
+    user_rows: dict[str, UsuarioPermissaoModulo],
+) -> tuple[dict[str, bool], dict[str, bool]]:
+    permissions: dict[str, bool] = {}
+    management: dict[str, bool] = {}
+
+    for item in MODULES:
+        module = item.code
+        enabled = company_rows.get(module, True)
+        override = user_rows.get(module)
+        view_allowed = bool(
+            enabled
+            and (
+                override.permitido
+                if override is not None and override.permitido is not None
+                else default_access(user.cargo, module)
+            )
+        )
+        permissions[module] = view_allowed
+
+        if module in VIEW_ONLY_MODULES or not view_allowed:
+            management[module] = False
+        else:
+            management[module] = bool(
+                override.pode_gerenciar
+                if override is not None and override.pode_gerenciar is not None
+                else default_manage(user.cargo, module)
+            )
+
+    return permissions, management
+
+
+def effective_permission_sets(
+    db: Session,
+    user: Usuario,
+) -> tuple[dict[str, bool], dict[str, bool]]:
+    """Calcula todas as permissões com duas consultas, sem N+1 por módulo."""
+    try:
+        company_rows = {
+            row.modulo: bool(row.ativo)
+            for row in db.scalars(
+                select(EmpresaModulo).where(
+                    EmpresaModulo.empresa_id == user.empresa_id,
+                    EmpresaModulo.modulo.in_(MODULE_CODES),
+                )
+            )
+        }
+        user_rows = {
+            row.modulo: row
+            for row in db.scalars(
+                select(UsuarioPermissaoModulo).where(
+                    UsuarioPermissaoModulo.empresa_id == user.empresa_id,
+                    UsuarioPermissaoModulo.usuario_id == user.id,
+                    UsuarioPermissaoModulo.modulo.in_(MODULE_CODES),
+                )
+            )
+        }
+    except ProgrammingError:
+        db.rollback()
+        company_rows = {}
+        user_rows = {}
+
+    return _permission_sets_from_rows(user, company_rows, user_rows)
+
+
 def company_module_enabled(db: Session, empresa_id: int, module: str) -> bool:
     module = validate_module(module)
     try:
         row = db.scalar(
-            select(EmpresaModulo).where(
+            select(EmpresaModulo.ativo).where(
                 EmpresaModulo.empresa_id == empresa_id,
                 EmpresaModulo.modulo == module,
             )
@@ -76,35 +196,16 @@ def company_module_enabled(db: Session, empresa_id: int, module: str) -> bool:
     except ProgrammingError:
         db.rollback()
         return True
-    return True if row is None else row.ativo
-
-
-def _user_override(
-    db: Session,
-    user: Usuario,
-    module: str,
-) -> UsuarioPermissaoModulo | None:
-    try:
-        return db.scalar(
-            select(UsuarioPermissaoModulo).where(
-                UsuarioPermissaoModulo.empresa_id == user.empresa_id,
-                UsuarioPermissaoModulo.usuario_id == user.id,
-                UsuarioPermissaoModulo.modulo == module,
-            )
-        )
-    except ProgrammingError:
-        db.rollback()
-        return None
+    return True if row is None else bool(row)
 
 
 def user_module_access(db: Session, user: Usuario, module: str) -> bool:
     module = validate_module(module)
-    if not company_module_enabled(db, user.empresa_id, module):
+    enabled, view_override, _manage_override = _module_state(db, user, module)
+    if not enabled:
         return False
-
-    override = _user_override(db, user, module)
-    if override is not None and override.permitido is not None:
-        return override.permitido
+    if view_override is not None:
+        return bool(view_override)
     return default_access(user.cargo, module)
 
 
@@ -112,21 +213,30 @@ def user_module_manage(db: Session, user: Usuario, module: str) -> bool:
     module = validate_module(module)
     if module in VIEW_ONLY_MODULES:
         return False
-    if not user_module_access(db, user, module):
+
+    enabled, view_override, manage_override = _module_state(db, user, module)
+    if not enabled:
         return False
 
-    override = _user_override(db, user, module)
-    if override is not None and override.pode_gerenciar is not None:
-        return override.pode_gerenciar
+    view_allowed = (
+        bool(view_override)
+        if view_override is not None
+        else default_access(user.cargo, module)
+    )
+    if not view_allowed:
+        return False
+
+    if manage_override is not None:
+        return bool(manage_override)
     return default_manage(user.cargo, module)
 
 
 def effective_permissions(db: Session, user: Usuario) -> dict[str, bool]:
-    return {item.code: user_module_access(db, user, item.code) for item in MODULES}
+    return effective_permission_sets(db, user)[0]
 
 
 def effective_management_permissions(db: Session, user: Usuario) -> dict[str, bool]:
-    return {item.code: user_module_manage(db, user, item.code) for item in MODULES}
+    return effective_permission_sets(db, user)[1]
 
 
 def require_module_access(db: Session, user: Usuario, module: str) -> None:
