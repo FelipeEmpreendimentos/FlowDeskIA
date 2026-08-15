@@ -16,6 +16,8 @@ services:
         sync: false
       - key: DB_SSLMODE
         value: require
+      - key: DB_POOLER_PORT_OVERRIDE
+        value: "6543"
       - key: SQL_ECHO
         value: "false"
       - key: JWT_SECRET
