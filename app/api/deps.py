@@ -3,7 +3,7 @@ from collections.abc import Callable
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import InvalidRequestError, ProgrammingError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -86,6 +86,42 @@ def _load_user_context(
         return user, empresa, None
 
 
+def _reuse_middleware_context(
+    request: Request,
+    db: Session,
+    *,
+    user_id: int,
+    empresa_id: int,
+) -> tuple[Usuario, bool, str, str | None] | None:
+    """Reaproveita o contexto já validado pelo middleware sem novo SELECT.
+
+    O middleware usa uma sessão curta própria e entrega um objeto limpo e
+    detached. ``merge(load=False)`` o anexa à sessão da rota sem consultar o
+    Postgres novamente, preservando a possibilidade de a rota alterar o ORM.
+    """
+    snapshot = getattr(request.state, "flowdesk_auth_context", None)
+    if not isinstance(snapshot, dict):
+        return None
+    if snapshot.get("user_id") != user_id or snapshot.get("empresa_id") != empresa_id:
+        return None
+
+    detached_user = snapshot.get("user")
+    if not isinstance(detached_user, Usuario):
+        return None
+
+    try:
+        user = db.merge(detached_user, load=False)
+    except InvalidRequestError:
+        return None
+
+    return (
+        user,
+        bool(snapshot.get("empresa_ativo", False)),
+        str(snapshot.get("empresa_timezone") or "America/Sao_Paulo"),
+        snapshot.get("plataforma_status"),
+    )
+
+
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
@@ -111,11 +147,31 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
-    user, empresa, plataforma = _load_user_context(
+    reused = _reuse_middleware_context(
+        request,
         db,
         user_id=user_id,
         empresa_id=empresa_id,
     )
+
+    if reused is not None:
+        user, empresa_ativa, empresa_timezone, plataforma_status = reused
+    else:
+        user, empresa, plataforma = _load_user_context(
+            db,
+            user_id=user_id,
+            empresa_id=empresa_id,
+        )
+        if user is None:
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                "Usuário inválido ou inativo.",
+            )
+        empresa_ativa = bool(empresa and empresa.ativo)
+        empresa_timezone = (
+            empresa.timezone if empresa is not None else "America/Sao_Paulo"
+        )
+        plataforma_status = plataforma.status if plataforma is not None else None
 
     if user is None:
         raise HTTPException(
@@ -123,13 +179,13 @@ def get_current_user(
             "Usuário inválido ou inativo.",
         )
 
-    if empresa is None or not empresa.ativo:
+    if not empresa_ativa:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "A empresa está inativa. Entre em contato com o suporte.",
         )
 
-    if plataforma and plataforma.status in {"SUSPENSA", "CANCELADA", "ARQUIVADA"}:
+    if plataforma_status in {"SUSPENSA", "CANCELADA", "ARQUIVADA"}:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "O acesso da empresa está suspenso. Entre em contato com o suporte.",
@@ -138,7 +194,7 @@ def get_current_user(
     auto_cancel_stale_appointments(
         db,
         empresa_id=empresa_id,
-        timezone_name=empresa.timezone,
+        timezone_name=empresa_timezone,
     )
 
     module = _module_for_request(request)
