@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
@@ -120,7 +120,7 @@ def _module_state(
 def _permission_sets_from_rows(
     user: Usuario,
     company_rows: dict[str, bool],
-    user_rows: dict[str, UsuarioPermissaoModulo],
+    user_rows: dict[str, tuple[bool | None, bool | None]],
 ) -> tuple[dict[str, bool], dict[str, bool]]:
     permissions: dict[str, bool] = {}
     management: dict[str, bool] = {}
@@ -128,12 +128,12 @@ def _permission_sets_from_rows(
     for item in MODULES:
         module = item.code
         enabled = company_rows.get(module, True)
-        override = user_rows.get(module)
+        view_override, manage_override = user_rows.get(module, (None, None))
         view_allowed = bool(
             enabled
             and (
-                override.permitido
-                if override is not None and override.permitido is not None
+                view_override
+                if view_override is not None
                 else default_access(user.cargo, module)
             )
         )
@@ -143,8 +143,8 @@ def _permission_sets_from_rows(
             management[module] = False
         else:
             management[module] = bool(
-                override.pode_gerenciar
-                if override is not None and override.pode_gerenciar is not None
+                manage_override
+                if manage_override is not None
                 else default_manage(user.cargo, module)
             )
 
@@ -155,26 +155,36 @@ def effective_permission_sets(
     db: Session,
     user: Usuario,
 ) -> tuple[dict[str, bool], dict[str, bool]]:
-    """Calcula todas as permissões com duas consultas, sem N+1 por módulo."""
+    """Calcula todas as permissões em uma única consulta ao banco."""
     try:
-        company_rows = {
-            row.modulo: bool(row.ativo)
-            for row in db.scalars(
-                select(EmpresaModulo).where(
-                    EmpresaModulo.empresa_id == user.empresa_id,
-                    EmpresaModulo.modulo.in_(MODULE_CODES),
-                )
+        rows = db.execute(
+            select(
+                EmpresaModulo.modulo,
+                EmpresaModulo.ativo,
+                UsuarioPermissaoModulo.permitido,
+                UsuarioPermissaoModulo.pode_gerenciar,
             )
+            .outerjoin(
+                UsuarioPermissaoModulo,
+                and_(
+                    UsuarioPermissaoModulo.empresa_id == EmpresaModulo.empresa_id,
+                    UsuarioPermissaoModulo.usuario_id == user.id,
+                    UsuarioPermissaoModulo.modulo == EmpresaModulo.modulo,
+                ),
+            )
+            .where(
+                EmpresaModulo.empresa_id == user.empresa_id,
+                EmpresaModulo.modulo.in_(MODULE_CODES),
+            )
+        ).all()
+        company_rows = {
+            module: bool(enabled)
+            for module, enabled, _view, _manage in rows
         }
         user_rows = {
-            row.modulo: row
-            for row in db.scalars(
-                select(UsuarioPermissaoModulo).where(
-                    UsuarioPermissaoModulo.empresa_id == user.empresa_id,
-                    UsuarioPermissaoModulo.usuario_id == user.id,
-                    UsuarioPermissaoModulo.modulo.in_(MODULE_CODES),
-                )
-            )
+            module: (view_override, manage_override)
+            for module, _enabled, view_override, manage_override in rows
+            if view_override is not None or manage_override is not None
         }
     except ProgrammingError:
         db.rollback()
