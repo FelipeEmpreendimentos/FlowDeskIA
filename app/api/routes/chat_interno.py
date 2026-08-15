@@ -57,6 +57,12 @@ def _mensagem_out(
 
 def _garantir_canal_geral(db: Session, empresa_id: int) -> CanalChatInterno:
     chave = f"GERAL:{empresa_id}"
+    canal = db.scalar(
+        select(CanalChatInterno).where(CanalChatInterno.chave_unica == chave)
+    )
+    if canal is not None:
+        return canal
+
     db.execute(
         insert(CanalChatInterno)
         .values(
@@ -429,23 +435,47 @@ def obter_resumo(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ChatInternoResumoOut:
-    canais = _canais_disponiveis(db, current_user)
-    canal_ids = [canal.id for canal in canais]
-    if not canal_ids:
-        return ChatInternoResumoOut(nao_lidas=0, ultima_mensagem_id=None)
-
-    ultima_mensagem_id = db.scalar(
-        select(func.max(MensagemChatInterno.id)).where(
-            MensagemChatInterno.canal_id.in_(canal_ids)
+    canais_membro = select(MembroCanalChatInterno.canal_id).where(
+        MembroCanalChatInterno.usuario_id == current_user.id
+    )
+    canais_disponiveis = (
+        select(CanalChatInterno.id)
+        .where(
+            CanalChatInterno.empresa_id == current_user.empresa_id,
+            or_(
+                CanalChatInterno.tipo == "GERAL",
+                CanalChatInterno.id.in_(canais_membro),
+            ),
         )
+        .subquery()
     )
-    nao_lidas = sum(
-        _nao_lidas_canal(db, current_user, canal_id)
-        for canal_id in canal_ids
-    )
+
+    row = db.execute(
+        select(
+            func.max(MensagemChatInterno.id).label("ultima_mensagem_id"),
+            func.count(MensagemChatInterno.id)
+            .filter(
+                MensagemChatInterno.usuario_id != current_user.id,
+                MensagemChatInterno.id
+                > func.coalesce(LeituraChatInterno.ultima_mensagem_id, 0),
+            )
+            .label("nao_lidas"),
+        )
+        .select_from(MensagemChatInterno)
+        .join(
+            canais_disponiveis,
+            canais_disponiveis.c.id == MensagemChatInterno.canal_id,
+        )
+        .outerjoin(
+            LeituraChatInterno,
+            (LeituraChatInterno.canal_id == MensagemChatInterno.canal_id)
+            & (LeituraChatInterno.usuario_id == current_user.id),
+        )
+    ).one()
+
     return ChatInternoResumoOut(
-        nao_lidas=nao_lidas,
-        ultima_mensagem_id=ultima_mensagem_id,
+        nao_lidas=int(row.nao_lidas or 0),
+        ultima_mensagem_id=row.ultima_mensagem_id,
     )
 
 
