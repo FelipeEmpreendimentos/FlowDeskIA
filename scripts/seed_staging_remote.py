@@ -4,9 +4,9 @@ A senha em texto nunca fica no repositório; somente o hash Argon2 forte.
 Remover este arquivo depois da primeira migração concluída.
 """
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
-from app.database.database import SessionLocal
+from app.database.database import SessionLocal, engine
 from app.models.enums import CargoUsuario
 from app.models.models import Empresa, Usuario
 from app.services.db_utils import commit_or_conflict
@@ -19,7 +19,24 @@ ADMIN_EMAIL = "usuarioteste@gmail.com"
 ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FOpDVDi03gAbctQg9osNQw$D7ksmk3iDPmnKRiSLXTjSOKw/wCYat5tZloLifB1oYs"
 
 
+def alinhar_defaults_plataforma() -> None:
+    """Corrige banco criado antes dos server_defaults entrarem no modelo."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                ALTER TABLE empresa_plataforma
+                    ALTER COLUMN status SET DEFAULT 'TRIAL',
+                    ALTER COLUMN ia_adicional_ativo SET DEFAULT FALSE,
+                    ALTER COLUMN ia_limite_adicional SET DEFAULT 0;
+                """
+            )
+        )
+
+
 def main() -> None:
+    alinhar_defaults_plataforma()
+
     db = SessionLocal()
     try:
         empresa = db.scalar(select(Empresa).where(Empresa.cnpj == EMPRESA_CNPJ))
