@@ -1,3 +1,9 @@
+databases:
+  - name: flowdeskia-db-staging-va
+    plan: free
+    region: virginia
+    postgresMajorVersion: "17"
+
 services:
   - type: web
     name: flowdeskia-api-staging
@@ -7,13 +13,15 @@ services:
     branch: staging
     autoDeployTrigger: checksPass
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python -m scripts.init_remote_database && python -m scripts.seed_staging_remote && python -m scripts.setup_release && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/system/health
     envVars:
       - key: APP_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: flowdeskia-db-staging-va
+          property: connectionString
       - key: DB_SSLMODE
         value: require
       - key: DB_POOLER_PORT_OVERRIDE
