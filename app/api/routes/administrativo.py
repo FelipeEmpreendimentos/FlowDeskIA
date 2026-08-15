@@ -40,37 +40,47 @@ def dashboard(
     empresa_id = current_user.empresa_id
     today = date.today()
 
-    agendamentos_hoje = db.scalar(
-        select(func.count()).select_from(Agendamento).where(
+    agendamentos_hoje = (
+        select(func.count())
+        .select_from(Agendamento)
+        .where(
             Agendamento.empresa_id == empresa_id,
             Agendamento.data == today,
             Agendamento.status != StatusAgendamento.CANCELADO,
         )
-    ) or 0
-
-    agendamentos_pendentes = db.scalar(
-        select(func.count()).select_from(Agendamento).where(
+        .scalar_subquery()
+    )
+    agendamentos_pendentes = (
+        select(func.count())
+        .select_from(Agendamento)
+        .where(
             Agendamento.empresa_id == empresa_id,
             Agendamento.status == StatusAgendamento.PENDENTE,
         )
-    ) or 0
-
-    conversas_abertas = db.scalar(
-        select(func.count()).select_from(Conversa).where(
+        .scalar_subquery()
+    )
+    conversas_abertas = (
+        select(func.count())
+        .select_from(Conversa)
+        .where(
             Conversa.empresa_id == empresa_id,
             Conversa.status != StatusConversa.FINALIZADA,
         )
-    ) or 0
-
-    clientes_ativos = db.scalar(
-        select(func.count()).select_from(Cliente).where(
+        .scalar_subquery()
+    )
+    clientes_ativos = (
+        select(func.count())
+        .select_from(Cliente)
+        .where(
             Cliente.empresa_id == empresa_id,
             Cliente.status == StatusCliente.ATIVO,
         )
-    ) or 0
-
-    notificacoes_nao_lidas = db.scalar(
-        select(func.count()).select_from(Notificacao).where(
+        .scalar_subquery()
+    )
+    notificacoes_nao_lidas = (
+        select(func.count())
+        .select_from(Notificacao)
+        .where(
             Notificacao.empresa_id == empresa_id,
             Notificacao.lida.is_(False),
             or_(
@@ -78,14 +88,25 @@ def dashboard(
                 Notificacao.usuario_id == current_user.id,
             ),
         )
-    ) or 0
+        .scalar_subquery()
+    )
+
+    row = db.execute(
+        select(
+            agendamentos_hoje.label("agendamentos_hoje"),
+            agendamentos_pendentes.label("agendamentos_pendentes"),
+            conversas_abertas.label("conversas_abertas"),
+            clientes_ativos.label("clientes_ativos"),
+            notificacoes_nao_lidas.label("notificacoes_nao_lidas"),
+        )
+    ).one()
 
     return DashboardOut(
-        agendamentos_hoje=agendamentos_hoje,
-        agendamentos_pendentes=agendamentos_pendentes,
-        conversas_abertas=conversas_abertas,
-        clientes_ativos=clientes_ativos,
-        notificacoes_nao_lidas=notificacoes_nao_lidas,
+        agendamentos_hoje=int(row.agendamentos_hoje or 0),
+        agendamentos_pendentes=int(row.agendamentos_pendentes or 0),
+        conversas_abertas=int(row.conversas_abertas or 0),
+        clientes_ativos=int(row.clientes_ativos or 0),
+        notificacoes_nao_lidas=int(row.notificacoes_nao_lidas or 0),
     )
 
 
