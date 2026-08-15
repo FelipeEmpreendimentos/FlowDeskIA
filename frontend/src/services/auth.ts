@@ -4,8 +4,9 @@ import type { CurrentAccess } from "../types/accessControl";
 const TOKEN_KEY = "flowdesk_token";
 const COMPANY_KEY = "flowdesk_empresa_id";
 const SESSION_CONTEXT_KEY = "flowdesk_session_context";
-const API_URL =
-  import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+const API_URL = import.meta.env.PROD
+  ? "/api/v1"
+  : import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
 export interface SessionContext {
   usuario: UsuarioLogado;
