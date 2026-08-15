@@ -72,7 +72,7 @@ class EmpresaPlataforma(Base):
         primary_key=True,
     )
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="TRIAL"
+        String(20), nullable=False, default="TRIAL", server_default=text("'TRIAL'")
     )
     trial_fim: Mapped[date | None] = mapped_column(Date)
     recursos_personalizados: Mapped[dict] = mapped_column(
@@ -82,10 +82,10 @@ class EmpresaPlataforma(Base):
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
     ia_adicional_ativo: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
+        Boolean, nullable=False, default=False, server_default=text("FALSE")
     )
     ia_limite_adicional: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
+        Integer, nullable=False, default=0, server_default=text("0")
     )
     observacoes: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(
