@@ -10,7 +10,6 @@ import { Clientes } from "./pages/Clientes";
 import { ConfiguracaoAcessos } from "./pages/ConfiguracaoAcessos";
 import { ConfiguracaoAgenda } from "./pages/ConfiguracaoAgenda";
 import { ConfiguracaoRelatorios } from "./pages/ConfiguracaoRelatorios";
-import { ConfiguracaoSimuladorIA } from "./pages/ConfiguracaoSimuladorIA";
 import { Configuracoes } from "./pages/Configuracoes";
 import { ConfiguracoesHub } from "./pages/ConfiguracoesHub";
 import { Conversas } from "./pages/Conversas";
@@ -29,10 +28,10 @@ import { SuperAdminAuditoria } from "./pages/SuperAdminAuditoria";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import { SuperAdminEmpresaDetalhe } from "./pages/SuperAdminEmpresaDetalhe";
 import { SuperAdminEmpresas } from "./pages/SuperAdminEmpresas";
+import { SuperAdminIASimulator } from "./pages/SuperAdminIASimulator";
 import { SuperAdminLogin } from "./pages/SuperAdminLogin";
 import { SuperAdminPlanos } from "./pages/SuperAdminPlanos";
 import { Veiculos } from "./pages/Veiculos";
-import { WhatsAppSimulator } from "./pages/WhatsAppSimulator";
 
 function App() {
   return (
@@ -40,7 +39,6 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/recuperar-senha" element={<RecuperarSenha />} />
       <Route path="/redefinir-senha" element={<RedefinirSenha />} />
-      <Route path="/simulador/whatsapp/:token" element={<WhatsAppSimulator />} />
       <Route path="/super-admin/login" element={<SuperAdminLogin />} />
 
       <Route
@@ -55,6 +53,7 @@ function App() {
         <Route path="dashboard" element={<SuperAdminDashboard />} />
         <Route path="empresas" element={<SuperAdminEmpresas />} />
         <Route path="empresas/:empresaId" element={<SuperAdminEmpresaDetalhe />} />
+        <Route path="simulador-ia" element={<SuperAdminIASimulator />} />
         <Route path="planos" element={<SuperAdminPlanos />} />
         <Route path="auditoria" element={<SuperAdminAuditoria />} />
       </Route>
@@ -85,7 +84,6 @@ function App() {
         <Route path="/configuracoes/agenda" element={<ConfiguracaoAgenda />} />
         <Route path="/configuracoes/acessos" element={<ConfiguracaoAcessos />} />
         <Route path="/configuracoes/relatorios" element={<ConfiguracaoRelatorios />} />
-        <Route path="/configuracoes/simulador-ia" element={<ConfiguracaoSimuladorIA />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
