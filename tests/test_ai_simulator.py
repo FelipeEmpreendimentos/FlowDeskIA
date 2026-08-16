@@ -3,27 +3,11 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from app.core.security import create_simulator_access_token, decode_access_token
-from app.services.ai_conversation import build_simulator_ai_context
+from app.models.enums import RemetenteMensagem
+from app.services.ai_simulator import build_real_customer_simulator_context
 
 
-def test_simulator_token_is_bound_to_company() -> None:
-    token, expires_in = create_simulator_access_token(
-        user_id=9,
-        empresa_id=4,
-        days=1,
-    )
-
-    payload = decode_access_token(token)
-
-    assert expires_in == 24 * 60 * 60
-    assert payload["kind"] == "ai_simulator"
-    assert payload["sub"] == "9"
-    assert payload["empresa_id"] == 4
-    assert payload["jti"]
-
-
-def test_simulator_context_uses_company_data_without_real_customer() -> None:
+def test_super_admin_simulator_uses_real_customer_context() -> None:
     db = Mock()
     empresa = SimpleNamespace(
         id=4,
@@ -34,6 +18,12 @@ def test_simulator_context_uses_company_data_without_real_customer() -> None:
         horario_abertura=time(8, 0),
         horario_fechamento=time(18, 0),
         ativo=True,
+    )
+    cliente = SimpleNamespace(
+        id=21,
+        empresa_id=4,
+        nome="Felipe Cliente",
+        observacoes="Prefere atendimento pela manhã.",
     )
     config = SimpleNamespace(
         nome_assistente="Lia",
@@ -47,29 +37,46 @@ def test_simulator_context_uses_company_data_without_real_customer() -> None:
         adicional_por_tipo_ativo=False,
         adicionais=[],
     )
+    veiculo = SimpleNamespace(
+        marca="Honda",
+        modelo="Civic",
+        tipo_veiculo="SEDAN",
+        ano=2022,
+        cor="Preto",
+        apelido=None,
+        observacoes="Cuidado com o banco traseiro.",
+        placa="ABC1D23",
+    )
+    memoria = SimpleNamespace(
+        categoria="preferencia",
+        informacao="Cliente prefere horários pela manhã.",
+    )
 
-    db.scalar.side_effect = [empresa, config]
-    db.scalars.side_effect = [[servico]]
+    db.scalar.side_effect = [empresa, cliente, config]
+    db.scalars.side_effect = [[servico], [veiculo], [memoria]]
+    db.execute.return_value.all.return_value = [
+        (RemetenteMensagem.CLIENTE, "Já fiz uma lavagem aí antes."),
+    ]
 
-    context = build_simulator_ai_context(
+    context = build_real_customer_simulator_context(
         db,
         empresa_id=4,
-        customer_name="Cliente de teste",
-        vehicle_type="SEDAN",
-        vehicle_description="Honda Civic 2022",
-        customer_notes="Prefere manhã.",
+        cliente_id=21,
         transcript=[
             ("ASSISTENTE IA", "Olá! Como posso ajudar?"),
-            ("CLIENTE", "Quanto custa a lavagem completa?"),
+            ("CLIENTE", "Quanto custa a lavagem completa para o meu carro?"),
         ],
     )
 
     assert "Empresa Teste" in context.input_text
     assert "Lavagem completa: R$ 120,00" in context.input_text
-    assert "Cliente de teste" in context.input_text
-    assert "SEDAN" in context.input_text
-    assert "Honda Civic 2022" in context.input_text
-    assert "Quanto custa a lavagem completa?" in context.input_text
+    assert "Felipe Cliente" in context.input_text
+    assert "Honda Civic" in context.input_text
+    assert "tipo SEDAN" in context.input_text
+    assert "Cliente prefere horários pela manhã." in context.input_text
+    assert "Já fiz uma lavagem aí antes." in context.input_text
+    assert "Quanto custa a lavagem completa para o meu carro?" in context.input_text
+    assert "ABC1D23" not in context.input_text
     assert "WhatsApp real" in context.instructions
     assert "Seja objetiva e cordial." in context.instructions
     assert "NÃO possui ferramenta" in context.instructions
