@@ -25,6 +25,7 @@ from app.api.routes import (
     preferencias_notificacoes,
     relatorios,
     servicos,
+    simulador_ia,
     smart_agenda,
     super_admin,
     super_admin_dashboard,
@@ -62,6 +63,7 @@ api_router.include_router(horarios.router)
 api_router.include_router(bloqueios.router)
 api_router.include_router(conversas.router)
 api_router.include_router(ia.router)
+api_router.include_router(simulador_ia.router)
 # O endpoint agregado de canais vem primeiro para eliminar o N+1 da listagem.
 api_router.include_router(chat_interno_fast.router)
 api_router.include_router(chat_interno.router)
