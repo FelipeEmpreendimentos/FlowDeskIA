@@ -94,12 +94,7 @@ def build_real_customer_simulator_context(
     O cliente, seus veículos, memórias e histórico recente são somente lidos.
     O simulador não cria Conversa/Mensagem e não altera o cadastro real.
     """
-    empresa = db.scalar(
-        select(Empresa).where(
-            Empresa.id == empresa_id,
-            Empresa.ativo.is_(True),
-        )
-    )
+    empresa = db.scalar(select(Empresa).where(Empresa.id == empresa_id))
     cliente = db.scalar(
         select(Cliente).where(
             Cliente.id == cliente_id,
