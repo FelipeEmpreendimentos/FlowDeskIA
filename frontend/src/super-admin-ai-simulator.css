@@ -1,0 +1,258 @@
+.super-admin-simulator-private {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid #d8e1ee;
+  border-radius: 999px;
+  color: #52647e;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.super-admin-ai-workspace {
+  display: grid;
+  grid-template-columns: minmax(300px, 365px) minmax(460px, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.super-admin-ai-control {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  padding: 18px;
+  min-width: 0;
+}
+
+.super-admin-ai-control-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.super-admin-ai-control-title > span {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  flex: 0 0 39px;
+  border-radius: 11px;
+  color: #3157d5;
+  background: #edf2ff;
+}
+
+.super-admin-ai-control-title > div {
+  display: grid;
+  gap: 2px;
+}
+
+.super-admin-ai-control-title strong {
+  color: #172b49;
+  font-size: 14px;
+}
+
+.super-admin-ai-control-title small {
+  color: #8693a6;
+  font-size: 10px;
+}
+
+.super-admin-ai-field {
+  display: grid;
+  gap: 6px;
+  color: #40526e;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.super-admin-ai-field select,
+.super-admin-ai-field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid #d5deea;
+  border-radius: 10px;
+  outline: none;
+  color: #172b49;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+}
+
+.super-admin-ai-field select:focus,
+.super-admin-ai-field input:focus {
+  border-color: #86a1ee;
+  box-shadow: 0 0 0 3px rgba(49, 87, 213, .08);
+}
+
+.super-admin-ai-field select:disabled,
+.super-admin-ai-field input:disabled {
+  color: #8b97a8;
+  background: #f5f7fa;
+}
+
+.super-admin-ai-search {
+  position: relative;
+}
+
+.super-admin-ai-search svg {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  transform: translateY(-50%);
+  color: #8795aa;
+  pointer-events: none;
+}
+
+.super-admin-ai-search input {
+  padding-left: 34px;
+}
+
+.super-admin-ai-context-card {
+  display: grid;
+  gap: 3px;
+  padding: 13px;
+  border: 1px solid #dce5f1;
+  border-radius: 12px;
+  background: #f8faff;
+}
+
+.super-admin-ai-context-card > span {
+  color: #3157d5;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.super-admin-ai-context-card strong {
+  margin-top: 2px;
+  color: #213958;
+  font-size: 13px;
+}
+
+.super-admin-ai-context-card small {
+  color: #758399;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.super-admin-ai-real-data {
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.super-admin-ai-real-data h2 {
+  margin: 0 0 3px;
+  color: #2e425f;
+  font-size: 11px;
+}
+
+.super-admin-ai-real-data > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #7b899c;
+  font-size: 10px;
+}
+
+.super-admin-ai-real-data > div strong {
+  color: #31445f;
+}
+
+.super-admin-ai-real-data > small {
+  padding: 5px 7px;
+  border-radius: 7px;
+  color: #4f6078;
+  background: #f0f4f8;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.super-admin-ai-real-data p {
+  margin: 3px 0 0;
+  color: #8793a5;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.super-admin-ai-control .wa-simulator-reset:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.super-admin-wa-shell {
+  min-height: 680px;
+  height: calc(100vh - 180px);
+  max-height: 860px;
+  border-radius: 18px;
+  box-shadow: 0 15px 42px rgba(29, 48, 77, .14);
+}
+
+.super-admin-wa-shell.is-disabled .wa-phone-composer {
+  opacity: .7;
+}
+
+.super-admin-ai-empty-chat {
+  display: grid;
+  min-height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 32px;
+  color: #7d897f;
+  text-align: center;
+}
+
+.super-admin-ai-empty-chat svg {
+  color: #8b998f;
+}
+
+.super-admin-ai-empty-chat strong {
+  color: #516157;
+  font-size: 14px;
+}
+
+.super-admin-ai-empty-chat span {
+  max-width: 330px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1120px) {
+  .super-admin-ai-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .super-admin-wa-shell {
+    height: 720px;
+    min-height: 620px;
+    max-height: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .super-admin-ai-workspace {
+    gap: 12px;
+  }
+
+  .super-admin-ai-control {
+    padding: 14px;
+  }
+
+  .super-admin-wa-shell {
+    height: 680px;
+    min-height: 560px;
+    border-radius: 14px;
+  }
+
+  .super-admin-simulator-private {
+    display: none;
+  }
+}
