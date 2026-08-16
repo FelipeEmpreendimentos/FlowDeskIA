@@ -11,6 +11,7 @@ import type {
 const menu: Array<{ to: string; label: string; icon: IconName }> = [
   { to: "/super-admin/dashboard", label: "Visão geral", icon: "dashboard" },
   { to: "/super-admin/empresas", label: "Empresas", icon: "building" },
+  { to: "/super-admin/simulador-ia", label: "Simulador IA", icon: "bot" },
   { to: "/super-admin/planos", label: "Planos", icon: "services" },
   { to: "/super-admin/auditoria", label: "Auditoria", icon: "clock" },
 ];
