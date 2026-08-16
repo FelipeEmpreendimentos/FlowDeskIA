@@ -93,7 +93,7 @@ export function ConfiguracaoSimuladorIA() {
             onClick={() => void gerarLink()}
             disabled={gerando}
           >
-            <Icon name="link" size={17} />
+            <Icon name="lock" size={17} />
             {gerando ? "Gerando link..." : linkGerado ? "Gerar novo link" : "Gerar link de teste"}
           </button>
 
@@ -105,7 +105,7 @@ export function ConfiguracaoSimuladorIA() {
               </label>
               <div className="simulator-generated-actions">
                 <button className="button button-secondary" type="button" onClick={() => void copiarLink()}>
-                  <Icon name="copy" size={16} />
+                  <Icon name="check" size={16} />
                   Copiar
                 </button>
                 <button
@@ -113,7 +113,7 @@ export function ConfiguracaoSimuladorIA() {
                   type="button"
                   onClick={() => window.open(fullLink, "_blank", "noopener,noreferrer")}
                 >
-                  <Icon name="arrow-right" size={16} />
+                  <Icon name="eye" size={16} />
                   Abrir simulador
                 </button>
               </div>
