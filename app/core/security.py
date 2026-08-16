@@ -82,6 +82,28 @@ def create_refresh_token(
     )
 
 
+def create_simulator_access_token(
+    *,
+    user_id: int,
+    empresa_id: int,
+    days: int = 7,
+) -> tuple[str, int]:
+    """Cria um link temporário e não autenticado para o laboratório da IA.
+
+    O token fica vinculado à empresa que o gerou e não carrega permissões de
+    usuário. As rotas públicas do simulador aceitam apenas ``kind=ai_simulator``.
+    """
+    return _encode_token(
+        {
+            "sub": str(user_id),
+            "empresa_id": empresa_id,
+            "kind": "ai_simulator",
+            "jti": secrets.token_urlsafe(18),
+        },
+        expires_delta=timedelta(days=days),
+    )
+
+
 def create_super_admin_access_token(*, super_admin_id: int) -> tuple[str, int]:
     return _encode_access_token(
         {
