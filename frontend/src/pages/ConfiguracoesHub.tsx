@@ -30,15 +30,6 @@ const cards: ConfiguracaoCard[] = [
     cargos: ["ADMIN", "GERENTE"],
   },
   {
-    to: "/configuracoes/simulador-ia",
-    title: "Simulador de IA",
-    description:
-      "Gere um link privado e teste a IA em um chat que reproduz a experiência de atendimento pelo WhatsApp.",
-    icon: "bot",
-    cargos: ["ADMIN", "GERENTE"],
-    badge: "Laboratório",
-  },
-  {
     to: "/configuracoes/relatorios",
     title: "Relatórios e financeiro",
     description:
