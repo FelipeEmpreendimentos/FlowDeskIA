@@ -32,6 +32,7 @@ import { SuperAdminIASimulator } from "./pages/SuperAdminIASimulator";
 import { SuperAdminLogin } from "./pages/SuperAdminLogin";
 import { SuperAdminPlanos } from "./pages/SuperAdminPlanos";
 import { Veiculos } from "./pages/Veiculos";
+import "./super-admin-ai-simulator.css";
 
 function App() {
   return (
