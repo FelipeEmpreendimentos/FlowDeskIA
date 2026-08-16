@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
 import { Icon } from "../components/Icon";
-import { LoadingState } from "../components/UI";
+import { AppToast, LoadingState } from "../components/UI";
 import { apiRequest, restoreRememberedSession } from "../services/api";
-import { getCompanyId, getToken, saveSession } from "../services/auth";
+import { getToken, saveSession } from "../services/auth";
 
 interface LoginResponse {
   access_token: string;
@@ -11,12 +11,41 @@ interface LoginResponse {
   expires_in: number;
 }
 
+interface RememberedLogin {
+  empresaId: string;
+  email: string;
+}
+
+const REMEMBERED_LOGIN_KEY = "flowdesk_remembered_login";
+
+function getRememberedLogin(): RememberedLogin | null {
+  const raw = localStorage.getItem(REMEMBERED_LOGIN_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<RememberedLogin>;
+    if (!parsed.empresaId || !parsed.email) {
+      localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+      return null;
+    }
+
+    return {
+      empresaId: String(parsed.empresaId),
+      email: String(parsed.email),
+    };
+  } catch {
+    localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+    return null;
+  }
+}
+
 export function Login() {
   const navigate = useNavigate();
-  const [empresaId, setEmpresaId] = useState(getCompanyId());
-  const [email, setEmail] = useState("");
+  const [acessoLembrado] = useState(() => getRememberedLogin());
+  const [empresaId, setEmpresaId] = useState(() => acessoLembrado?.empresaId ?? "");
+  const [email, setEmail] = useState(() => acessoLembrado?.email ?? "");
   const [senha, setSenha] = useState("");
-  const [manterConectado, setManterConectado] = useState(false);
+  const [manterConectado, setManterConectado] = useState(() => Boolean(acessoLembrado));
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
@@ -38,6 +67,12 @@ export function Login() {
     };
   }, [verificandoSessao]);
 
+  useEffect(() => {
+    if (!erro) return;
+    const timer = window.setTimeout(() => setErro(""), 4500);
+    return () => window.clearTimeout(timer);
+  }, [erro]);
+
   if (verificandoSessao) {
     return (
       <main className="app-loading">
@@ -53,18 +88,34 @@ export function Login() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro("");
+
+    if (senha.length < 6) {
+      setErro("Senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
     setCarregando(true);
 
     try {
+      const emailNormalizado = email.trim();
       const response = await apiRequest<LoginResponse>("/auth/login", {
         method: "POST",
         body: JSON.stringify({
           empresa_id: Number(empresaId),
-          email: email.trim(),
+          email: emailNormalizado,
           senha,
           manter_conectado: manterConectado,
         }),
       });
+
+      if (manterConectado) {
+        localStorage.setItem(
+          REMEMBERED_LOGIN_KEY,
+          JSON.stringify({ empresaId, email: emailNormalizado } satisfies RememberedLogin),
+        );
+      } else {
+        localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+      }
 
       saveSession(response.access_token, empresaId);
       navigate("/dashboard", { replace: true });
@@ -81,6 +132,15 @@ export function Login() {
 
   return (
     <main className="login-page">
+      {erro && (
+        <AppToast
+          type="error"
+          title="Não foi possível entrar"
+          message={erro}
+          onClose={() => setErro("")}
+        />
+      )}
+
       <section className="login-brand" aria-label="Apresentação do FlowDeskIA">
         <div className="brand-content">
           <div className="brand-logo">F</div>
@@ -177,8 +237,6 @@ export function Login() {
               Esqueceu sua senha?
             </Link>
           </div>
-
-          {erro && <div className="alert alert-error">{erro}</div>}
 
           <button
             className="button button-primary button-full"
