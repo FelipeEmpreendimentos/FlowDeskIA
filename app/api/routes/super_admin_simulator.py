@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api.super_admin_deps import get_current_super_admin
 from app.database.database import get_db
-from app.models.ai import AIContactMetadata
+from app.models.ai import AICompanySettings, AIContactMetadata
 from app.models.models import Cliente, ConfigIA, Empresa, Veiculo
 from app.models.platform import SuperAdmin, SuperAdminLog
 from app.services.ai_agent import (
@@ -266,8 +266,14 @@ def listar_clientes_para_simulacao(
             whatsapp=item.whatsapp,
             telefone=item.telefone,
             status=item.status.value,
-            criado_por_ia=bool(metadata_rows.get(item.id) and metadata_rows[item.id].criado_por_ia),
-            cadastro_completo=(metadata_rows[item.id].cadastro_completo if item.id in metadata_rows else True),
+            criado_por_ia=bool(
+                metadata_rows.get(item.id) and metadata_rows[item.id].criado_por_ia
+            ),
+            cadastro_completo=(
+                metadata_rows[item.id].cadastro_completo
+                if item.id in metadata_rows
+                else True
+            ),
         )
         for item in clients
     ]
@@ -302,13 +308,24 @@ def criar_novo_contato_simulado(
 ) -> SimulatorBootstrapOut:
     del current
     empresa = _require_company(db, empresa_id)
+    company_settings = db.scalar(
+        select(AICompanySettings).where(AICompanySettings.empresa_id == empresa_id)
+    )
+    if company_settings is not None and not company_settings.criar_cliente_auto:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "A criação automática de clientes está desativada na configuração desta empresa.",
+        )
+
     phone = _normalize_phone(data.whatsapp)
     existing = db.scalar(
         select(Cliente).where(
             Cliente.empresa_id == empresa_id,
             or_(
-                func.regexp_replace(func.coalesce(Cliente.whatsapp, ""), r"\D", "", "g") == phone,
-                func.regexp_replace(func.coalesce(Cliente.telefone, ""), r"\D", "", "g") == phone,
+                func.regexp_replace(func.coalesce(Cliente.whatsapp, ""), r"\D", "", "g")
+                == phone,
+                func.regexp_replace(func.coalesce(Cliente.telefone, ""), r"\D", "", "g")
+                == phone,
             ),
         )
     )
@@ -329,7 +346,7 @@ def criar_novo_contato_simulado(
         email=None,
         cpf=None,
         data_nascimento=None,
-        observacoes="Contato criado automaticamente pelo laboratório da IA.",
+        observacoes=None,
     )
     db.add(cliente)
     db.flush()
@@ -388,7 +405,11 @@ def excluir_contato_de_teste(
     del current
     cliente = _require_client(db, empresa_id, cliente_id)
     metadata = _metadata(db, cliente_id)
-    if metadata is None or not metadata.criado_por_ia or metadata.origem != "SIMULADOR_IA":
+    if (
+        metadata is None
+        or not metadata.criado_por_ia
+        or metadata.origem != "SIMULADOR_IA"
+    ):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "Somente contatos criados pelo laboratório podem ser removidos por esta ação.",
@@ -425,7 +446,10 @@ def responder_no_simulador(
         )
 
     transcript = [
-        ("CLIENTE" if item.remetente == "CLIENTE" else "ASSISTENTE IA", item.conteudo)
+        (
+            "CLIENTE" if item.remetente == "CLIENTE" else "ASSISTENTE IA",
+            item.conteudo,
+        )
         for item in data.mensagens
     ]
 
@@ -438,12 +462,12 @@ def responder_no_simulador(
             session_id=data.session_id,
             transcript=transcript,
         )
-    except AIAgentError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except AIAgentNotConfigured as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
     except AIAgentProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    except AIAgentError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
     latency_ms = max(1, round((perf_counter() - started) * 1000))
     session_hash = sha256(data.session_id.encode("utf-8")).hexdigest()[:16]
@@ -496,7 +520,11 @@ def responder_no_simulador(
         customer_complete=result.customer_complete,
         pending_action=result.pending_action,
         tools=[
-            ToolTraceOut(name=item.name, arguments=item.arguments, result=item.result)
+            ToolTraceOut(
+                name=item.name,
+                arguments=item.arguments,
+                result=item.result,
+            )
             for item in result.tool_trace
         ],
     )
