@@ -9,6 +9,7 @@ from app.core.config import PROJECT_ROOT, settings
 from app.database.database import warm_database_pool
 from app.middleware.observability import observability_middleware
 from app.middleware.plan_access import plan_access_middleware
+from scripts.setup_ai_v2 import aplicar_estrutura as aplicar_ai_v2
 
 
 logging.basicConfig(
@@ -45,7 +46,14 @@ app.include_router(api_router)
 
 
 @app.on_event("startup")
-def aquecer_banco() -> None:
+def preparar_runtime() -> None:
+    try:
+        aplicar_ai_v2()
+        logger.info("ai_v2_schema_ready")
+    except Exception:
+        logger.exception("ai_v2_schema_setup_failed")
+        raise
+
     try:
         warmed = warm_database_pool()
         logger.info("database_pool_warmed connections=%s", warmed)
