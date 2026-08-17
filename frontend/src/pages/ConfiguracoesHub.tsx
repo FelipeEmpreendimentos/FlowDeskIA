@@ -30,6 +30,15 @@ const cards: ConfiguracaoCard[] = [
     cargos: ["ADMIN", "GERENTE"],
   },
   {
+    to: "/configuracoes/ia",
+    title: "Inteligência artificial",
+    description:
+      "Personalize a assistente, cadastros automáticos, agenda, handoff humano e conhecimento da empresa.",
+    icon: "bot",
+    cargos: ["ADMIN", "GERENTE"],
+    badge: "Automação",
+  },
+  {
     to: "/configuracoes/relatorios",
     title: "Relatórios e financeiro",
     description:
