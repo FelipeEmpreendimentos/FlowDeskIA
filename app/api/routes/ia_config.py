@@ -15,6 +15,8 @@ from app.services.db_utils import commit_or_conflict
 
 router = APIRouter(prefix="/configuracoes/ia-operacional", tags=["Configurações - IA operacional"])
 
+POLICY_MARKER = "\n\n[FLOWDESK_POLITICA_OPERACIONAL]\n"
+
 
 def _get_or_create_settings(db: Session, empresa_id: int) -> AICompanySettings:
     item = db.scalar(
@@ -42,11 +44,76 @@ def _get_or_create_base_config(db: Session, empresa_id: int) -> ConfigIA:
     return item
 
 
+def _user_prompt(value: str | None) -> str | None:
+    if not value:
+        return None
+    return value.split(POLICY_MARKER, 1)[0].strip() or None
+
+
+def _policy_prompt(data: AICompanySettingsPut) -> str:
+    def yesno(value: bool) -> str:
+        return "SIM" if value else "NÃO"
+
+    lines = [
+        "POLÍTICA OPERACIONAL CONFIGURADA PELA EMPRESA:",
+        f"- Criar cliente automaticamente: {yesno(data.criar_cliente_auto)}.",
+        f"- Criar veículo automaticamente: {yesno(data.criar_veiculo_auto)}.",
+        f"- Pode agendar: {yesno(data.pode_agendar)}.",
+        f"- Pode reagendar: {yesno(data.pode_reagendar)}.",
+        f"- Pode cancelar: {yesno(data.pode_cancelar)}.",
+        f"- Exigir confirmação antes de ações: {yesno(data.confirmar_acoes)}.",
+        f"- Transferir pedidos fora do escopo: {yesno(data.transferir_fora_escopo)}.",
+        f"- Máximo de tentativas sem entender antes de transferir: {data.tentativas_antes_handoff}.",
+        "- Campos de cliente necessários para concluir operações: "
+        + (", ".join(data.campos_cliente_obrigatorios) or "nenhum adicional"),
+        "- Campos de veículo necessários para concluir operações: "
+        + (", ".join(data.campos_veiculo_obrigatorios) or "nenhum adicional"),
+    ]
+
+    if data.mensagem_fora_escopo:
+        lines.append(
+            "- Ao explicar que um pedido está fora do escopo, use como referência natural esta mensagem: "
+            + data.mensagem_fora_escopo.strip()
+        )
+    if data.mensagem_indisponibilidade:
+        lines.append(
+            "- Quando não houver horários, use como referência natural esta mensagem: "
+            + data.mensagem_indisponibilidade.strip()
+        )
+    if data.mensagem_despedida:
+        lines.append(
+            "- Quando o atendimento estiver realmente concluído, use como referência natural esta despedida: "
+            + data.mensagem_despedida.strip()
+        )
+    if data.mensagem_transferencia:
+        lines.append(
+            "- Ao transferir para humano, use como referência esta mensagem: "
+            + data.mensagem_transferencia.strip()
+        )
+
+    if not data.transferir_fora_escopo:
+        lines.append(
+            "- Para pedido fora do escopo, apenas informe que a empresa não oferece o serviço; NÃO transfira somente por esse motivo."
+        )
+    else:
+        lines.append(
+            "- Para pedido claramente fora do escopo, informe que a empresa não oferece o serviço e depois use transferir_para_humano."
+        )
+
+    return "\n".join(lines)
+
+
+def _combined_prompt(data: AICompanySettingsPut) -> str:
+    user = data.prompt_adicional.strip() if data.prompt_adicional else ""
+    policy = _policy_prompt(data)
+    return (user + POLICY_MARKER + policy).strip()
+
+
 def _out(settings: AICompanySettings, base: ConfigIA) -> AICompanySettingsOut:
     return AICompanySettingsOut(
         empresa_id=settings.empresa_id,
         nome_assistente=base.nome_assistente,
-        prompt_adicional=base.prompt,
+        prompt_adicional=_user_prompt(base.prompt),
         saudacao_cliente_novo=settings.saudacao_cliente_novo,
         saudacao_cliente_conhecido=settings.saudacao_cliente_conhecido,
         mensagem_transferencia=settings.mensagem_transferencia,
@@ -95,7 +162,7 @@ def salvar_configuracao_ia_operacional(
     base = _get_or_create_base_config(db, current_user.empresa_id)
 
     base.nome_assistente = data.nome_assistente.strip()
-    base.prompt = data.prompt_adicional.strip() if data.prompt_adicional else None
+    base.prompt = _combined_prompt(data)
     if data.saudacao_cliente_novo:
         base.mensagem_boas_vindas = data.saudacao_cliente_novo.strip()
 
@@ -117,6 +184,7 @@ def salvar_configuracao_ia_operacional(
             "pode_cancelar": settings.pode_cancelar,
             "criar_cliente_auto": settings.criar_cliente_auto,
             "criar_veiculo_auto": settings.criar_veiculo_auto,
+            "transferir_fora_escopo": settings.transferir_fora_escopo,
         },
     )
     commit_or_conflict(db, settings)
