@@ -9,6 +9,7 @@ import { ChatInterno } from "./pages/ChatInterno";
 import { Clientes } from "./pages/Clientes";
 import { ConfiguracaoAcessos } from "./pages/ConfiguracaoAcessos";
 import { ConfiguracaoAgenda } from "./pages/ConfiguracaoAgenda";
+import { ConfiguracaoIA } from "./pages/ConfiguracaoIA";
 import { ConfiguracaoRelatorios } from "./pages/ConfiguracaoRelatorios";
 import { Configuracoes } from "./pages/Configuracoes";
 import { ConfiguracoesHub } from "./pages/ConfiguracoesHub";
@@ -83,6 +84,7 @@ function App() {
         <Route path="/configuracoes" element={<ConfiguracoesHub />} />
         <Route path="/configuracoes/dados" element={<Configuracoes />} />
         <Route path="/configuracoes/agenda" element={<ConfiguracaoAgenda />} />
+        <Route path="/configuracoes/ia" element={<ConfiguracaoIA />} />
         <Route path="/configuracoes/acessos" element={<ConfiguracaoAcessos />} />
         <Route path="/configuracoes/relatorios" element={<ConfiguracaoRelatorios />} />
       </Route>
