@@ -2,6 +2,7 @@ export type IconName =
   | "dashboard"
   | "calendar"
   | "users"
+  | "user"
   | "car"
   | "services"
   | "chat"
@@ -26,6 +27,7 @@ export type IconName =
   | "lock"
   | "building"
   | "bot"
+  | "info"
   | "arrow-left";
 
 interface IconProps {
@@ -69,6 +71,12 @@ export function Icon({ name, size = 20, className }: IconProps) {
         <path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4.5a4 4 0 0 1 0 7.5M17 15a6 6 0 0 1 4 5.7" />
       </>
     ),
+    user: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+      </>
+    ),
     car: (
       <>
         <path d="m5 17-1 2v2M19 17l1 2v2M5 17h14l-1.5-6h-11zM7 17v1M17 17v1" />
@@ -107,11 +115,7 @@ export function Icon({ name, size = 20, className }: IconProps) {
     logout: <path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" />,
     plus: <path d="M12 5v14M5 12h14" />,
     search: <path d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" />,
-    filter: (
-      <>
-        <path d="M4 5h16M7 12h10M10 19h4" />
-      </>
-    ),
+    filter: <path d="M4 5h16M7 12h10M10 19h4" />,
     edit: <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />,
     trash: <path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 11v6M14 11v6" />,
     close: <path d="M6 6l12 12M18 6 6 18" />,
@@ -126,6 +130,12 @@ export function Icon({ name, size = 20, className }: IconProps) {
     lock: <path d="M6 10V7a6 6 0 0 1 12 0v3M5 10h14v11H5z" />,
     building: <path d="M3 21h18M6 21V3h12v18M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2" />,
     bot: <path d="M12 2v3M8 5h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4zM8 12h.01M16 12h.01M9 16h6" />,
+    info: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v6M12 7h.01" />
+      </>
+    ),
     "arrow-left": <path d="M19 12H5M12 19l-7-7 7-7" />,
   };
 
