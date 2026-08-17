@@ -2,8 +2,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.common import ORMModel
-
 
 TomIA = Literal["FORMAL", "EQUILIBRADO", "INFORMAL"]
 TamanhoRespostaIA = Literal["CURTA", "MEDIA", "DETALHADA"]
@@ -17,6 +15,8 @@ class ConhecimentoIAItem(BaseModel):
 
 
 class AICompanySettingsPut(BaseModel):
+    nome_assistente: str = Field(default="Assistente", min_length=1, max_length=80)
+    prompt_adicional: str | None = Field(default=None, max_length=4000)
     saudacao_cliente_novo: str | None = Field(default=None, max_length=800)
     saudacao_cliente_conhecido: str | None = Field(default=None, max_length=800)
     mensagem_transferencia: str | None = Field(default=None, max_length=800)
@@ -39,25 +39,5 @@ class AICompanySettingsPut(BaseModel):
     conhecimento: list[ConhecimentoIAItem] = Field(default_factory=list, max_length=40)
 
 
-class AICompanySettingsOut(ORMModel):
+class AICompanySettingsOut(AICompanySettingsPut):
     empresa_id: int
-    saudacao_cliente_novo: str | None
-    saudacao_cliente_conhecido: str | None
-    mensagem_transferencia: str | None
-    mensagem_fora_escopo: str | None
-    mensagem_indisponibilidade: str | None
-    mensagem_despedida: str | None
-    tom: TomIA
-    tamanho_resposta: TamanhoRespostaIA
-    usar_emojis: bool
-    criar_cliente_auto: bool
-    criar_veiculo_auto: bool
-    pode_agendar: bool
-    pode_reagendar: bool
-    pode_cancelar: bool
-    confirmar_acoes: bool
-    transferir_fora_escopo: bool
-    tentativas_antes_handoff: int
-    campos_cliente_obrigatorios: list[CampoClienteIA]
-    campos_veiculo_obrigatorios: list[CampoVeiculoIA]
-    conhecimento: list[ConhecimentoIAItem]
