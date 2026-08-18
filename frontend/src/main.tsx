@@ -27,6 +27,8 @@ import "./review-round-aug09.css";
 import "./report-settings.css";
 import "./conversation-controls.css";
 import "./ai-conversation.css";
+import "./attendance-presence.css";
+import "./conversation-responsive-v2.css";
 
 installContactInputGuards();
 
