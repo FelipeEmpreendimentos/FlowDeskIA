@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.database.database import get_db
-from app.models.ai import AICompanySettings
+from app.models.ai import AICompanySettings, DEFAULT_AI_MENU
 from app.models.enums import CargoUsuario
 from app.models.models import ConfigIA, Usuario
 from app.schemas.ai import AICompanySettingsOut, AICompanySettingsPut
@@ -56,6 +56,8 @@ def _policy_prompt(data: AICompanySettingsPut) -> str:
 
     lines = [
         "POLÍTICA OPERACIONAL CONFIGURADA PELA EMPRESA:",
+        f"- Fluxo guiado com opções rápidas: {yesno(data.fluxo_guiado_ativo)}.",
+        f"- Mostrar ao cliente o que foi interpretado em mensagens livres: {yesno(data.mostrar_interpretacao)}.",
         f"- Criar cliente automaticamente: {yesno(data.criar_cliente_auto)}.",
         f"- Criar veículo automaticamente: {yesno(data.criar_veiculo_auto)}.",
         f"- Pode agendar: {yesno(data.pode_agendar)}.",
@@ -120,6 +122,7 @@ def _out(settings: AICompanySettings, base: ConfigIA) -> AICompanySettingsOut:
         mensagem_fora_escopo=settings.mensagem_fora_escopo,
         mensagem_indisponibilidade=settings.mensagem_indisponibilidade,
         mensagem_despedida=settings.mensagem_despedida,
+        texto_menu_principal=settings.texto_menu_principal,
         tom=settings.tom,
         tamanho_resposta=settings.tamanho_resposta,
         usar_emojis=settings.usar_emojis,
@@ -130,10 +133,13 @@ def _out(settings: AICompanySettings, base: ConfigIA) -> AICompanySettingsOut:
         pode_cancelar=settings.pode_cancelar,
         confirmar_acoes=settings.confirmar_acoes,
         transferir_fora_escopo=settings.transferir_fora_escopo,
+        fluxo_guiado_ativo=settings.fluxo_guiado_ativo,
+        mostrar_interpretacao=settings.mostrar_interpretacao,
         tentativas_antes_handoff=settings.tentativas_antes_handoff,
         campos_cliente_obrigatorios=settings.campos_cliente_obrigatorios or [],
         campos_veiculo_obrigatorios=settings.campos_veiculo_obrigatorios or [],
         conhecimento=settings.conhecimento or [],
+        menu_principal=settings.menu_principal or [dict(item) for item in DEFAULT_AI_MENU],
     )
 
 
@@ -146,6 +152,8 @@ def obter_configuracao_ia_operacional(
 ) -> AICompanySettingsOut:
     settings = _get_or_create_settings(db, current_user.empresa_id)
     base = _get_or_create_base_config(db, current_user.empresa_id)
+    if not settings.menu_principal:
+        settings.menu_principal = [dict(item) for item in DEFAULT_AI_MENU]
     db.commit()
     return _out(settings, base)
 
@@ -166,8 +174,13 @@ def salvar_configuracao_ia_operacional(
     if data.saudacao_cliente_novo:
         base.mensagem_boas_vindas = data.saudacao_cliente_novo.strip()
 
-    values = data.model_dump(exclude={"nome_assistente", "prompt_adicional"})
+    values = data.model_dump(
+        exclude={"nome_assistente", "prompt_adicional", "conhecimento", "menu_principal"}
+    )
     values["conhecimento"] = [entry.model_dump() for entry in data.conhecimento]
+    values["menu_principal"] = [entry.model_dump() for entry in data.menu_principal]
+    if not values["menu_principal"]:
+        values["menu_principal"] = [dict(item) for item in DEFAULT_AI_MENU]
     for key, value in values.items():
         setattr(settings, key, value)
 
@@ -179,6 +192,13 @@ def salvar_configuracao_ia_operacional(
         entity_id=current_user.empresa_id,
         details={
             "tom": settings.tom,
+            "fluxo_guiado_ativo": settings.fluxo_guiado_ativo,
+            "mostrar_interpretacao": settings.mostrar_interpretacao,
+            "menu_ativo": [
+                item.get("acao")
+                for item in (settings.menu_principal or [])
+                if isinstance(item, dict) and item.get("ativo")
+            ],
             "pode_agendar": settings.pode_agendar,
             "pode_reagendar": settings.pode_reagendar,
             "pode_cancelar": settings.pode_cancelar,
