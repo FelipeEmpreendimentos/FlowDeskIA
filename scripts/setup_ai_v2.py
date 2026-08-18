@@ -29,14 +29,7 @@ CREATE TABLE IF NOT EXISTS ai_company_settings (
     campos_cliente_obrigatorios JSONB NOT NULL DEFAULT '["nome"]'::jsonb,
     campos_veiculo_obrigatorios JSONB NOT NULL DEFAULT '["tipo_veiculo"]'::jsonb,
     conhecimento JSONB NOT NULL DEFAULT '[]'::jsonb,
-    menu_principal JSONB NOT NULL DEFAULT '[
-      {"acao":"AGENDAR","rotulo":"Agendar serviço","ativo":true,"ordem":10},
-      {"acao":"CONSULTAR_AGENDAMENTO","rotulo":"Consultar agendamento","ativo":true,"ordem":20},
-      {"acao":"REAGENDAR","rotulo":"Reagendar","ativo":true,"ordem":30},
-      {"acao":"CANCELAR","rotulo":"Cancelar","ativo":true,"ordem":40},
-      {"acao":"SERVICOS_PRECOS","rotulo":"Serviços e preços","ativo":true,"ordem":50},
-      {"acao":"HUMANO","rotulo":"Falar com atendente","ativo":true,"ordem":60}
-    ]'::jsonb,
+    menu_principal JSONB NOT NULL DEFAULT '[]'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ai_settings_tom CHECK (tom IN ('FORMAL', 'EQUILIBRADO', 'INFORMAL')),
     CONSTRAINT ck_ai_settings_tamanho CHECK (tamanho_resposta IN ('CURTA', 'MEDIA', 'DETALHADA')),
@@ -46,14 +39,7 @@ CREATE TABLE IF NOT EXISTS ai_company_settings (
 ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS texto_menu_principal TEXT;
 ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS fluxo_guiado_ativo BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS mostrar_interpretacao BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS menu_principal JSONB NOT NULL DEFAULT '[
-  {"acao":"AGENDAR","rotulo":"Agendar serviço","ativo":true,"ordem":10},
-  {"acao":"CONSULTAR_AGENDAMENTO","rotulo":"Consultar agendamento","ativo":true,"ordem":20},
-  {"acao":"REAGENDAR","rotulo":"Reagendar","ativo":true,"ordem":30},
-  {"acao":"CANCELAR","rotulo":"Cancelar","ativo":true,"ordem":40},
-  {"acao":"SERVICOS_PRECOS","rotulo":"Serviços e preços","ativo":true,"ordem":50},
-  {"acao":"HUMANO","rotulo":"Falar com atendente","ativo":true,"ordem":60}
-]'::jsonb;
+ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS menu_principal JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS ai_contact_metadata (
     cliente_id BIGINT PRIMARY KEY REFERENCES clientes(id) ON DELETE CASCADE,
