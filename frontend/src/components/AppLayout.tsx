@@ -18,6 +18,10 @@ import type {
 } from "../types";
 import type { CurrentAccess, ModuleCode } from "../types/accessControl";
 import type { ChatInternoResumo } from "../types/internal-chat";
+import {
+  AttendancePresenceSelect,
+  useAttendancePresence,
+} from "./AttendancePresence";
 import { Icon, type IconName } from "./Icon";
 import { AppToast, LoadingState } from "./UI";
 
@@ -161,6 +165,7 @@ export function AppLayout() {
   const [toast, setToast] = useState<AppToastEventDetail | null>(null);
   const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
   const [chatNaoLidas, setChatNaoLidas] = useState(0);
+  const attendancePresence = useAttendancePresence(Boolean(usuario));
 
   const atualizarUsuario = useCallback(async () => {
     try {
@@ -345,6 +350,21 @@ export function AppLayout() {
           <Icon name="menu" />
         </button>
 
+        <div className="attendance-mobile-bar">
+          <div className="attendance-mobile-brand" aria-label="FlowDeskIA">
+            <span className="attendance-mobile-brand-mark">F</span>
+            <strong>FlowDeskIA</strong>
+          </div>
+          <AttendancePresenceSelect
+            compact
+            status={attendancePresence.status}
+            effectiveStatus={attendancePresence.effectiveStatus}
+            loading={attendancePresence.loading}
+            changing={attendancePresence.changing}
+            onChange={(value) => void attendancePresence.changeStatus(value)}
+          />
+        </div>
+
         <button
           type="button"
           className={`global-notification-button ${
@@ -443,6 +463,14 @@ export function AppLayout() {
               />
               <span>{configuracoesLabel}</span>
             </NavLink>
+
+            <AttendancePresenceSelect
+              status={attendancePresence.status}
+              effectiveStatus={attendancePresence.effectiveStatus}
+              loading={attendancePresence.loading}
+              changing={attendancePresence.changing}
+              onChange={(value) => void attendancePresence.changeStatus(value)}
+            />
 
             <div className="sidebar-user">
               <span className="sidebar-user-avatar">
