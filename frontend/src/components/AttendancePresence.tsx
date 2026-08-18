@@ -36,6 +36,17 @@ export function useAttendancePresence(enabled: boolean) {
     setEffectiveStatus(value.status_efetivo);
   }, []);
 
+  useEffect(() => {
+    if (!enabled) {
+      delete document.documentElement.dataset.attendanceStatus;
+      return;
+    }
+    document.documentElement.dataset.attendanceStatus = effectiveStatus;
+    return () => {
+      delete document.documentElement.dataset.attendanceStatus;
+    };
+  }, [effectiveStatus, enabled]);
+
   const heartbeat = useCallback(async () => {
     if (!enabled) return;
     try {
@@ -55,6 +66,7 @@ export function useAttendancePresence(enabled: boolean) {
       return;
     }
 
+    setLoading(true);
     let active = true;
     async function load() {
       try {
