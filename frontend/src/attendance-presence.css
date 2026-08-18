@@ -1,3 +1,15 @@
+.brand-logo,
+.sidebar-logo,
+.attendance-mobile-brand-mark {
+  overflow: hidden;
+  color: transparent !important;
+  background-image: url("/favicon.svg") !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  font-size: 0 !important;
+}
+
 .attendance-presence-control {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr);
@@ -62,25 +74,6 @@
 
 .attendance-mobile-bar {
   display: none;
-}
-
-html[data-attendance-status="OFFLINE"] .route-conversas .message-form::before {
-  grid-column: 1 / -1;
-  content: "Você está Offline. Mude seu status para Disponível ou Ausente para responder.";
-  padding: 8px 10px;
-  border: 1px solid #e1e6ef;
-  border-radius: 9px;
-  color: #69758a;
-  background: #f5f7fa;
-  font-size: 10px;
-  font-weight: 750;
-  line-height: 1.35;
-}
-
-html[data-attendance-status="OFFLINE"] .route-conversas .message-form textarea,
-html[data-attendance-status="OFFLINE"] .route-conversas .message-form .send-button {
-  pointer-events: none;
-  opacity: 0.48;
 }
 
 @media (max-width: 1000px) {
@@ -164,4 +157,19 @@ html[data-attendance-status="OFFLINE"] .route-conversas .message-form .send-butt
     min-width: 108px;
     max-width: 118px;
   }
+}
+
+/* Quando o próprio usuário está Offline, a caixa deixa claro que não pode responder. */
+.attendance-user-offline .route-conversas .message-form textarea,
+.attendance-user-offline.route-conversas .message-form textarea {
+  cursor: not-allowed;
+  color: #8b96a8;
+  background: #f0f3f7;
+}
+
+.attendance-user-offline .route-conversas .send-button,
+.attendance-user-offline.route-conversas .send-button {
+  cursor: not-allowed;
+  background: #9aa6b8;
+  box-shadow: none;
 }
