@@ -57,7 +57,7 @@ def ensure_presence(
     db: Session,
     user: Usuario,
     *,
-    initial_status: str = STATUS_DISPONIVEL,
+    initial_status: str = STATUS_OFFLINE,
 ) -> UserAttendancePresence:
     row = _presence_row(
         db,
@@ -114,7 +114,9 @@ def snapshot(row: UserAttendancePresence) -> PresenceSnapshot:
 
 
 def touch_heartbeat(db: Session, user: Usuario) -> PresenceSnapshot:
-    row = ensure_presence(db, user)
+    row = _presence_row(db, user_id=user.id, empresa_id=user.empresa_id)
+    if row is None:
+        row = ensure_presence(db, user, initial_status=STATUS_DISPONIVEL)
     now = _now()
     row.heartbeat_at = now
     row.updated_at = now
@@ -134,7 +136,9 @@ def set_presence_status(
             "Status de atendimento inválido.",
         )
 
-    row = ensure_presence(db, user)
+    row = _presence_row(db, user_id=user.id, empresa_id=user.empresa_id)
+    if row is None:
+        row = ensure_presence(db, user, initial_status=normalized)
     now = _now()
     row.status = normalized
     row.heartbeat_at = now
@@ -149,21 +153,23 @@ def get_presence_snapshot(
     *,
     touch: bool = False,
 ) -> PresenceSnapshot:
-    row = ensure_presence(db, user)
+    row = _presence_row(db, user_id=user.id, empresa_id=user.empresa_id)
+    if row is None:
+        row = ensure_presence(
+            db,
+            user,
+            initial_status=STATUS_DISPONIVEL if touch else STATUS_OFFLINE,
+        )
     if touch:
         now = _now()
         row.heartbeat_at = now
         row.updated_at = now
-        db.commit()
-    elif row in db.new:
-        db.commit()
+    db.commit()
     return snapshot(row)
 
 
 def can_reply(db: Session, user: Usuario) -> bool:
-    row = ensure_presence(db, user)
-    if row in db.new:
-        db.commit()
+    row = _presence_row(db, user_id=user.id, empresa_id=user.empresa_id)
     return effective_status(row) != STATUS_OFFLINE
 
 
