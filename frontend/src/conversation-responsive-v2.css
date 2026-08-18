@@ -1,26 +1,41 @@
-/* Conversas: faixa intermediária para notebooks e janelas reduzidas. */
+/* Conversas: responsividade baseada na largura útil que sobra após a navegação. */
 
-@media (max-width: 1350px) and (min-width: 901px) {
+/*
+ * Em notebooks (1366/1440/1536px) a sidebar consome parte importante da tela.
+ * Por isso o cabeçalho da conversa já passa para duas linhas antes do breakpoint
+ * mobile: identificação do cliente em cima e controles embaixo.
+ */
+@media (max-width: 1600px) and (min-width: 901px) {
+  .route-conversas .page {
+    padding-inline: 28px;
+  }
+
   .route-conversas .conversation-shell {
-    grid-template-columns: minmax(270px, 300px) minmax(0, 1fr);
+    grid-template-columns: minmax(260px, 290px) minmax(0, 1fr);
   }
 
   .route-conversas .chat-header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 10px 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+    min-height: 0;
     padding: 12px 14px;
   }
 
   .route-conversas .chat-header > .entity-cell {
     width: 100%;
     min-width: 0;
-    flex: 1 1 100%;
+  }
+
+  .route-conversas .chat-header > .entity-cell > div {
+    min-width: 0;
   }
 
   .route-conversas .conversation-assume-button {
-    width: fit-content;
-    margin-top: 5px;
+    width: max-content;
+    max-width: 100%;
+    margin-top: 6px;
   }
 
   .route-conversas .chat-controls {
@@ -30,7 +45,7 @@
     width: 100%;
     height: auto !important;
     min-height: 40px !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(104px, 0.72fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(118px, 0.78fr);
     align-items: stretch !important;
     gap: 8px;
     margin: 0 !important;
@@ -42,17 +57,28 @@
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
+    height: 40px !important;
+    min-height: 40px !important;
     flex: 1 1 auto !important;
   }
 }
 
-@media (max-width: 1100px) and (min-width: 901px) {
+/* Faixa mais apertada: mantém a lista lateral, mas dá mais área útil ao chat. */
+@media (max-width: 1200px) and (min-width: 901px) {
   .route-conversas .page {
-    padding-inline: 24px;
+    padding-inline: 22px;
   }
 
   .route-conversas .conversation-shell {
-    grid-template-columns: minmax(250px, 280px) minmax(0, 1fr);
+    grid-template-columns: minmax(235px, 260px) minmax(0, 1fr);
+  }
+
+  .route-conversas .chat-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .route-conversas .conversation-ai-control {
+    grid-column: 1 / -1;
   }
 
   .route-conversas .conversation-list-item {
@@ -68,8 +94,12 @@
   }
 }
 
+/* Tablet/mobile: o layout global já empilha lista e chat; organizamos o cabeçalho. */
 @media (max-width: 900px) {
   .route-conversas .chat-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
     gap: 10px;
   }
 
