@@ -1,0 +1,128 @@
+/* Conversas: faixa intermediária para notebooks e janelas reduzidas. */
+
+@media (max-width: 1350px) and (min-width: 901px) {
+  .route-conversas .conversation-shell {
+    grid-template-columns: minmax(270px, 300px) minmax(0, 1fr);
+  }
+
+  .route-conversas .chat-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 12px 14px;
+  }
+
+  .route-conversas .chat-header > .entity-cell {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .route-conversas .conversation-assume-button {
+    width: fit-content;
+    margin-top: 5px;
+  }
+
+  .route-conversas .chat-controls {
+    position: static !important;
+    top: auto !important;
+    display: grid !important;
+    width: 100%;
+    height: auto !important;
+    min-height: 40px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(104px, 0.72fr);
+    align-items: stretch !important;
+    gap: 8px;
+    margin: 0 !important;
+  }
+
+  .route-conversas .chat-controls select[title="Responsável"],
+  .route-conversas .chat-controls select[title="Status da conversa"],
+  .route-conversas .conversation-ai-control {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .route-conversas .page {
+    padding-inline: 24px;
+  }
+
+  .route-conversas .conversation-shell {
+    grid-template-columns: minmax(250px, 280px) minmax(0, 1fr);
+  }
+
+  .route-conversas .conversation-list-item {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .route-conversas .conversation-list-signals {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 900px) {
+  .route-conversas .chat-header {
+    gap: 10px;
+  }
+
+  .route-conversas .chat-header > .entity-cell {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .route-conversas .chat-controls {
+    position: static !important;
+    top: auto !important;
+    display: grid !important;
+    width: 100%;
+    height: auto !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 !important;
+  }
+
+  .route-conversas .chat-controls select[title="Responsável"],
+  .route-conversas .chat-controls select[title="Status da conversa"],
+  .route-conversas .conversation-ai-control {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .route-conversas .chat-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .route-conversas .conversation-ai-control {
+    grid-column: 1 / -1;
+  }
+
+  .route-conversas .chat-header {
+    padding: 11px 12px;
+  }
+
+  .route-conversas .entity-cell {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 460px) {
+  .route-conversas .chat-controls {
+    grid-template-columns: 1fr !important;
+  }
+
+  .route-conversas .conversation-ai-control {
+    grid-column: auto;
+  }
+}
