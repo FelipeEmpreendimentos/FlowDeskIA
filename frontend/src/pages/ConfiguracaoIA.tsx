@@ -12,6 +12,21 @@ interface KnowledgeItem {
   conteudo: string;
 }
 
+type MenuAction =
+  | "AGENDAR"
+  | "CONSULTAR_AGENDAMENTO"
+  | "REAGENDAR"
+  | "CANCELAR"
+  | "SERVICOS_PRECOS"
+  | "HUMANO";
+
+interface MenuItem {
+  acao: MenuAction;
+  rotulo: string;
+  ativo: boolean;
+  ordem: number;
+}
+
 interface AISettings {
   empresa_id: number;
   nome_assistente: string;
@@ -22,6 +37,7 @@ interface AISettings {
   mensagem_fora_escopo: string | null;
   mensagem_indisponibilidade: string | null;
   mensagem_despedida: string | null;
+  texto_menu_principal: string | null;
   tom: "FORMAL" | "EQUILIBRADO" | "INFORMAL";
   tamanho_resposta: "CURTA" | "MEDIA" | "DETALHADA";
   usar_emojis: boolean;
@@ -32,11 +48,23 @@ interface AISettings {
   pode_cancelar: boolean;
   confirmar_acoes: boolean;
   transferir_fora_escopo: boolean;
+  fluxo_guiado_ativo: boolean;
+  mostrar_interpretacao: boolean;
   tentativas_antes_handoff: number;
   campos_cliente_obrigatorios: Array<"nome" | "email">;
   campos_veiculo_obrigatorios: Array<"tipo_veiculo" | "marca" | "modelo" | "ano" | "cor">;
   conhecimento: KnowledgeItem[];
+  menu_principal: MenuItem[];
 }
+
+const defaultMenu: MenuItem[] = [
+  { acao: "AGENDAR", rotulo: "Agendar serviço", ativo: true, ordem: 10 },
+  { acao: "CONSULTAR_AGENDAMENTO", rotulo: "Consultar agendamento", ativo: true, ordem: 20 },
+  { acao: "REAGENDAR", rotulo: "Reagendar", ativo: true, ordem: 30 },
+  { acao: "CANCELAR", rotulo: "Cancelar", ativo: true, ordem: 40 },
+  { acao: "SERVICOS_PRECOS", rotulo: "Serviços e preços", ativo: true, ordem: 50 },
+  { acao: "HUMANO", rotulo: "Falar com atendente", ativo: true, ordem: 60 },
+];
 
 const defaultSettings: AISettings = {
   empresa_id: 0,
@@ -48,6 +76,7 @@ const defaultSettings: AISettings = {
   mensagem_fora_escopo: "Esse serviço não faz parte do que oferecemos atualmente.",
   mensagem_indisponibilidade: "Não encontrei disponibilidade nesse período. Posso buscar outro horário para você?",
   mensagem_despedida: "Perfeito! Se precisar de mais alguma coisa, estamos por aqui.",
+  texto_menu_principal: "Como posso ajudar hoje?",
   tom: "EQUILIBRADO",
   tamanho_resposta: "CURTA",
   usar_emojis: true,
@@ -58,10 +87,13 @@ const defaultSettings: AISettings = {
   pode_cancelar: true,
   confirmar_acoes: true,
   transferir_fora_escopo: true,
+  fluxo_guiado_ativo: true,
+  mostrar_interpretacao: true,
   tentativas_antes_handoff: 2,
   campos_cliente_obrigatorios: ["nome"],
   campos_veiculo_obrigatorios: ["tipo_veiculo"],
   conhecimento: [],
+  menu_principal: defaultMenu,
 };
 
 function Toggle({
@@ -100,7 +132,14 @@ export function ConfiguracaoIA() {
       setError("");
       try {
         const response = await apiRequest<AISettings>("/configuracoes/ia-operacional");
-        setData({ ...defaultSettings, ...response, conhecimento: response.conhecimento ?? [] });
+        setData({
+          ...defaultSettings,
+          ...response,
+          conhecimento: response.conhecimento ?? [],
+          menu_principal: (response.menu_principal?.length ? response.menu_principal : defaultMenu)
+            .slice()
+            .sort((a, b) => a.ordem - b.ordem),
+        });
       } catch (requestError) {
         setError(requestError instanceof Error ? requestError.message : "Não foi possível carregar a IA.");
       } finally {
@@ -132,6 +171,24 @@ export function ConfiguracaoIA() {
     );
   }
 
+  function updateMenu(index: number, patch: Partial<MenuItem>) {
+    set(
+      "menu_principal",
+      data.menu_principal.map((item, position) => (position === index ? { ...item, ...patch } : item)),
+    );
+  }
+
+  function moveMenu(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= data.menu_principal.length) return;
+    const next = [...data.menu_principal];
+    [next[index], next[target]] = [next[target], next[index]];
+    set(
+      "menu_principal",
+      next.map((item, position) => ({ ...item, ordem: (position + 1) * 10 })),
+    );
+  }
+
   function addKnowledge() {
     set("conhecimento", [...data.conhecimento, { titulo: "", conteudo: "" }]);
   }
@@ -153,12 +210,17 @@ export function ConfiguracaoIA() {
     const knowledge = data.conhecimento
       .map((item) => ({ titulo: item.titulo.trim(), conteudo: item.conteudo.trim() }))
       .filter((item) => item.titulo && item.conteudo);
+    const menu = data.menu_principal.map((item, index) => ({
+      ...item,
+      rotulo: item.rotulo.trim() || defaultMenu.find((entry) => entry.acao === item.acao)?.rotulo || item.acao,
+      ordem: (index + 1) * 10,
+    }));
     setSaving(true);
     setError("");
     try {
       const response = await apiRequest<AISettings>("/configuracoes/ia-operacional", {
         method: "PUT",
-        body: JSON.stringify({ ...data, conhecimento: knowledge }),
+        body: JSON.stringify({ ...data, conhecimento: knowledge, menu_principal: menu }),
       });
       setData({ ...defaultSettings, ...response });
       showAppToast("Configuração da IA salva com sucesso.");
@@ -174,7 +236,7 @@ export function ConfiguracaoIA() {
       <PageHeader
         eyebrow="Atendimento automatizado"
         title="Configuração da IA"
-        description="Defina como a assistente conversa, quais ações pode executar e quando deve chamar uma pessoa da equipe."
+        description="Defina como a assistente conversa, quais ações pode executar e como o cliente navega pelas opções rápidas."
         actions={
           <Link className="button button-secondary" to="/configuracoes">
             <Icon name="arrow-left" size={17} />
@@ -216,9 +278,41 @@ export function ConfiguracaoIA() {
             </div>
             <Toggle checked={data.usar_emojis} onChange={(value) => set("usar_emojis", value)} title="Usar emojis" description="Permite emojis com moderação para deixar a conversa mais natural." />
             <label className="field">Orientações adicionais da empresa
-              <textarea rows={4} value={data.prompt_adicional ?? ""} disabled={!canEdit || saving} placeholder="Ex.: chame nossos planos mensais de Clube de Lavagem; nunca ofereça desconto sem autorização." onChange={(e) => set("prompt_adicional", e.target.value || null)} />
-              <small className="field-help">Essas orientações complementam as regras de segurança do FlowDeskIA, que não podem ser substituídas.</small>
+              <textarea rows={4} value={data.prompt_adicional ?? ""} disabled={!canEdit || saving} placeholder="Ex.: nunca ofereça desconto sem autorização." onChange={(e) => set("prompt_adicional", e.target.value || null)} />
+              <small className="field-help">Essas orientações complementam as regras de segurança do FlowDeskIA.</small>
             </label>
+          </section>
+
+          <section className="content-card ai-v2-card">
+            <div className="card-heading">
+              <div><span>Navegação</span><h2>Fluxo guiado e opções rápidas</h2></div>
+              <Icon name="chat" size={24} />
+            </div>
+            <div className="ai-v2-toggle-grid">
+              <Toggle checked={data.fluxo_guiado_ativo} onChange={(value) => set("fluxo_guiado_ativo", value)} title="Usar fluxo guiado" description="Apresenta opções clicáveis e usa a IA para interpretar mensagens livres como atalhos para os mesmos fluxos." />
+              <Toggle checked={data.mostrar_interpretacao} onChange={(value) => set("mostrar_interpretacao", value)} title="Mostrar o que foi interpretado" description="Ex.: “Entendi que você quer realizar um agendamento” antes de abrir as opções correspondentes." />
+            </div>
+            <label className="field">Texto acima do menu principal
+              <input value={data.texto_menu_principal ?? ""} maxLength={500} disabled={!canEdit || saving} onChange={(e) => set("texto_menu_principal", e.target.value || null)} placeholder="Como posso ajudar hoje?" />
+            </label>
+            <div className="ai-v2-knowledge-list">
+              {data.menu_principal.map((item, index) => (
+                <article className="ai-v2-knowledge-item" key={item.acao}>
+                  <div className="ai-v2-menu-row">
+                    <label>
+                      <input type="checkbox" checked={item.ativo} disabled={!canEdit || saving} onChange={(e) => updateMenu(index, { ativo: e.target.checked })} />
+                      <strong>{item.acao.replaceAll("_", " ")}</strong>
+                    </label>
+                    <div>
+                      <button type="button" className="button button-secondary" disabled={!canEdit || saving || index === 0} onClick={() => moveMenu(index, -1)}>↑</button>
+                      <button type="button" className="button button-secondary" disabled={!canEdit || saving || index === data.menu_principal.length - 1} onClick={() => moveMenu(index, 1)}>↓</button>
+                    </div>
+                  </div>
+                  <input value={item.rotulo} maxLength={40} disabled={!canEdit || saving} onChange={(e) => updateMenu(index, { rotulo: e.target.value })} placeholder="Texto do botão" />
+                </article>
+              ))}
+            </div>
+            <small className="field-help">A ordem acima é a ordem mostrada ao cliente. Recursos desativados em Autonomia são removidos do menu automaticamente.</small>
           </section>
 
           <section className="content-card ai-v2-card">
@@ -246,7 +340,7 @@ export function ConfiguracaoIA() {
                 <textarea rows={3} value={data.mensagem_despedida ?? ""} disabled={!canEdit || saving} onChange={(e) => set("mensagem_despedida", e.target.value || null)} />
               </label>
             </div>
-            <div className="ai-v2-template-help">Variáveis disponíveis: <code>{"{{primeiro_nome}}"}</code>, <code>{"{{nome_cliente}}"}</code>, <code>{"{{nome_assistente}}"}</code> e <code>{"{{empresa}}"}</code>.</div>
+            <div className="ai-v2-template-help">Variáveis: <code>{"{{primeiro_nome}}"}</code>, <code>{"{{nome_cliente}}"}</code>, <code>{"{{nome_assistente}}"}</code> e <code>{"{{empresa}}"}</code>.</div>
           </section>
 
           <section className="content-card ai-v2-card">
@@ -280,14 +374,14 @@ export function ConfiguracaoIA() {
                 <strong>Cliente</strong>
                 <label><input type="checkbox" checked={data.campos_cliente_obrigatorios.includes("nome")} onChange={() => toggleRequiredClient("nome")} disabled={!canEdit || saving} /> Nome</label>
                 <label><input type="checkbox" checked={data.campos_cliente_obrigatorios.includes("email")} onChange={() => toggleRequiredClient("email")} disabled={!canEdit || saving} /> E-mail</label>
-                <small>WhatsApp já vem do próprio canal e não precisa ser perguntado.</small>
+                <small>WhatsApp já vem do próprio canal.</small>
               </div>
               <div>
                 <strong>Veículo</strong>
                 {(["tipo_veiculo", "marca", "modelo", "ano", "cor"] as const).map((field) => (
                   <label key={field}><input type="checkbox" checked={data.campos_veiculo_obrigatorios.includes(field)} onChange={() => toggleRequiredVehicle(field)} disabled={!canEdit || saving} /> {field === "tipo_veiculo" ? "Tipo do veículo" : field.charAt(0).toUpperCase() + field.slice(1)}</label>
                 ))}
-                <small>A IA coleta apenas quando necessário para o pedido atual.</small>
+                <small>A IA coleta apenas quando necessário.</small>
               </div>
             </div>
           </section>
@@ -297,12 +391,12 @@ export function ConfiguracaoIA() {
               <div><span>Conhecimento</span><h2>Informações que a IA pode usar</h2></div>
               <Icon name="info" size={24} />
             </div>
-            <p className="ai-v2-section-copy">Cadastre regras comerciais e respostas que não cabem nos serviços: formas de pagamento, região atendida, busca e entrega, políticas, garantias e perguntas frequentes.</p>
+            <p className="ai-v2-section-copy">Cadastre formas de pagamento, região atendida, busca e entrega, políticas, garantias e perguntas frequentes.</p>
             <div className="ai-v2-knowledge-list">
               {data.conhecimento.map((item, index) => (
                 <article className="ai-v2-knowledge-item" key={index}>
-                  <input value={item.titulo} maxLength={120} disabled={!canEdit || saving} placeholder="Título, ex.: Formas de pagamento" onChange={(e) => updateKnowledge(index, { titulo: e.target.value })} />
-                  <textarea rows={3} value={item.conteudo} maxLength={1200} disabled={!canEdit || saving} placeholder="Conteúdo que a IA pode informar ao cliente" onChange={(e) => updateKnowledge(index, { conteudo: e.target.value })} />
+                  <input value={item.titulo} maxLength={120} disabled={!canEdit || saving} placeholder="Título" onChange={(e) => updateKnowledge(index, { titulo: e.target.value })} />
+                  <textarea rows={3} value={item.conteudo} maxLength={1200} disabled={!canEdit || saving} placeholder="Conteúdo que a IA pode informar" onChange={(e) => updateKnowledge(index, { conteudo: e.target.value })} />
                   <button type="button" className="button button-secondary" onClick={() => removeKnowledge(index)} disabled={!canEdit || saving}><Icon name="trash" size={15} /> Remover</button>
                 </article>
               ))}
@@ -312,7 +406,7 @@ export function ConfiguracaoIA() {
           </section>
 
           <div className="ai-v2-save-bar">
-            <span>As regras de segurança e isolamento de dados continuam sendo controladas pelo FlowDeskIA.</span>
+            <span>Regras de segurança, confirmação e isolamento de dados continuam controladas pelo FlowDeskIA.</span>
             <button className="button button-primary" type="submit" disabled={!canEdit || saving}>{saving ? "Salvando..." : "Salvar configuração da IA"}</button>
           </div>
         </form>
