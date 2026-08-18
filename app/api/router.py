@@ -30,6 +30,7 @@ from app.api.routes import (
     super_admin,
     super_admin_dashboard,
     super_admin_simulator,
+    super_admin_simulator_autonomous,
     system,
     usuarios,
     veiculos,
@@ -42,6 +43,7 @@ api_router.include_router(auth.router)
 api_router.include_router(super_admin.router)
 api_router.include_router(super_admin_dashboard.router)
 api_router.include_router(super_admin_simulator.router)
+api_router.include_router(super_admin_simulator_autonomous.router)
 api_router.include_router(empresas.router)
 api_router.include_router(acessos.router)
 api_router.include_router(usuarios.router)
