@@ -5,6 +5,7 @@ from app.api.routes import (
     administrativo,
     agenda,
     atividades,
+    attendance_presence,
     auth,
     bloqueios,
     chat_interno,
@@ -40,6 +41,7 @@ api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(system.router)
 api_router.include_router(auth.router)
+api_router.include_router(attendance_presence.router)
 api_router.include_router(super_admin.router)
 api_router.include_router(super_admin_dashboard.router)
 api_router.include_router(super_admin_simulator.router)
