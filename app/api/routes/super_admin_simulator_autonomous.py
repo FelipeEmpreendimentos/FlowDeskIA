@@ -30,6 +30,7 @@ from app.models.enums import (
 from app.models.models import Conversa, Mensagem
 from app.models.platform import SuperAdmin, SuperAdminLog
 from app.services.ai_guided_autonomy import run_autonomous_guided_agent
+from app.services.attendance_presence import distribute_handoff_conversation
 
 
 router = APIRouter(
@@ -196,10 +197,17 @@ def responder_no_simulador_autonomo(
         sender=RemetenteMensagem.IA,
         content=result.text,
     )
+
+    distribution: dict[str, object] | None = None
     if result.handoff:
-        conversation.ia_ativa = False
-        conversation.status = StatusConversa.ABERTA
-        db.commit()
+        distribution = distribute_handoff_conversation(
+            db,
+            conversation=conversation,
+            reason=(
+                result.handoff_reason
+                or "Atendimento transferido pela IA para acompanhamento humano."
+            ),
+        )
 
     trace = [
         {
@@ -227,6 +235,7 @@ def responder_no_simulador_autonomo(
                 "interpreted_as": result.interpreted_as,
                 "state": result.state,
                 "handoff": result.handoff,
+                "distribuicao": distribution,
                 "action_id": data.action_id,
                 "quick_replies": [item.id for item in result.options],
                 "tools": trace[-12:],
