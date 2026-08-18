@@ -29,6 +29,7 @@ from app.schemas.auth import (
     UsuarioLogado,
 )
 from app.schemas.common import MessageResponse
+from app.services.attendance_presence import STATUS_DISPONIVEL, set_presence_status
 from app.services.email import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
@@ -145,6 +146,7 @@ def login(
     _validar_acesso_empresa(db, user.empresa_id)
     user.ultimo_login = datetime.now(timezone.utc)
     db.commit()
+    set_presence_status(db, user, STATUS_DISPONIVEL)
 
     token, expires_in = create_access_token(
         user_id=user.id,
@@ -220,96 +222,68 @@ def alterar_senha(
     if not verify_password(data.senha_atual, current_user.senha_hash):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "A senha atual está incorreta.",
+            "Senha atual inválida.",
         )
-
     current_user.senha_hash = hash_password(data.nova_senha)
     db.commit()
-    return MessageResponse(mensagem="Senha alterada com sucesso.")
+    return MessageResponse(message="Senha alterada com sucesso.")
 
 
 @router.post("/recuperar-senha", response_model=RecuperarSenhaResponse)
 def recuperar_senha(
     data: RecuperarSenhaRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> RecuperarSenhaResponse:
+    email = data.email.strip().lower()
     generic_message = (
-        "Se os dados informados estiverem cadastrados, você receberá um "
-        "e-mail com o link para redefinir sua senha. Verifique também a "
-        "caixa de spam."
+        "Se os dados estiverem corretos, você receberá instruções para redefinir a senha."
     )
-
-    if not settings.smtp_configured:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "O serviço de recuperação por e-mail ainda não está configurado.",
-        )
 
     user = db.scalar(
         select(Usuario).where(
             Usuario.empresa_id == data.empresa_id,
-            func.lower(Usuario.email) == data.email.strip().lower(),
+            func.lower(Usuario.email) == email,
             Usuario.ativo.is_(True),
         )
     )
-
     if user is None:
-        return RecuperarSenhaResponse(mensagem=generic_message)
-
-    now = datetime.now(timezone.utc)
-    cooldown_start = now - timedelta(
-        seconds=settings.reset_request_cooldown_seconds
-    )
-    recent_request = db.scalar(
-        select(PasswordResetToken)
-        .where(
-            PasswordResetToken.usuario_id == user.id,
-            PasswordResetToken.created_at >= cooldown_start,
-        )
-        .order_by(PasswordResetToken.created_at.desc())
-        .limit(1)
-    )
-
-    if recent_request is not None:
-        return RecuperarSenhaResponse(mensagem=generic_message)
-
-    raw_token, token_hash = create_password_reset_token()
-    reset_token = PasswordResetToken(
-        usuario_id=user.id,
-        token_hash=token_hash,
-        expires_at=now + timedelta(minutes=settings.reset_token_minutes),
-    )
-    db.add(reset_token)
-    db.commit()
-    db.refresh(reset_token)
-
-    reset_url = f"{settings.frontend_url}/redefinir-senha?token={raw_token}"
-    email_sent = send_password_reset_email(
-        recipient=user.email,
-        reset_url=reset_url,
-    )
-
-    if not email_sent:
-        db.delete(reset_token)
-        db.commit()
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Não foi possível enviar o e-mail de recuperação agora. "
-            "Tente novamente em alguns minutos.",
-        )
+        return RecuperarSenhaResponse(message=generic_message)
 
     db.execute(
         update(PasswordResetToken)
         .where(
             PasswordResetToken.usuario_id == user.id,
-            PasswordResetToken.id != reset_token.id,
             PasswordResetToken.used_at.is_(None),
         )
-        .values(used_at=now)
+        .values(used_at=datetime.now(timezone.utc))
     )
+
+    raw_token = create_password_reset_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    reset_token = PasswordResetToken(
+        usuario_id=user.id,
+        token_hash=hash_password_reset_token(raw_token),
+        expires_at=expires_at,
+    )
+    db.add(reset_token)
     db.commit()
 
-    return RecuperarSenhaResponse(mensagem=generic_message)
+    reset_url = f"{settings.frontend_url.rstrip('/')}/redefinir-senha?token={raw_token}"
+    email_sent = send_password_reset_email(
+        recipient=user.email,
+        user_name=user.nome,
+        reset_url=reset_url,
+    )
+
+    development_url = None
+    if settings.environment not in PRODUCTION_ENVIRONMENTS and not email_sent:
+        development_url = reset_url
+
+    return RecuperarSenhaResponse(
+        message=generic_message,
+        development_reset_url=development_url,
+    )
 
 
 @router.post("/redefinir-senha", response_model=MessageResponse)
@@ -317,45 +291,27 @@ def redefinir_senha(
     data: RedefinirSenhaRequest,
     db: Session = Depends(get_db),
 ) -> MessageResponse:
-    now = datetime.now(timezone.utc)
     token_hash = hash_password_reset_token(data.token)
-
     reset_token = db.scalar(
         select(PasswordResetToken).where(
             PasswordResetToken.token_hash == token_hash,
             PasswordResetToken.used_at.is_(None),
-            PasswordResetToken.expires_at > now,
         )
     )
-
-    if reset_token is None:
+    if reset_token is None or reset_token.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "O link de recuperação é inválido ou expirou.",
+            "Link de redefinição inválido ou expirado.",
         )
 
-    user = db.scalar(
-        select(Usuario).where(
-            Usuario.id == reset_token.usuario_id,
-            Usuario.ativo.is_(True),
-        )
-    )
-
-    if user is None:
+    user = db.get(Usuario, reset_token.usuario_id)
+    if user is None or not user.ativo:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "O link de recuperação é inválido ou expirou.",
+            "Usuário não está mais disponível.",
         )
 
     user.senha_hash = hash_password(data.nova_senha)
-    db.execute(
-        update(PasswordResetToken)
-        .where(
-            PasswordResetToken.usuario_id == user.id,
-            PasswordResetToken.used_at.is_(None),
-        )
-        .values(used_at=now)
-    )
+    reset_token.used_at = datetime.now(timezone.utc)
     db.commit()
-
-    return MessageResponse(mensagem="Senha redefinida com sucesso.")
+    return MessageResponse(message="Senha redefinida com sucesso.")
