@@ -29,7 +29,7 @@ import { SuperAdminAuditoria } from "./pages/SuperAdminAuditoria";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import { SuperAdminEmpresaDetalhe } from "./pages/SuperAdminEmpresaDetalhe";
 import { SuperAdminEmpresas } from "./pages/SuperAdminEmpresas";
-import { SuperAdminIASimulator } from "./pages/SuperAdminIASimulator";
+import { SuperAdminIASimulatorGuided } from "./pages/SuperAdminIASimulatorGuided";
 import { SuperAdminLogin } from "./pages/SuperAdminLogin";
 import { SuperAdminPlanos } from "./pages/SuperAdminPlanos";
 import { Veiculos } from "./pages/Veiculos";
@@ -55,7 +55,7 @@ function App() {
         <Route path="dashboard" element={<SuperAdminDashboard />} />
         <Route path="empresas" element={<SuperAdminEmpresas />} />
         <Route path="empresas/:empresaId" element={<SuperAdminEmpresaDetalhe />} />
-        <Route path="simulador-ia" element={<SuperAdminIASimulator />} />
+        <Route path="simulador-ia" element={<SuperAdminIASimulatorGuided />} />
         <Route path="planos" element={<SuperAdminPlanos />} />
         <Route path="auditoria" element={<SuperAdminAuditoria />} />
       </Route>
