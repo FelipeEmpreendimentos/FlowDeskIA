@@ -79,6 +79,22 @@ export function saveSession(token: string, empresaId: string): void {
 }
 
 export function clearSession(options: { keepCompanyId?: boolean } = {}): void {
+  const token = getToken();
+
+  if (token) {
+    void fetch(`${API_URL}/atendimento-equipe/me`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status: "OFFLINE" }),
+      keepalive: true,
+    }).catch(() => {
+      // O heartbeat também derruba o status efetivo se o navegador desaparecer.
+    });
+  }
+
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
   clearSessionContext();
@@ -91,6 +107,7 @@ export function clearSession(options: { keepCompanyId?: boolean } = {}): void {
   void fetch(`${API_URL}/auth/logout`, {
     method: "POST",
     credentials: "include",
+    keepalive: true,
   }).catch(() => {
     // A sessão local já foi removida mesmo quando o servidor está indisponível.
   });
