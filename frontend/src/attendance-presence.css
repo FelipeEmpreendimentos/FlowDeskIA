@@ -3,11 +3,24 @@
 .attendance-mobile-brand-mark {
   overflow: hidden;
   color: transparent !important;
+  background-color: transparent !important;
   background-image: url("/favicon.svg") !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
-  background-size: cover !important;
+  background-size: contain !important;
   font-size: 0 !important;
+}
+
+.brand-logo {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.sidebar-logo,
+.attendance-mobile-brand-mark {
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 .attendance-presence-control {
