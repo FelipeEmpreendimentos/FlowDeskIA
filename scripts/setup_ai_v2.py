@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS ai_company_settings (
     mensagem_fora_escopo TEXT,
     mensagem_indisponibilidade TEXT,
     mensagem_despedida TEXT,
+    texto_menu_principal TEXT,
     tom VARCHAR(20) NOT NULL DEFAULT 'EQUILIBRADO',
     tamanho_resposta VARCHAR(20) NOT NULL DEFAULT 'CURTA',
     usar_emojis BOOLEAN NOT NULL DEFAULT TRUE,
@@ -22,15 +23,37 @@ CREATE TABLE IF NOT EXISTS ai_company_settings (
     pode_cancelar BOOLEAN NOT NULL DEFAULT TRUE,
     confirmar_acoes BOOLEAN NOT NULL DEFAULT TRUE,
     transferir_fora_escopo BOOLEAN NOT NULL DEFAULT TRUE,
+    fluxo_guiado_ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    mostrar_interpretacao BOOLEAN NOT NULL DEFAULT TRUE,
     tentativas_antes_handoff SMALLINT NOT NULL DEFAULT 2,
     campos_cliente_obrigatorios JSONB NOT NULL DEFAULT '["nome"]'::jsonb,
     campos_veiculo_obrigatorios JSONB NOT NULL DEFAULT '["tipo_veiculo"]'::jsonb,
     conhecimento JSONB NOT NULL DEFAULT '[]'::jsonb,
+    menu_principal JSONB NOT NULL DEFAULT '[
+      {"acao":"AGENDAR","rotulo":"Agendar serviço","ativo":true,"ordem":10},
+      {"acao":"CONSULTAR_AGENDAMENTO","rotulo":"Consultar agendamento","ativo":true,"ordem":20},
+      {"acao":"REAGENDAR","rotulo":"Reagendar","ativo":true,"ordem":30},
+      {"acao":"CANCELAR","rotulo":"Cancelar","ativo":true,"ordem":40},
+      {"acao":"SERVICOS_PRECOS","rotulo":"Serviços e preços","ativo":true,"ordem":50},
+      {"acao":"HUMANO","rotulo":"Falar com atendente","ativo":true,"ordem":60}
+    ]'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ai_settings_tom CHECK (tom IN ('FORMAL', 'EQUILIBRADO', 'INFORMAL')),
     CONSTRAINT ck_ai_settings_tamanho CHECK (tamanho_resposta IN ('CURTA', 'MEDIA', 'DETALHADA')),
     CONSTRAINT ck_ai_settings_handoff CHECK (tentativas_antes_handoff BETWEEN 1 AND 5)
 );
+
+ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS texto_menu_principal TEXT;
+ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS fluxo_guiado_ativo BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS mostrar_interpretacao BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS menu_principal JSONB NOT NULL DEFAULT '[
+  {"acao":"AGENDAR","rotulo":"Agendar serviço","ativo":true,"ordem":10},
+  {"acao":"CONSULTAR_AGENDAMENTO","rotulo":"Consultar agendamento","ativo":true,"ordem":20},
+  {"acao":"REAGENDAR","rotulo":"Reagendar","ativo":true,"ordem":30},
+  {"acao":"CANCELAR","rotulo":"Cancelar","ativo":true,"ordem":40},
+  {"acao":"SERVICOS_PRECOS","rotulo":"Serviços e preços","ativo":true,"ordem":50},
+  {"acao":"HUMANO","rotulo":"Falar com atendente","ativo":true,"ordem":60}
+]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS ai_contact_metadata (
     cliente_id BIGINT PRIMARY KEY REFERENCES clientes(id) ON DELETE CASCADE,
@@ -63,6 +86,7 @@ CREATE TABLE IF NOT EXISTS ai_atendimento_sessoes (
     estado VARCHAR(30) NOT NULL DEFAULT 'ATENDENDO',
     falhas_entendimento SMALLINT NOT NULL DEFAULT 0,
     pending_action JSONB,
+    flow_context JSONB,
     last_intent VARCHAR(80),
     last_tool_trace JSONB NOT NULL DEFAULT '[]'::jsonb,
     handoff_motivo TEXT,
@@ -72,6 +96,7 @@ CREATE TABLE IF NOT EXISTS ai_atendimento_sessoes (
         UNIQUE (empresa_id, canal, external_id),
     CONSTRAINT ck_ai_atendimento_falhas CHECK (falhas_entendimento >= 0)
 );
+ALTER TABLE ai_atendimento_sessoes ADD COLUMN IF NOT EXISTS flow_context JSONB;
 CREATE INDEX IF NOT EXISTS idx_ai_atendimento_cliente
     ON ai_atendimento_sessoes(empresa_id, cliente_id, updated_at DESC);
 
