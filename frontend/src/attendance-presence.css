@@ -64,6 +64,25 @@
   display: none;
 }
 
+html[data-attendance-status="OFFLINE"] .route-conversas .message-form::before {
+  grid-column: 1 / -1;
+  content: "Você está Offline. Mude seu status para Disponível ou Ausente para responder.";
+  padding: 8px 10px;
+  border: 1px solid #e1e6ef;
+  border-radius: 9px;
+  color: #69758a;
+  background: #f5f7fa;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+html[data-attendance-status="OFFLINE"] .route-conversas .message-form textarea,
+html[data-attendance-status="OFFLINE"] .route-conversas .message-form .send-button {
+  pointer-events: none;
+  opacity: 0.48;
+}
+
 @media (max-width: 1000px) {
   .attendance-mobile-bar {
     position: fixed;
