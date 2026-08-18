@@ -18,13 +18,8 @@ from app.database.database import get_db
 from app.models.ai import AICompanySettings, AIContactMetadata
 from app.models.models import Cliente, ConfigIA, Empresa, Veiculo
 from app.models.platform import SuperAdmin, SuperAdminLog
-from app.services.ai_agent import (
-    AIAgentError,
-    AIAgentNotConfigured,
-    AIAgentProviderError,
-    reset_agent_session,
-    run_operational_agent,
-)
+from app.services.ai_agent import AIAgentError, AIAgentNotConfigured, AIAgentProviderError, reset_agent_session
+from app.services.ai_guided_flow import run_guided_agent
 
 router = APIRouter(
     prefix="/super-admin/simulador-ia",
@@ -90,9 +85,16 @@ class ToolTraceOut(BaseModel):
     result: dict[str, Any]
 
 
+class QuickReplyOut(BaseModel):
+    id: str
+    label: str
+    kind: str = "default"
+
+
 class SimulatorReplyRequest(BaseModel):
     session_id: str = Field(min_length=8, max_length=100)
     mensagens: list[SimulatorHistoryMessage] = Field(min_length=1, max_length=20)
+    action_id: str | None = Field(default=None, max_length=160)
 
 
 class SimulatorReplyOut(BaseModel):
@@ -104,12 +106,14 @@ class SimulatorReplyOut(BaseModel):
     latency_ms: int
     status: Literal["ENTREGUE"] = "ENTREGUE"
     intent: str | None
+    interpreted_as: str | None
     agent_state: str
     handoff: bool
     handoff_reason: str | None
     customer_id: int | None
     customer_complete: bool
     pending_action: dict[str, Any] | None
+    quick_replies: list[QuickReplyOut]
     tools: list[ToolTraceOut]
 
 
@@ -455,18 +459,19 @@ def responder_no_simulador(
 
     started = perf_counter()
     try:
-        result = run_operational_agent(
+        result = run_guided_agent(
             db,
             empresa_id=empresa_id,
             cliente_id=cliente_id,
             session_id=data.session_id,
             transcript=transcript,
+            action_id=data.action_id,
         )
     except AIAgentNotConfigured as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
     except AIAgentProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
-    except AIAgentError as exc:
+    except (AIAgentError, RuntimeError, ValueError) as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
     latency_ms = max(1, round((perf_counter() - started) * 1000))
@@ -483,7 +488,7 @@ def responder_no_simulador(
         SuperAdminLog(
             super_admin_id=current.id,
             empresa_id=empresa_id,
-            acao="SIMULOU_AGENTE_IA_V2",
+            acao="SIMULOU_FLUXO_GUIADO_IA",
             entidade="clientes",
             entidade_id=cliente_id,
             dados_anteriores=None,
@@ -494,8 +499,11 @@ def responder_no_simulador(
                 "latency_ms": latency_ms,
                 "canal": "WHATSAPP_SIMULADO",
                 "intent": result.intent,
+                "interpreted_as": result.interpreted_as,
                 "state": result.state,
                 "handoff": result.handoff,
+                "action_id": data.action_id,
+                "quick_replies": [item.id for item in result.options],
                 "tools": trace[-12:],
             },
             ip=_ip(request),
@@ -513,12 +521,17 @@ def responder_no_simulador(
         model=result.model,
         latency_ms=latency_ms,
         intent=result.intent,
+        interpreted_as=result.interpreted_as,
         agent_state=result.state,
         handoff=result.handoff,
         handoff_reason=result.handoff_reason,
         customer_id=result.customer_id,
         customer_complete=result.customer_complete,
         pending_action=result.pending_action,
+        quick_replies=[
+            QuickReplyOut(id=item.id, label=item.label, kind=item.kind)
+            for item in result.options
+        ],
         tools=[
             ToolTraceOut(
                 name=item.name,
