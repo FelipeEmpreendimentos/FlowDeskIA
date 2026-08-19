@@ -29,45 +29,109 @@ from app.services.ai_guided_flow import (
 )
 
 
-# Catálogo de recuperação rápida para erros de digitação comuns. Ele não tenta
-# ser uma tabela completa de veículos: quando não há correspondência segura, a
-# interpretação semântica do modelo assume.
+# Catálogo local para os modelos mais comuns no Brasil. Ele existe para que
+# mensagens simples como "Corsa", "corola" ou "corssa" não dependam de uma
+# chamada ao provedor de IA. Quando o modelo não está aqui, o fallback
+# semântico continua assumindo a interpretação.
 _COMMON_VEHICLES: list[tuple[str, str, str]] = [
     ("toyota", "corolla", "SEDAN"),
     ("toyota", "etios", "HATCH"),
+    ("toyota", "yaris", "HATCH"),
     ("toyota", "hilux", "CAMINHONETE"),
     ("toyota", "sw4", "SUV"),
     ("honda", "civic", "SEDAN"),
     ("honda", "city", "SEDAN"),
+    ("honda", "fit", "HATCH"),
     ("honda", "hr-v", "SUV"),
     ("honda", "hrv", "SUV"),
+    ("honda", "wr-v", "SUV"),
+    ("honda", "wrv", "SUV"),
+    ("chevrolet", "corsa", "HATCH"),
+    ("chevrolet", "corsa sedan", "SEDAN"),
+    ("chevrolet", "classic", "SEDAN"),
+    ("chevrolet", "celta", "HATCH"),
+    ("chevrolet", "prisma", "SEDAN"),
     ("chevrolet", "onix", "HATCH"),
+    ("chevrolet", "onix plus", "SEDAN"),
     ("chevrolet", "cruze", "SEDAN"),
+    ("chevrolet", "astra", "HATCH"),
+    ("chevrolet", "vectra", "SEDAN"),
     ("chevrolet", "tracker", "SUV"),
+    ("chevrolet", "spin", "OUTRO"),
+    ("chevrolet", "montana", "CAMINHONETE"),
     ("chevrolet", "s10", "CAMINHONETE"),
     ("volkswagen", "gol", "HATCH"),
+    ("volkswagen", "fox", "HATCH"),
     ("volkswagen", "polo", "HATCH"),
+    ("volkswagen", "voyage", "SEDAN"),
     ("volkswagen", "virtus", "SEDAN"),
+    ("volkswagen", "jetta", "SEDAN"),
     ("volkswagen", "t-cross", "SUV"),
     ("volkswagen", "tcross", "SUV"),
     ("volkswagen", "nivus", "SUV"),
+    ("volkswagen", "taos", "SUV"),
+    ("volkswagen", "saveiro", "CAMINHONETE"),
     ("fiat", "uno", "HATCH"),
+    ("fiat", "mobi", "HATCH"),
     ("fiat", "palio", "HATCH"),
+    ("fiat", "punto", "HATCH"),
     ("fiat", "argo", "HATCH"),
+    ("fiat", "siena", "SEDAN"),
+    ("fiat", "grand siena", "SEDAN"),
     ("fiat", "cronos", "SEDAN"),
+    ("fiat", "pulse", "SUV"),
+    ("fiat", "fastback", "SUV"),
     ("fiat", "toro", "CAMINHONETE"),
     ("fiat", "strada", "CAMINHONETE"),
     ("hyundai", "hb20", "HATCH"),
+    ("hyundai", "hb20s", "SEDAN"),
     ("hyundai", "creta", "SUV"),
+    ("hyundai", "tucson", "SUV"),
     ("jeep", "renegade", "SUV"),
     ("jeep", "compass", "SUV"),
+    ("jeep", "commander", "SUV"),
     ("ford", "ka", "HATCH"),
+    ("ford", "fiesta", "HATCH"),
+    ("ford", "focus", "HATCH"),
+    ("ford", "ecosport", "SUV"),
+    ("ford", "territory", "SUV"),
     ("ford", "ranger", "CAMINHONETE"),
     ("renault", "kwid", "HATCH"),
     ("renault", "sandero", "HATCH"),
-    ("nissan", "kicks", "SUV"),
+    ("renault", "logan", "SEDAN"),
+    ("renault", "duster", "SUV"),
+    ("renault", "oroch", "CAMINHONETE"),
+    ("nissan", "march", "HATCH"),
     ("nissan", "versa", "SEDAN"),
+    ("nissan", "sentra", "SEDAN"),
+    ("nissan", "kicks", "SUV"),
+    ("nissan", "frontier", "CAMINHONETE"),
+    ("peugeot", "206", "HATCH"),
+    ("peugeot", "207", "HATCH"),
+    ("peugeot", "208", "HATCH"),
+    ("peugeot", "2008", "SUV"),
+    ("citroen", "c3", "HATCH"),
+    ("citroen", "c4 cactus", "SUV"),
+    ("kia", "sportage", "SUV"),
+    ("mitsubishi", "pajero", "SUV"),
+    ("mitsubishi", "l200", "CAMINHONETE"),
 ]
+
+
+# Algumas famílias tiveram mais de uma carroceria. Para o atendimento rápido,
+# aceitamos a forma mais comum quando o cliente escreve somente o modelo, mas
+# respeitamos qualificadores explícitos. Isso evita perguntar "hatch ou sedan?"
+# sem necessidade na maioria dos atendimentos.
+_EXACT_VEHICLE_ALIASES: dict[str, tuple[str, str, str]] = {
+    "corsa": ("chevrolet", "corsa", "HATCH"),
+    "corsa hatch": ("chevrolet", "corsa", "HATCH"),
+    "corsa sedan": ("chevrolet", "corsa", "SEDAN"),
+    "corsa classic": ("chevrolet", "classic", "SEDAN"),
+    "classic": ("chevrolet", "classic", "SEDAN"),
+    "onix plus": ("chevrolet", "onix plus", "SEDAN"),
+    "hb20s": ("hyundai", "hb20s", "SEDAN"),
+    "grand siena": ("fiat", "grand siena", "SEDAN"),
+}
 
 
 def _normalize(value: str) -> str:
@@ -103,14 +167,36 @@ def _local_vehicle_guess(value: str) -> dict[str, Any] | None:
     text = _strip_vehicle_filler(value)
     if not text:
         return None
-    tokens = text.split()
+
+    # Ano é irrelevante para o fluxo. Removê-lo também melhora a comparação
+    # quando o cliente escreve algo como "Corsa 2008".
+    text_without_year = " ".join(
+        token for token in text.split() if not re.fullmatch(r"(?:19|20)\d{2}", token)
+    ).strip()
+    alias = _EXACT_VEHICLE_ALIASES.get(text_without_year)
+    if alias is not None:
+        brand, model, vehicle_type = alias
+        return {
+            "identificavel": True,
+            "marca": brand.title(),
+            "modelo": model.title(),
+            "tipo_veiculo": vehicle_type,
+            "cor": None,
+            "confianca": "ALTA",
+            "interpretacao": f"{brand.title()} {model.title()}",
+            "pergunta": None,
+            "origem_interpretacao": "alias-local",
+            "score": 1.0,
+        }
+
+    tokens = text_without_year.split() or text.split()
     candidates: list[tuple[float, str, str, str]] = []
     for brand, model, vehicle_type in _COMMON_VEHICLES:
         model_norm = _normalize(model)
         brand_norm = _normalize(brand)
         best_model = max(
             [SequenceMatcher(None, token, model_norm).ratio() for token in tokens] +
-            [SequenceMatcher(None, text, model_norm).ratio()]
+            [SequenceMatcher(None, text_without_year or text, model_norm).ratio()]
         )
         brand_bonus = 0.08 if brand_norm in text else 0.0
         score = min(1.0, best_model + brand_bonus)
@@ -118,8 +204,8 @@ def _local_vehicle_guess(value: str) -> dict[str, Any] | None:
     candidates.sort(reverse=True)
     best = candidates[0]
     second = candidates[1] if len(candidates) > 1 else (0.0, "", "", "")
-    # Ex.: corola -> corolla. Exigimos distância razoável do segundo candidato
-    # para não transformar uma palavra ambígua em cadastro definitivo.
+    # Ex.: corola -> corolla; corssa -> corsa. Exigimos distância razoável do
+    # segundo candidato, exceto quando a correspondência do modelo é quase exata.
     if best[0] >= 0.78 and (best[0] - second[0] >= 0.08 or best[0] >= 0.90):
         return {
             "identificavel": True,
@@ -177,12 +263,14 @@ def _semantic_vehicle_guess(value: str) -> dict[str, Any] | None:
         "strict": True,
     }
     instructions = """Você interpreta veículos em conversas brasileiras de WhatsApp.
-Seja tolerante a abreviações, ausência de acentos e erros de digitação. Use conhecimento automotivo geral para normalizar marca/modelo e inferir o TIPO do veículo sem perguntar isso ao cliente.
-Exemplos: 'corola' normalmente significa Toyota Corolla e pode ser normalizado; 'civc' pode ser Honda Civic; 'hilux' permite inferir Toyota Hilux e CAMINHONETE.
+Seu objetivo é entender linguagem humana, não validar um formulário. Um nome de modelo conhecido sozinho já é informação suficiente para identificar um veículo na maioria dos casos.
+Seja tolerante a abreviações, ausência de acentos, erros de digitação, nomes incompletos e marca omitida. Use conhecimento automotivo geral para normalizar marca/modelo e inferir o TIPO do veículo sem perguntar isso ao cliente.
+Exemplos: 'corola' normalmente significa Toyota Corolla SEDAN; 'civc' pode ser Honda Civic SEDAN; 'hilux' significa Toyota Hilux CAMINHONETE; 'corsa' deve ser tratado por padrão como Chevrolet Corsa HATCH; 'corsa sedan' ou 'classic' devem ser SEDAN.
 NÃO exija ano. Ano não é necessário para este fluxo e não existe campo de ano na resposta.
+Se um modelo teve mais de uma carroceria e o cliente não especificou a variante, prefira a versão mais comum/plausível no Brasil e siga com confiança MEDIA, em vez de interromper o atendimento. Se ele especificar hatch, sedan, SUV ou picape, respeite o qualificador.
 Se houver uma interpretação única e plausível, prefira seguir com confiança MEDIA/ALTA em vez de pedir confirmação por perfeccionismo.
-Só use BAIXA e faça uma pergunta curta quando realmente houver mais de uma interpretação plausível ou nenhum veículo identificável.
-Não invente uma placa nem informação pessoal."""
+Só use BAIXA e faça uma pergunta curta quando realmente houver mais de uma interpretação plausível que possa mudar materialmente o atendimento ou quando nenhum veículo for identificável.
+Não invente placa nem informação pessoal."""
     try:
         response = client.responses.create(
             model=app_settings.openai_model,
@@ -298,7 +386,7 @@ def _handle_vehicle_state(
                 guided,
                 text=prefix + guided.text,
                 tool_trace=trace + guided.tool_trace,
-                model=("flowdesk-fuzzy" if interpretation.get("origem_interpretacao") == "fuzzy-local" else app_settings.openai_model),
+                model=("flowdesk-fuzzy" if interpretation.get("origem_interpretacao") in {"fuzzy-local", "alias-local"} else app_settings.openai_model),
                 interpreted_as="VEICULO_IDENTIFICADO",
             )
 
@@ -346,7 +434,7 @@ def _handle_vehicle_state(
     question = None
     if interpretation:
         question = interpretation.get("pergunta")
-    question = question or "Não consegui identificar qual é o carro. Pode digitar o modelo novamente? Ex.: Corolla, Civic, Onix ou Hilux."
+    question = question or "Não consegui identificar qual é o carro. Pode digitar o modelo novamente? Ex.: Corsa, Corolla, Civic, Onix ou Hilux."
     return _base_result(
         db,
         cliente=cliente,
@@ -437,7 +525,7 @@ def run_autonomous_guided_agent(
         if result.state == "AGENDAR_VEICULO_NOVO":
             result = replace(
                 result,
-                text="Qual é o seu carro? Pode escrever só o modelo, por exemplo: “Corolla”, “Civic”, “Onix” ou “Hilux”.",
+                text="Qual é o seu carro? Pode escrever só o modelo, por exemplo: “Corsa”, “Corolla”, “Civic”, “Onix” ou “Hilux”.",
             )
         if leading_greeting and result.interpreted_as:
             result = replace(result, text=f"{leading_greeting.capitalize()}! {result.text}")
