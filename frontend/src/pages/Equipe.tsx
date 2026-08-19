@@ -517,12 +517,21 @@ export function Equipe() {
   }
 
   function montarSemanaFuncionario(funcionarioId: number): SemanaJornadaForm {
+    const registrosFuncionario = horarios.filter(
+      (item) => item.funcionario_id === funcionarioId,
+    );
+
+    // Primeiro cadastro: oferecemos um padrão útil já selecionado. Isso é apenas
+    // um valor inicial do formulário; nada é persistido até o usuário salvar.
+    if (registrosFuncionario.length === 0) {
+      return criarSemanaJornada(funcionarioId.toString());
+    }
+
     const dias = criarSemanaJornada(funcionarioId.toString()).dias;
 
     for (const dia of ordemDiasJornada) {
-      const registro = horarios.find(
-        (item) =>
-          item.funcionario_id === funcionarioId && item.dia_semana === dia,
+      const registro = registrosFuncionario.find(
+        (item) => item.dia_semana === dia,
       );
 
       if (!registro) {
