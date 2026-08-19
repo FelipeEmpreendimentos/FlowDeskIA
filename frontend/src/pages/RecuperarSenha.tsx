@@ -8,8 +8,14 @@ interface RecuperarSenhaResponse {
   mensagem: string;
 }
 
+const MAX_EMPRESA_ID_DIGITS = 8;
+
+function normalizarEmpresaId(value: string): string {
+  return value.replace(/\D/g, "").slice(0, MAX_EMPRESA_ID_DIGITS);
+}
+
 export function RecuperarSenha() {
-  const [empresaId, setEmpresaId] = useState(getCompanyId());
+  const [empresaId, setEmpresaId] = useState(() => normalizarEmpresaId(getCompanyId()));
   const [email, setEmail] = useState("");
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
@@ -19,6 +25,13 @@ export function RecuperarSenha() {
     event.preventDefault();
     setErro("");
     setMensagem("");
+
+    const empresaIdNormalizado = normalizarEmpresaId(empresaId);
+    if (!empresaIdNormalizado || Number(empresaIdNormalizado) < 1) {
+      setErro("Informe um número de empresa válido.");
+      return;
+    }
+
     setCarregando(true);
 
     try {
@@ -27,7 +40,7 @@ export function RecuperarSenha() {
         {
           method: "POST",
           body: JSON.stringify({
-            empresa_id: Number(empresaId),
+            empresa_id: Number(empresaIdNormalizado),
             email: email.trim(),
           }),
         },
@@ -75,11 +88,12 @@ export function RecuperarSenha() {
           <label>
             Empresa ID
             <input
-              type="number"
-              min="1"
+              type="text"
               inputMode="numeric"
+              maxLength={MAX_EMPRESA_ID_DIGITS}
+              pattern="[0-9]{1,8}"
               value={empresaId}
-              onChange={(event) => setEmpresaId(event.target.value)}
+              onChange={(event) => setEmpresaId(normalizarEmpresaId(event.target.value))}
               required
             />
           </label>
