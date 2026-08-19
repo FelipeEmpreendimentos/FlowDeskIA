@@ -1,7 +1,8 @@
 from datetime import time
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -14,6 +15,19 @@ from app.services.db_utils import apply_patch, commit_or_conflict
 from app.services.ownership import require_user
 
 router = APIRouter(prefix="/horarios", tags=["Horários"])
+
+
+class DiaJornadaSemanal(BaseModel):
+    dia_semana: int = Field(ge=0, le=6)
+    ativo: bool = True
+    hora_inicio: time | None = None
+    hora_fim: time | None = None
+    pausa_inicio: time | None = None
+    pausa_fim: time | None = None
+
+
+class JornadaSemanalInput(BaseModel):
+    dias: list[DiaJornadaSemanal]
 
 
 def _get(db: Session, empresa_id: int, horario_id: int) -> Horario:
@@ -73,6 +87,111 @@ def listar_horarios(
         query = query.where(Horario.funcionario_id == funcionario_id)
     return list(
         db.scalars(query.order_by(Horario.dia_semana, Horario.hora_inicio))
+    )
+
+
+@router.put("/semana/{funcionario_id}", response_model=list[HorarioOut])
+def salvar_jornada_semanal(
+    funcionario_id: int,
+    data: JornadaSemanalInput,
+    current_user: Usuario = Depends(
+        require_roles(CargoUsuario.ADMIN, CargoUsuario.GERENTE)
+    ),
+    db: Session = Depends(get_db),
+) -> list[Horario]:
+    """Substitui a semana inteira em uma única transação.
+
+    O frontend antigo salvava cada dia em uma requisição separada. Isso podia
+    deixar a jornada parcialmente atualizada quando uma chamada falhava. Aqui
+    toda a configuração é validada antes de qualquer alteração no banco.
+    """
+    require_user(db, current_user.empresa_id, funcionario_id)
+
+    if len(data.dias) != 7:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Envie a configuração dos sete dias da semana.",
+        )
+
+    por_dia: dict[int, DiaJornadaSemanal] = {}
+    for configuracao in data.dias:
+        if configuracao.dia_semana in por_dia:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Existe mais de uma configuração para o mesmo dia da semana.",
+            )
+        por_dia[configuracao.dia_semana] = configuracao
+
+    if set(por_dia) != set(range(7)):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "A jornada precisa informar cada dia da semana uma única vez.",
+        )
+
+    for configuracao in por_dia.values():
+        if not configuracao.ativo:
+            continue
+        if configuracao.hora_inicio is None or configuracao.hora_fim is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Informe o início e o fim de todos os dias trabalhados.",
+            )
+        _validar_jornada(
+            configuracao.hora_inicio,
+            configuracao.hora_fim,
+            configuracao.pausa_inicio,
+            configuracao.pausa_fim,
+        )
+
+    db.execute(
+        delete(Horario).where(
+            Horario.empresa_id == current_user.empresa_id,
+            Horario.funcionario_id == funcionario_id,
+        )
+    )
+
+    dias_ativos: list[int] = []
+    for dia in range(7):
+        configuracao = por_dia[dia]
+        if not configuracao.ativo:
+            continue
+
+        item = Horario(
+            empresa_id=current_user.empresa_id,
+            funcionario_id=funcionario_id,
+            dia_semana=dia,
+            hora_inicio=configuracao.hora_inicio,
+            hora_fim=configuracao.hora_fim,
+            pausa_inicio=configuracao.pausa_inicio,
+            pausa_fim=configuracao.pausa_fim,
+            ativo=True,
+        )
+        db.add(item)
+        dias_ativos.append(dia)
+
+    db.flush()
+    add_audit_log(
+        db,
+        user=current_user,
+        action="SALVOU_JORNADA_SEMANAL",
+        entity="horarios",
+        entity_id=funcionario_id,
+        details={
+            "funcionario_id": funcionario_id,
+            "dias_ativos": dias_ativos,
+        },
+    )
+    commit_or_conflict(db)
+
+    return list(
+        db.scalars(
+            select(Horario)
+            .where(
+                Horario.empresa_id == current_user.empresa_id,
+                Horario.funcionario_id == funcionario_id,
+            )
+            .order_by(Horario.dia_semana, Horario.hora_inicio)
+        )
     )
 
 
