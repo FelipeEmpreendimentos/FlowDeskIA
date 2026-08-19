@@ -4,8 +4,11 @@ from app.models.enums import CargoUsuario
 from app.schemas.common import ORMModel
 
 
+MAX_EMPRESA_ID = 99_999_999
+
+
 class LoginRequest(BaseModel):
-    empresa_id: int = Field(gt=0)
+    empresa_id: int = Field(gt=0, le=MAX_EMPRESA_ID)
     email: str = Field(min_length=3, max_length=150)
     senha: str = Field(min_length=6, max_length=128)
     manter_conectado: bool = False
@@ -32,7 +35,7 @@ class UsuarioLogado(ORMModel):
 
 
 class RecuperarSenhaRequest(BaseModel):
-    empresa_id: int = Field(gt=0)
+    empresa_id: int = Field(gt=0, le=MAX_EMPRESA_ID)
     email: str = Field(min_length=3, max_length=150)
 
 
