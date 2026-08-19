@@ -1,4 +1,10 @@
-import { useEffect, type ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { Icon } from "./Icon";
 
 interface ModalProps {
@@ -38,6 +44,19 @@ export function Modal({
 
   if (!open) return null;
 
+  // Alguns navegadores bloqueiam silenciosamente o submit de inputs de horário
+  // quando consideram um campo nativo inválido. Nas jornadas preferimos deixar
+  // o submit chegar ao handler e usar as validações do FlowDeskIA/backend, que
+  // retornam uma mensagem clara para o usuário.
+  const formularioJornada = title.toLocaleLowerCase("pt-BR").includes("jornada");
+  const conteudo =
+    formularioJornada && isValidElement(children) && children.type === "form"
+      ? cloneElement(
+          children as ReactElement<{ noValidate?: boolean }>,
+          { noValidate: true },
+        )
+      : children;
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <section
@@ -56,7 +75,7 @@ export function Modal({
             <Icon name="close" />
           </button>
         </header>
-        <div className="modal-body">{children}</div>
+        <div className="modal-body">{conteudo}</div>
       </section>
     </div>
   );
