@@ -10,6 +10,7 @@ from app.database.database import warm_database_pool
 from app.middleware.attendance_presence import attendance_presence_guard
 from app.middleware.observability import observability_middleware
 from app.middleware.plan_access import plan_access_middleware
+from scripts.bootstrap_company_admin import aplicar_bootstrap as aplicar_bootstrap_admin
 from scripts.setup_ai_v2 import aplicar_estrutura as aplicar_ai_v2
 from scripts.setup_attendance_presence import aplicar_estrutura as aplicar_presenca_atendimento
 
@@ -62,6 +63,13 @@ def preparar_runtime() -> None:
         logger.info("attendance_presence_schema_ready")
     except Exception:
         logger.exception("attendance_presence_schema_setup_failed")
+        raise
+
+    try:
+        if aplicar_bootstrap_admin():
+            logger.info("company_admin_bootstrap_applied")
+    except Exception:
+        logger.exception("company_admin_bootstrap_failed")
         raise
 
     try:
