@@ -10,7 +10,6 @@ from app.database.database import warm_database_pool
 from app.middleware.attendance_presence import attendance_presence_guard
 from app.middleware.observability import observability_middleware
 from app.middleware.plan_access import plan_access_middleware
-from scripts.bootstrap_company_user import aplicar_bootstrap as aplicar_bootstrap_usuario_empresa
 from scripts.setup_ai_v2 import aplicar_estrutura as aplicar_ai_v2
 from scripts.setup_attendance_presence import aplicar_estrutura as aplicar_presenca_atendimento
 
@@ -51,13 +50,6 @@ app.include_router(api_router)
 
 @app.on_event("startup")
 def preparar_runtime() -> None:
-    try:
-        if aplicar_bootstrap_usuario_empresa():
-            logger.info("company_user_bootstrap_applied")
-    except Exception:
-        logger.exception("company_user_bootstrap_failed")
-        raise
-
     try:
         aplicar_ai_v2()
         logger.info("ai_v2_schema_ready")
