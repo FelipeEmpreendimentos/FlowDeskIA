@@ -87,9 +87,9 @@
 
 /*
  * Desktop: o status passa a fazer parte do cartão do usuário.
- * O select real permanece sobre o cartão para preservar a mesma lógica/backend,
- * mas fica visualmente transparente. Clicar em qualquer ponto do cartão abre
- * Disponível / Ausente / Offline.
+ * O componente de presença ocupa a mesma área do cartão e usa um summary
+ * transparente como gatilho. Assim nome/avatar continuam visíveis e o menu
+ * próprio do FlowDeskIA abre ao clicar em qualquer ponto do cartão.
  */
 .sidebar-footer {
   position: relative;
@@ -97,15 +97,16 @@
     "settings"
     "user"
     "logout";
+  overflow: visible;
 }
 
 .sidebar-footer .sidebar-settings-link {
   grid-area: settings;
 }
 
-.sidebar-footer > .attendance-presence-control:not(.attendance-presence-compact) {
+.sidebar-footer > .attendance-presence-user-menu {
   position: relative;
-  z-index: 4;
+  z-index: 12;
   grid-area: user;
   width: 100%;
   min-height: 54px;
@@ -114,33 +115,95 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  pointer-events: none;
 }
 
-.sidebar-footer > .attendance-presence-control:not(.attendance-presence-compact)
-  .attendance-presence-dot,
-.sidebar-footer > .attendance-presence-control:not(.attendance-presence-compact)
-  .attendance-presence-caption {
+.attendance-presence-user-trigger {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.attendance-presence-user-trigger::-webkit-details-marker {
   display: none;
 }
 
-.sidebar-footer > .attendance-presence-control:not(.attendance-presence-compact)
-  select {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-  cursor: pointer;
-  pointer-events: auto;
+.attendance-presence-user-trigger::marker {
+  display: none;
+  content: "";
 }
 
-.sidebar-footer > .attendance-presence-control:not(.attendance-presence-compact)
-  select:disabled {
+.attendance-presence-user-options {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid #dfe5ee;
+  border-radius: 13px;
+  color: #172033;
+  background: #ffffff;
+  box-shadow: 0 18px 46px rgba(7, 18, 42, 0.24);
+}
+
+.attendance-presence-user-option {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  color: #26324a;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.attendance-presence-user-option:hover,
+.attendance-presence-user-option.active {
+  background: #f4f7fb;
+}
+
+.attendance-presence-user-option:disabled {
   cursor: wait;
+  opacity: 0.65;
+}
+
+.attendance-presence-option-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #8e99aa;
+}
+
+.attendance-presence-user-option-disponivel .attendance-presence-option-dot {
+  background: #20ad78;
+}
+
+.attendance-presence-user-option-ausente .attendance-presence-option-dot {
+  background: #f0a20b;
+}
+
+.attendance-presence-user-option-offline .attendance-presence-option-dot {
+  background: #a79f99;
+}
+
+.attendance-presence-option-check {
+  color: #3157d5;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .sidebar-footer > .sidebar-user {
@@ -160,8 +223,8 @@
     background 0.16s;
 }
 
-.sidebar-footer > .attendance-presence-control:not(.attendance-presence-compact):hover
-  + .sidebar-user {
+.sidebar-footer > .attendance-presence-user-menu:hover + .sidebar-user,
+.sidebar-footer > .attendance-presence-user-menu[open] + .sidebar-user {
   border-color: rgba(113, 143, 255, 0.34);
   background: rgba(255, 255, 255, 0.065);
 }
@@ -212,6 +275,11 @@
   border-bottom: 1.5px solid #8190aa;
   content: "";
   transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.16s;
+}
+
+.sidebar-footer > .attendance-presence-user-menu[open] + .sidebar-user::after {
+  transform: translateY(-20%) rotate(225deg);
 }
 
 html[data-attendance-status="DISPONIVEL"]
