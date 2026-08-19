@@ -14,17 +14,31 @@
     grid-template-columns: minmax(260px, 290px) minmax(0, 1fr);
   }
 
+  /*
+   * O seletor Meus / IA / Geral fica alinhado ao conteúdo interno da coluna
+   * esquerda, e não à largura externa inteira dela. Isso evita o vazamento para
+   * a área do chat em notebooks e janelas menores.
+   */
   .route-conversas .conversation-scope-switch {
     box-sizing: border-box;
-    width: 290px !important;
-    max-width: 290px !important;
+    width: 262px !important;
+    max-width: 262px !important;
     min-width: 0 !important;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
   }
 
   .route-conversas .conversation-scope-switch button {
     min-width: 0;
-    padding-inline: 8px;
+    padding-inline: 7px;
+    overflow: hidden;
+  }
+
+  .route-conversas .conversation-scope-switch button span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .route-conversas .chat-header {
@@ -87,13 +101,13 @@
   }
 
   .route-conversas .conversation-scope-switch {
-    width: 260px !important;
-    max-width: 260px !important;
+    width: 232px !important;
+    max-width: 232px !important;
   }
 
   .route-conversas .conversation-scope-switch button {
     gap: 4px;
-    padding-inline: 5px;
+    padding-inline: 4px;
     font-size: 10px;
   }
 
