@@ -17,6 +17,11 @@ interface RememberedLogin {
 }
 
 const REMEMBERED_LOGIN_KEY = "flowdesk_remembered_login";
+const MAX_EMPRESA_ID_DIGITS = 8;
+
+function normalizarEmpresaId(value: string): string {
+  return value.replace(/\D/g, "").slice(0, MAX_EMPRESA_ID_DIGITS);
+}
 
 function getRememberedLogin(): RememberedLogin | null {
   const raw = localStorage.getItem(REMEMBERED_LOGIN_KEY);
@@ -30,7 +35,7 @@ function getRememberedLogin(): RememberedLogin | null {
     }
 
     return {
-      empresaId: String(parsed.empresaId),
+      empresaId: normalizarEmpresaId(String(parsed.empresaId)),
       email: String(parsed.email),
     };
   } catch {
@@ -89,6 +94,12 @@ export function Login() {
     event.preventDefault();
     setErro("");
 
+    const empresaIdNormalizado = normalizarEmpresaId(empresaId);
+    if (!empresaIdNormalizado || Number(empresaIdNormalizado) < 1) {
+      setErro("Informe um número de empresa válido.");
+      return;
+    }
+
     if (senha.length < 6) {
       setErro("Senha deve ter pelo menos 6 caracteres.");
       return;
@@ -101,7 +112,7 @@ export function Login() {
       const response = await apiRequest<LoginResponse>("/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          empresa_id: Number(empresaId),
+          empresa_id: Number(empresaIdNormalizado),
           email: emailNormalizado,
           senha,
           manter_conectado: manterConectado,
@@ -111,13 +122,16 @@ export function Login() {
       if (manterConectado) {
         localStorage.setItem(
           REMEMBERED_LOGIN_KEY,
-          JSON.stringify({ empresaId, email: emailNormalizado } satisfies RememberedLogin),
+          JSON.stringify({
+            empresaId: empresaIdNormalizado,
+            email: emailNormalizado,
+          } satisfies RememberedLogin),
         );
       } else {
         localStorage.removeItem(REMEMBERED_LOGIN_KEY);
       }
 
-      saveSession(response.access_token, empresaId);
+      saveSession(response.access_token, empresaIdNormalizado);
       navigate("/dashboard", { replace: true });
     } catch (error) {
       setErro(
@@ -174,13 +188,14 @@ export function Login() {
           <label>
             Empresa ID
             <input
-              type="number"
+              type="text"
               name="organization"
               autoComplete="organization"
-              min="1"
               inputMode="numeric"
+              maxLength={MAX_EMPRESA_ID_DIGITS}
+              pattern="[0-9]{1,8}"
               value={empresaId}
-              onChange={(event) => setEmpresaId(event.target.value)}
+              onChange={(event) => setEmpresaId(normalizarEmpresaId(event.target.value))}
               required
             />
           </label>
