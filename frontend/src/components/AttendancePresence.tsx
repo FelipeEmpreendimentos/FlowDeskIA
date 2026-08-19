@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest } from "../services/api";
 
 export type AttendanceStatus = "DISPONIVEL" | "AUSENTE" | "OFFLINE";
@@ -23,6 +23,12 @@ const descriptions: Record<AttendanceStatus, string> = {
   AUSENTE: "Pode responder conversas atuais, mas não recebe novas distribuições.",
   OFFLINE: "Não recebe novos atendimentos e não pode responder clientes.",
 };
+
+const attendanceStatuses: AttendanceStatus[] = [
+  "DISPONIVEL",
+  "AUSENTE",
+  "OFFLINE",
+];
 
 export function useAttendancePresence(enabled: boolean) {
   const [status, setStatusState] = useState<AttendanceStatus>("OFFLINE");
@@ -145,26 +151,64 @@ export function AttendancePresenceSelect({
   compact?: boolean;
   onChange: (value: AttendanceStatus) => void;
 }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  if (!compact) {
+    return (
+      <details
+        ref={detailsRef}
+        className={`attendance-presence-control attendance-presence-user-menu attendance-presence-${effectiveStatus.toLowerCase()}`}
+        title={descriptions[effectiveStatus]}
+      >
+        <summary
+          className="attendance-presence-user-trigger"
+          aria-label={`Alterar status de atendimento. Status atual: ${labels[effectiveStatus]}`}
+        />
+        <div className="attendance-presence-user-options" role="menu">
+          {attendanceStatuses.map((value) => (
+            <button
+              className={`attendance-presence-user-option attendance-presence-user-option-${value.toLowerCase()} ${status === value ? "active" : ""}`}
+              type="button"
+              role="menuitem"
+              key={value}
+              disabled={loading || changing}
+              title={descriptions[value]}
+              onClick={() => {
+                if (detailsRef.current) detailsRef.current.open = false;
+                if (value !== status) onChange(value);
+              }}
+            >
+              <span className="attendance-presence-option-dot" aria-hidden="true" />
+              <span>{labels[value]}</span>
+              {status === value && (
+                <span className="attendance-presence-option-check" aria-hidden="true">
+                  ✓
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </details>
+    );
+  }
+
   return (
     <label
-      className={`attendance-presence-control attendance-presence-${effectiveStatus.toLowerCase()} ${compact ? "attendance-presence-compact" : ""}`}
+      className={`attendance-presence-control attendance-presence-${effectiveStatus.toLowerCase()} attendance-presence-compact`}
       title={descriptions[effectiveStatus]}
     >
       <span className="attendance-presence-dot" aria-hidden="true" />
-      {!compact && <span className="attendance-presence-caption">Atendimento</span>}
       <select
         aria-label="Status de atendimento"
         value={status}
         disabled={loading || changing}
         onChange={(event) => onChange(event.target.value as AttendanceStatus)}
       >
-        {(["DISPONIVEL", "AUSENTE", "OFFLINE"] as AttendanceStatus[]).map(
-          (value) => (
-            <option value={value} key={value}>
-              {labels[value]}
-            </option>
-          ),
-        )}
+        {attendanceStatuses.map((value) => (
+          <option value={value} key={value}>
+            {labels[value]}
+          </option>
+        ))}
       </select>
     </label>
   );
