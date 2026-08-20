@@ -223,10 +223,6 @@ export function ConfiguracaoIAPersonalizacao() {
               <Icon name="arrow-left" size={17} />
               Voltar
             </Link>
-            <Link className="button button-secondary" to="/configuracoes/ia">
-              <Icon name="settings" size={17} />
-              Configurações avançadas
-            </Link>
           </div>
         }
       />
