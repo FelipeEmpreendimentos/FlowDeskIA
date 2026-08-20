@@ -18,6 +18,20 @@ DEFAULT_AI_MENU = [
     {"acao": "HUMANO", "rotulo": "Falar com atendente", "ativo": True, "ordem": 60},
 ]
 
+DEFAULT_AI_QUESTIONS = {
+    "servico": "Qual serviço você quer agendar?",
+    "nome": "Antes de continuar, qual é o seu nome?",
+    "email": "Qual é o seu e-mail?",
+    "veiculo_novo": "Qual é o seu carro? Pode escrever só o modelo, por exemplo: Corsa, Corolla, Civic, Onix ou Hilux.",
+    "veiculo_existente": "Qual veículo você quer usar neste agendamento?",
+    "data_agendamento": "Para qual dia você prefere?",
+    "data_reagendamento": "Para qual nova data você prefere reagendar?",
+    "horario": "Encontrei estes horários para {{data}}. Qual você prefere?",
+    "consulta_agendamento": "Encontrei estes agendamentos. Qual você quer consultar?",
+    "cancelamento": "Qual agendamento você quer cancelar?",
+    "reagendamento": "Qual agendamento você quer reagendar?",
+}
+
 
 class AICompanySettings(Base):
     __tablename__ = "ai_company_settings"
@@ -62,6 +76,11 @@ class AICompanySettings(Base):
         JSONB,
         nullable=False,
         default=lambda: [dict(item) for item in DEFAULT_AI_MENU],
+    )
+    perguntas_basicas: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=lambda: dict(DEFAULT_AI_QUESTIONS),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
