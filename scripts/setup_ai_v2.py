@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS ai_company_settings (
     campos_veiculo_obrigatorios JSONB NOT NULL DEFAULT '["tipo_veiculo"]'::jsonb,
     conhecimento JSONB NOT NULL DEFAULT '[]'::jsonb,
     menu_principal JSONB NOT NULL DEFAULT '[]'::jsonb,
+    perguntas_basicas JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ai_settings_tom CHECK (tom IN ('FORMAL', 'EQUILIBRADO', 'INFORMAL')),
     CONSTRAINT ck_ai_settings_tamanho CHECK (tamanho_resposta IN ('CURTA', 'MEDIA', 'DETALHADA')),
@@ -40,6 +41,7 @@ ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS texto_menu_principal TE
 ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS fluxo_guiado_ativo BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS mostrar_interpretacao BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS menu_principal JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE ai_company_settings ADD COLUMN IF NOT EXISTS perguntas_basicas JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS ai_contact_metadata (
     cliente_id BIGINT PRIMARY KEY REFERENCES clientes(id) ON DELETE CASCADE,
@@ -64,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_ai_vehicle_metadata_empresa
     ON ai_vehicle_metadata(empresa_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS ai_atendimento_sessoes (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY REFERENCES empresas(id) ON DELETE CASCADE,
     empresa_id BIGINT NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
     canal VARCHAR(30) NOT NULL DEFAULT 'WHATSAPP',
     external_id VARCHAR(150) NOT NULL,
