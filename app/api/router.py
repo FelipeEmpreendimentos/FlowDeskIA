@@ -21,6 +21,7 @@ from app.api.routes import (
     horarios,
     ia,
     ia_config,
+    ia_personalizacao,
     notificacoes,
     onboarding,
     plano_empresa,
@@ -59,6 +60,7 @@ api_router.include_router(agenda.router)
 api_router.include_router(configuracao_agenda.router)
 api_router.include_router(configuracao_relatorios.router)
 api_router.include_router(ia_config.router)
+api_router.include_router(ia_personalizacao.router)
 api_router.include_router(financeiro_permissoes.router)
 api_router.include_router(financeiro.router)
 api_router.include_router(relatorios.router)
