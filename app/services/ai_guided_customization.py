@@ -64,13 +64,28 @@ def _question_for_state(result: GuidedAgentResult) -> str | None:
     return None
 
 
-def _preserve_interpretation_prefix(original: str, customized: str, interpreted_as: str | None) -> str:
-    if not interpreted_as:
-        return customized
+def _preserve_context_prefix(
+    original: str,
+    customized: str,
+    *,
+    key: str,
+    interpreted_as: str | None,
+) -> str:
     if "\n\n" in original:
-        first, _ = original.split("\n\n", 1)
+        first, rest = original.split("\n\n", 1)
         if "entendi que" in first.lower():
             return f"{first}\n\n{customized}"
+        if key == "email" and "prazer" in first.lower():
+            return f"{first}\n\n{customized}"
+        if rest.strip() == DEFAULT_AI_QUESTIONS.get(key, "").strip():
+            return f"{first}\n\n{customized}"
+
+    if interpreted_as == "VEICULO_IDENTIFICADO" and key in {"data_agendamento", "data_reagendamento"}:
+        default_question = "Para qual dia você prefere?"
+        if original.endswith(default_question):
+            prefix = original[: -len(default_question)].rstrip()
+            return f"{prefix} {customized}".strip()
+
     return customized
 
 
@@ -128,5 +143,10 @@ def run_customized_guided_agent(
         return result
     return replace(
         result,
-        text=_preserve_interpretation_prefix(result.text, customized, result.interpreted_as),
+        text=_preserve_context_prefix(
+            result.text,
+            customized,
+            key=key,
+            interpreted_as=result.interpreted_as,
+        ),
     )
