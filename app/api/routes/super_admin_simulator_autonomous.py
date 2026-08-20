@@ -29,7 +29,7 @@ from app.models.enums import (
 )
 from app.models.models import Conversa, Mensagem
 from app.models.platform import SuperAdmin, SuperAdminLog
-from app.services.ai_guided_autonomy import run_autonomous_guided_agent
+from app.services.ai_guided_customization import run_customized_guided_agent
 from app.services.attendance_presence import distribute_handoff_conversation
 
 
@@ -179,7 +179,7 @@ def responder_no_simulador_autonomo(
     ]
 
     started = perf_counter()
-    result = run_autonomous_guided_agent(
+    result = run_customized_guided_agent(
         db,
         empresa_id=empresa_id,
         cliente_id=cliente_id,
