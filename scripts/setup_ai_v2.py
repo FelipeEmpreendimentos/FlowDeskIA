@@ -66,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_ai_vehicle_metadata_empresa
     ON ai_vehicle_metadata(empresa_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS ai_atendimento_sessoes (
-    id BIGSERIAL PRIMARY KEY REFERENCES empresas(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
     empresa_id BIGINT NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
     canal VARCHAR(30) NOT NULL DEFAULT 'WHATSAPP',
     external_id VARCHAR(150) NOT NULL,
