@@ -4,7 +4,7 @@ import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import { Alert, EmptyState, LoadingState, PageHeader, StatusBadge } from "../components/UI";
 import { apiRequest } from "../services/api";
-import type { Servico, TipoVeiculo } from "../types";
+import type { Servico, TipoVeiculo, Usuario } from "../types";
 import { formatCurrency, normalizeNullable } from "../utils/format";
 
 interface ServicoForm {
@@ -16,6 +16,11 @@ interface ServicoForm {
   ativo: boolean;
   adicional_por_tipo_ativo: boolean;
   adicionais: Record<TipoVeiculo, string>;
+}
+
+interface QualificacaoServico {
+  servico_id: number;
+  funcionario_ids: number[];
 }
 
 const tiposVeiculo: Array<{ value: TipoVeiculo; label: string }> = [
@@ -50,6 +55,9 @@ function criarFormVazio(): ServicoForm {
 export function Servicos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [servicos, setServicos] = useState<Servico[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [qualificacoes, setQualificacoes] = useState<Record<number, number[]>>({});
+  const [funcionarioIds, setFuncionarioIds] = useState<number[]>([]);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("ativos");
   const [carregando, setCarregando] = useState(true);
@@ -69,15 +77,28 @@ export function Servicos() {
   const [excluindoServico, setExcluindoServico] = useState(false);
   const [erroExclusao, setErroExclusao] = useState("");
 
+  const usuariosAtivos = useMemo(
+    () => usuarios.filter((item) => item.ativo).sort((a, b) => a.nome.localeCompare(b.nome)),
+    [usuarios],
+  );
+
   async function carregar() {
     setCarregando(true);
     setErro("");
     try {
-      const [ativos, inativos] = await Promise.all([
+      const [ativos, inativos, dadosUsuarios, dadosQualificacoes] = await Promise.all([
         apiRequest<Servico[]>("/servicos?ativo=true&limit=100"),
         apiRequest<Servico[]>("/servicos?ativo=false&limit=100"),
+        apiRequest<Usuario[]>("/usuarios?ativo=true&limit=100"),
+        apiRequest<QualificacaoServico[]>("/servicos-qualificacoes"),
       ]);
       setServicos([...ativos, ...inativos].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setUsuarios(dadosUsuarios);
+      setQualificacoes(
+        Object.fromEntries(
+          dadosQualificacoes.map((item) => [item.servico_id, item.funcionario_ids]),
+        ),
+      );
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível carregar os serviços.");
     } finally {
@@ -133,6 +154,7 @@ export function Servicos() {
     setEditando(null);
     setLimpezaAdicionaisAberta(false);
     setForm(criarFormVazio());
+    setFuncionarioIds(usuariosAtivos.map((item) => item.id));
     setModalAberto(true);
     setErro("");
   }
@@ -155,6 +177,9 @@ export function Servicos() {
       adicional_por_tipo_ativo: item.adicional_por_tipo_ativo,
       adicionais,
     });
+    setFuncionarioIds(
+      qualificacoes[item.id] ?? usuariosAtivos.map((usuario) => usuario.id),
+    );
     setModalAberto(true);
     setErro("");
   }
@@ -162,7 +187,16 @@ export function Servicos() {
   function fecharModal() {
     setModalAberto(false);
     setEditando(null);
+    setFuncionarioIds([]);
     setLimpezaAdicionaisAberta(false);
+  }
+
+  function alternarFuncionario(funcionarioId: number) {
+    setFuncionarioIds((atuais) =>
+      atuais.includes(funcionarioId)
+        ? atuais.filter((id) => id !== funcionarioId)
+        : [...atuais, funcionarioId],
+    );
   }
 
   function abrirLimpezaAdicionais() {
@@ -183,8 +217,18 @@ export function Servicos() {
 
   async function salvar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSalvando(true);
     setErro("");
+
+    if (usuariosAtivos.length === 0) {
+      setErro("Cadastre pelo menos um usuário ativo antes de salvar este serviço.");
+      return;
+    }
+    if (funcionarioIds.length === 0) {
+      setErro("Selecione pelo menos um usuário para realizar este serviço.");
+      return;
+    }
+
+    setSalvando(true);
 
     const payload = {
       nome: form.nome.trim(),
@@ -203,19 +247,25 @@ export function Servicos() {
     };
 
     try {
+      let servicoSalvo: Servico;
       if (editando) {
-        await apiRequest<Servico>(`/servicos/${editando.id}`, {
+        servicoSalvo = await apiRequest<Servico>(`/servicos/${editando.id}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
-        setSucesso("Serviço atualizado com sucesso.");
       } else {
-        await apiRequest<Servico>("/servicos", {
+        servicoSalvo = await apiRequest<Servico>("/servicos", {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        setSucesso("Serviço cadastrado com sucesso.");
       }
+
+      await apiRequest<QualificacaoServico>(`/servicos/${servicoSalvo.id}/funcionarios`, {
+        method: "PUT",
+        body: JSON.stringify({ funcionario_ids: funcionarioIds }),
+      });
+
+      setSucesso(editando ? "Serviço e equipe atualizados com sucesso." : "Serviço cadastrado com sucesso.");
       fecharModal();
       await carregar();
     } catch (error) {
@@ -309,7 +359,7 @@ export function Servicos() {
       <PageHeader
         eyebrow="Catálogo"
         title="Serviços"
-        description="Defina preços, duração e disponibilidade dos seus serviços."
+        description="Defina preços, duração, equipe e disponibilidade dos seus serviços."
         actions={
           <button className="button button-primary" type="button" onClick={abrirNovo}>
             <Icon name="plus" size={18} />
@@ -413,7 +463,7 @@ export function Servicos() {
         )}
       </section>
 
-      <Modal open={modalAberto} title={editando ? "Editar serviço" : "Novo serviço"} subtitle="Configure os dados comerciais e o tempo de atendimento." onClose={fecharModal}>
+      <Modal open={modalAberto} title={editando ? "Editar serviço" : "Novo serviço"} subtitle="Configure os dados comerciais, a equipe e o tempo de atendimento." onClose={fecharModal}>
         <form onSubmit={salvar}>
           {erro && <Alert>{erro}</Alert>}
           <div className="form-grid form-grid-2">
@@ -446,6 +496,36 @@ export function Servicos() {
               Descrição
               <textarea rows={4} value={form.descricao} onChange={(event) => setForm({ ...form, descricao: event.target.value })} />
             </label>
+
+            <div className="field field-span-2">
+              <strong>Quem realiza este serviço</strong>
+              <small className="field-help">
+                Selecione os usuários habilitados. A agenda e a IA só distribuirão este serviço entre as pessoas marcadas.
+              </small>
+              {usuariosAtivos.length === 0 ? (
+                <Alert type="info">Cadastre pelo menos um usuário ativo para configurar a equipe do serviço.</Alert>
+              ) : (
+                <div className="agenda-service-team-users">
+                  {usuariosAtivos.map((funcionario) => {
+                    const marcado = funcionarioIds.includes(funcionario.id);
+                    return (
+                      <label
+                        className={`agenda-service-team-user ${marcado ? "agenda-service-team-user-active" : ""}`}
+                        key={funcionario.id}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          disabled={salvando}
+                          onChange={() => alternarFuncionario(funcionario.id)}
+                        />
+                        <span>{funcionario.nome}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <div className="vehicle-addon-settings field-span-2">
               <div className="vehicle-addon-header">
@@ -513,7 +593,7 @@ export function Servicos() {
           </div>
           <div className="modal-actions">
             <button className="button button-secondary" type="button" onClick={fecharModal}>Cancelar</button>
-            <button className="button button-primary" type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar serviço"}</button>
+            <button className="button button-primary" type="submit" disabled={salvando || usuariosAtivos.length === 0}>{salvando ? "Salvando..." : "Salvar serviço"}</button>
           </div>
         </form>
       </Modal>
