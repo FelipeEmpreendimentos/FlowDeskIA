@@ -13,14 +13,14 @@ interface PresenceResponse {
 }
 
 const labels: Record<AttendanceStatus, string> = {
-  DISPONIVEL: "Disponível",
+  DISPONIVEL: "Online",
   AUSENTE: "Ausente",
   OFFLINE: "Offline",
 };
 
 const descriptions: Record<AttendanceStatus, string> = {
   DISPONIVEL: "Recebe novos atendimentos distribuídos automaticamente.",
-  AUSENTE: "Pode responder conversas atuais, mas não recebe novas distribuições.",
+  AUSENTE: "Não recebe novas distribuições automáticas, mas pode atender e controlar conversas normalmente.",
   OFFLINE: "Não recebe novos atendimentos e não pode responder clientes.",
 };
 
