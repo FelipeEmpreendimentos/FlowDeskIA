@@ -37,6 +37,7 @@ def test_stale_presence_becomes_effectively_offline() -> None:
 
 
 def test_explicit_human_requests_are_detected() -> None:
+    assert _requests_human_handoff("humano")
     assert _requests_human_handoff("Quero falar com um atendente")
     assert _requests_human_handoff("Pode me passar pro atendente?")
     assert _requests_human_handoff("ATENDIMENTO HUMANO")
