@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Literal
+import unicodedata
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -20,6 +21,10 @@ from app.schemas.entities import (
     MensagemCreate,
     MensagemOut,
     UsuarioOut,
+)
+from app.services.attendance_presence import (
+    distribute_handoff_conversation,
+    require_can_receive_conversation,
 )
 from app.services.audit import add_audit_log
 from app.services.db_utils import apply_patch, commit_or_conflict
@@ -116,6 +121,53 @@ def _ensure_access(item: Conversa, current_user: Usuario) -> None:
         status.HTTP_403_FORBIDDEN,
         "Você só pode acessar conversas atribuídas a você ou ainda sem responsável.",
     )
+
+
+def _normalize_handoff_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value.lower())
+    plain = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return " ".join("".join(ch if ch.isalnum() else " " for ch in plain).split())
+
+
+def _requests_human_handoff(value: str) -> bool:
+    """Reconhece pedidos explícitos de atendimento humano sem depender do provedor de IA."""
+    text = _normalize_handoff_text(value)
+    if not text:
+        return False
+
+    negative_phrases = (
+        "nao quero falar com atendente",
+        "nao quero um atendente",
+        "nao preciso de atendente",
+        "nao quero atendimento humano",
+        "sem atendente",
+    )
+    if any(phrase in text for phrase in negative_phrases):
+        return False
+
+    if text in {"humano", "atendente", "atendimento humano", "falar com atendente"}:
+        return True
+
+    positive_phrases = (
+        "quero falar com um atendente",
+        "quero falar com atendente",
+        "quero um atendente",
+        "falar com uma pessoa",
+        "falar com alguem",
+        "falar com alguem da equipe",
+        "falar com uma pessoa da equipe",
+        "falar com humano",
+        "quero atendimento humano",
+        "me passa para um atendente",
+        "me passa pro atendente",
+        "me transfere para um atendente",
+        "me transfere pro atendente",
+        "chama um atendente",
+        "chama o atendente",
+        "quero falar com o gerente",
+        "chama o gerente",
+    )
+    return any(phrase in text for phrase in positive_phrases)
 
 
 def _limpar_finalizacao(item: Conversa) -> None:
@@ -215,11 +267,12 @@ def criar_conversa(
         values["responsavel_id"] = current_user.id
 
     if values.get("responsavel_id"):
-        require_user(
+        target_user = require_user(
             db,
             current_user.empresa_id,
             values["responsavel_id"],
         )
+        require_can_receive_conversation(db, target_user)
 
     item = Conversa(
         empresa_id=current_user.empresa_id,
@@ -334,16 +387,18 @@ def atualizar_conversa(
             )
 
     if "responsavel_id" in values and values["responsavel_id"] is not None:
-        require_user(
+        target_user = require_user(
             db,
             current_user.empresa_id,
             values["responsavel_id"],
         )
+        require_can_receive_conversation(db, target_user)
         values["ia_ativa"] = False
         values["status"] = StatusConversa.EM_ATENDIMENTO
 
     if values.get("status") == StatusConversa.EM_ATENDIMENTO:
         if item.responsavel_id is None and "responsavel_id" not in values:
+            require_can_receive_conversation(db, current_user)
             values["responsavel_id"] = current_user.id
         values["ia_ativa"] = False
 
@@ -451,6 +506,7 @@ def reabrir_conversa(
     if existente is not None:
         _raise_active_conversation_conflict(existente, item.origem)
 
+    require_can_receive_conversation(db, current_user)
     item.status = StatusConversa.EM_ATENDIMENTO
     item.responsavel_id = current_user.id
     item.ia_ativa = False
@@ -591,7 +647,13 @@ def criar_mensagem(
             _limpar_finalizacao(conversation)
             _limpar_avaliacao_pendente(conversation)
 
-        if conversation.responsavel_id:
+        if conversation.ia_ativa and _requests_human_handoff(data.conteudo):
+            distribute_handoff_conversation(
+                db,
+                conversation=conversation,
+                reason=f"Cliente solicitou atendimento humano: {data.conteudo.strip()[:300]}",
+            )
+        elif conversation.responsavel_id:
             notify_user(
                 db,
                 empresa_id=current_user.empresa_id,
