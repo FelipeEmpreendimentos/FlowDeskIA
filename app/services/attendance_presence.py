@@ -14,6 +14,7 @@ from app.services.access_control import user_module_access
 from app.services.notifications import notify_management, notify_user
 
 
+# O valor persistido DISPONIVEL é exibido ao usuário como "Online" no produto.
 STATUS_DISPONIVEL = "DISPONIVEL"
 STATUS_AUSENTE = "AUSENTE"
 STATUS_OFFLINE = "OFFLINE"
