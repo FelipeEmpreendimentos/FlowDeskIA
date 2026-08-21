@@ -251,6 +251,15 @@ function isContactValidation(statusCode: number, message: string): boolean {
   );
 }
 
+function isOfflineAttendanceReply(endpoint: string, statusCode: number, message: string): boolean {
+  const path = endpoint.split("?")[0];
+  return (
+    statusCode === 409 &&
+    /^\/conversas\/\d+\/mensagens\/?$/.test(path) &&
+    /status.*offline|offline.*responder/i.test(message)
+  );
+}
+
 async function executeApiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -283,6 +292,13 @@ async function executeApiRequest<T>(
     ) {
       clearSession({ keepCompanyId: true });
       window.location.assign("/login");
+    }
+
+    if (isOfflineAttendanceReply(endpoint, response.status, message)) {
+      window.alert(
+        "Você está Offline. Para responder clientes, altere seu status de atendimento para Online ou Ausente.",
+      );
+      throw new ApiError("", response.status);
     }
 
     if (isRegistryDuplicate(endpoint, response.status, message)) {
