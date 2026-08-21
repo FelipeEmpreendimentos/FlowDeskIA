@@ -178,7 +178,24 @@ def require_can_reply(db: Session, user: Usuario) -> None:
         return
     raise HTTPException(
         status.HTTP_409_CONFLICT,
-        "Seu status está Offline. Mude para Disponível ou Ausente antes de responder clientes.",
+        "Seu status está Offline. Mude para Online ou Ausente antes de responder clientes.",
+    )
+
+
+def can_receive_manual_assignment(db: Session, user: Usuario) -> bool:
+    """Online e Ausente podem assumir conversa manualmente; Offline não pode receber."""
+    if not user.ativo:
+        return False
+    row = _presence_row(db, user_id=user.id, empresa_id=user.empresa_id)
+    return effective_status(row) in {STATUS_DISPONIVEL, STATUS_AUSENTE}
+
+
+def require_can_receive_conversation(db: Session, user: Usuario) -> None:
+    if can_receive_manual_assignment(db, user):
+        return
+    raise HTTPException(
+        status.HTTP_409_CONFLICT,
+        f"{user.nome} está Offline e não pode receber uma conversa. Altere o status para Online ou Ausente.",
     )
 
 
@@ -221,12 +238,12 @@ def distribute_handoff_conversation(
     conversation: Conversa,
     reason: str,
 ) -> dict[str, object]:
-    """Distribui um handoff em rodízio somente entre usuários realmente disponíveis.
+    """Distribui um handoff em rodízio somente entre usuários realmente Online.
 
     O campo ``last_assignment_at`` implementa um round-robin persistente: quem
     recebeu há mais tempo volta para o início da fila. ``FOR UPDATE SKIP LOCKED``
     evita que dois handoffs simultâneos escolham o mesmo usuário quando houver
-    outros disponíveis.
+    outros Online. Usuários Ausentes nunca entram na distribuição automática.
     """
 
     now = _now()
@@ -288,10 +305,10 @@ def distribute_handoff_conversation(
         notify_management(
             db,
             empresa_id=conversation.empresa_id,
-            titulo="Atendimento aguardando equipe disponível",
+            titulo="Atendimento aguardando equipe Online",
             mensagem=(
                 f"A conversa #{conversation.id} foi transferida pela IA, mas não há "
-                "ninguém com status Disponível neste momento."
+                "ninguém Online neste momento."
             ),
         )
         assignment = {
@@ -311,7 +328,7 @@ def distribute_handoff_conversation(
             detalhes={
                 **assignment,
                 "motivo": reason.strip()[:500],
-                "politica": "ROUND_ROBIN_DISPONIVEIS",
+                "politica": "ROUND_ROBIN_ONLINE",
             },
         )
     )
