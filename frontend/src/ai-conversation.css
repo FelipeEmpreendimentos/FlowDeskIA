@@ -9,7 +9,6 @@
 
 .route-conversas .chat-header,
 .route-conversas .conversation-finalization-summary,
-.route-conversas .conversation-ai-reply-bar,
 .route-conversas .message-form,
 .route-conversas .conversation-readonly-footer {
   flex: 0 0 auto;
@@ -27,69 +26,5 @@
 }
 
 .route-conversas .conversation-ai-reply-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 13px 0;
-  background: #fff;
-}
-
-.route-conversas .conversation-ai-reply-copy {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 9px;
-  color: #53617a;
-}
-
-.route-conversas .conversation-ai-reply-copy > span:last-child {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-}
-
-.route-conversas .conversation-ai-reply-copy strong {
-  color: #3157d5;
-  font-size: 12px;
-}
-
-.route-conversas .conversation-ai-reply-copy small {
-  overflow: hidden;
-  color: #7b879a;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.route-conversas .conversation-ai-reply-icon {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  flex: 0 0 30px;
-  border-radius: 9px;
-  color: #3157d5;
-  background: #edf2ff;
-}
-
-.route-conversas .conversation-ai-reply-button {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-@media (max-width: 760px) {
-  .route-conversas .conversation-ai-reply-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .route-conversas .conversation-ai-reply-copy small {
-    white-space: normal;
-  }
-
-  .route-conversas .conversation-ai-reply-button {
-    width: 100%;
-    justify-content: center;
-  }
+  display: none !important;
 }
