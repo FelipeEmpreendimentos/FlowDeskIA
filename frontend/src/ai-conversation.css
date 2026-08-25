@@ -1,3 +1,31 @@
+.route-conversas .chat-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f6f8fc;
+}
+
+.route-conversas .chat-header,
+.route-conversas .conversation-finalization-summary,
+.route-conversas .conversation-ai-reply-bar,
+.route-conversas .message-form,
+.route-conversas .conversation-readonly-footer {
+  flex: 0 0 auto;
+}
+
+.route-conversas .messages-area {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.route-conversas .chat-panel > .empty-state {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
 .route-conversas .conversation-ai-reply-bar {
   display: flex;
   align-items: center;
