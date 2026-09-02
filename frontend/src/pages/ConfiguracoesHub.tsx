@@ -55,15 +55,6 @@ const cards: ConfiguracaoCard[] = [
     grupo: "OPERACAO",
   },
   {
-    to: "/servicos",
-    title: "Serviços e equipe",
-    description:
-      "Gerencie serviços, preços e as pessoas habilitadas para realizar cada atendimento.",
-    icon: "services",
-    cargos: ["ADMIN", "GERENTE"],
-    grupo: "OPERACAO",
-  },
-  {
     to: "/configuracoes/ia/personalizacao",
     title: "Inteligência artificial",
     description:
