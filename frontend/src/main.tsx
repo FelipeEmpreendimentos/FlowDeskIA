@@ -29,6 +29,7 @@ import "./conversation-controls.css";
 import "./ai-conversation.css";
 import "./attendance-presence.css";
 import "./conversation-responsive-v2.css";
+import "./form-visual-refinement.css";
 
 installContactInputGuards();
 
