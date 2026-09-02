@@ -1,0 +1,230 @@
+/* Editor de serviço: versão mais compacta e refinada. */
+
+.modal:has(.agenda-service-team-users) {
+  width: min(560px, 100%);
+  border-radius: 18px;
+}
+
+.modal:has(.agenda-service-team-users) .modal-header {
+  padding: 16px 18px 12px;
+}
+
+.modal:has(.agenda-service-team-users) .modal-header h2 {
+  font-size: 18px;
+  letter-spacing: -0.025em;
+}
+
+.modal:has(.agenda-service-team-users) .modal-header p {
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.modal:has(.agenda-service-team-users) .modal-body {
+  padding: 14px 18px 16px;
+}
+
+.modal:has(.agenda-service-team-users) .form-grid {
+  gap: 10px 12px;
+}
+
+.modal:has(.agenda-service-team-users) .field {
+  gap: 5px;
+  margin: 0;
+  color: #33415a;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.modal:has(.agenda-service-team-users) .field > input,
+.modal:has(.agenda-service-team-users) .field > select,
+.modal:has(.agenda-service-team-users) .field > textarea,
+.modal:has(.agenda-service-team-users) .color-field > input:not([type="color"]) {
+  min-height: 38px;
+  padding: 8px 10px;
+  border-color: #dce4ef;
+  border-radius: 10px;
+  background: #fbfcfe;
+  font-size: 11px;
+}
+
+.modal:has(.agenda-service-team-users) .field > input:focus,
+.modal:has(.agenda-service-team-users) .field > select:focus,
+.modal:has(.agenda-service-team-users) .field > textarea:focus,
+.modal:has(.agenda-service-team-users) .color-field > input:not([type="color"]):focus {
+  border-color: var(--primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(49, 87, 213, 0.08);
+}
+
+.modal:has(.agenda-service-team-users) .field > textarea {
+  height: 64px;
+  min-height: 64px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.modal:has(.agenda-service-team-users) .color-field {
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.modal:has(.agenda-service-team-users) .color-field input[type="color"] {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.modal:has(.agenda-service-team-users) .checkbox-field {
+  min-height: 38px;
+  align-self: end;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid #e0e6ef;
+  border-radius: 10px;
+  background: #f8faff;
+  font-size: 10px;
+}
+
+.modal:has(.agenda-service-team-users) .checkbox-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.modal:has(.agenda-service-team-users) .field:has(> .agenda-service-team-users) {
+  gap: 4px;
+  padding: 10px 11px;
+  border: 1px solid #e0e7f1;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfcff 0%, #f7f9fd 100%);
+}
+
+.modal:has(.agenda-service-team-users) .field:has(> .agenda-service-team-users) > strong {
+  color: #263650;
+  font-size: 11px;
+}
+
+.modal:has(.agenda-service-team-users) .field-help {
+  color: #8490a3;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.modal:has(.agenda-service-team-users) .agenda-service-team-users {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.modal:has(.agenda-service-team-users) .agenda-service-team-user {
+  width: auto;
+  min-width: 0;
+  min-height: 32px;
+  flex: 0 1 auto;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.modal:has(.agenda-service-team-users) .agenda-service-team-user:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.modal:has(.agenda-service-team-users) .agenda-service-team-user input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+.modal:has(.agenda-service-team-users) .agenda-service-team-user span {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.modal:has(.agenda-service-team-users) .agenda-service-team-user-active {
+  border-color: #9db0ed;
+  color: #294fc5;
+  background: #edf2ff;
+}
+
+.modal:has(.agenda-service-team-users) .vehicle-addon-settings {
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: 12px;
+}
+
+.modal:has(.agenda-service-team-users) .vehicle-addon-header {
+  gap: 10px;
+}
+
+.modal:has(.agenda-service-team-users) .vehicle-addon-toggle-copy {
+  gap: 1px;
+}
+
+.modal:has(.agenda-service-team-users) .vehicle-addon-toggle-copy strong {
+  font-size: 10px;
+}
+
+.modal:has(.agenda-service-team-users) .vehicle-addon-toggle-copy small {
+  font-size: 8.5px;
+}
+
+.modal:has(.agenda-service-team-users) .vehicle-addon-grid {
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.modal:has(.agenda-service-team-users) .money-field {
+  min-height: 36px;
+  border-radius: 9px;
+}
+
+.modal:has(.agenda-service-team-users) .money-field input {
+  min-height: 34px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.modal:has(.agenda-service-team-users) .modal-actions {
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.modal:has(.agenda-service-team-users) .modal-actions .button {
+  min-height: 38px;
+  padding: 8px 13px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+@media (max-width: 640px) {
+  .modal:has(.agenda-service-team-users) {
+    width: 100%;
+  }
+
+  .modal:has(.agenda-service-team-users) .modal-header {
+    padding: 14px 14px 11px;
+  }
+
+  .modal:has(.agenda-service-team-users) .modal-body {
+    padding: 12px 14px 14px;
+  }
+
+  .modal:has(.agenda-service-team-users) .agenda-service-team-user {
+    flex: 1 1 calc(50% - 6px);
+  }
+}
