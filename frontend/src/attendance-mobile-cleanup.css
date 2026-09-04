@@ -1,0 +1,11 @@
+/* Em resoluções menores, o status continua disponível pelo fluxo normal do sistema,
+   mas não ocupa espaço na barra superior responsiva. */
+@media (max-width: 1000px) {
+  .attendance-mobile-bar .attendance-presence-control {
+    display: none !important;
+  }
+
+  .attendance-mobile-bar {
+    justify-content: flex-start;
+  }
+}
