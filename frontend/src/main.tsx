@@ -28,6 +28,7 @@ import "./report-settings.css";
 import "./conversation-controls.css";
 import "./ai-conversation.css";
 import "./attendance-presence.css";
+import "./attendance-mobile-cleanup.css";
 import "./conversation-responsive-v2.css";
 import "./form-visual-refinement.css";
 import "./service-editor-refinement.css";
