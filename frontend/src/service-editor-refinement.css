@@ -99,7 +99,7 @@
 }
 
 .modal:has(.agenda-service-team-users) .field:has(> .agenda-service-team-users) {
-  gap: 3px;
+  gap: 4px;
   padding: 8px 9px;
   border: 1px solid #e0e7f1;
   border-radius: 11px;
@@ -121,43 +121,70 @@
 .modal:has(.agenda-service-team-users) .agenda-service-team-users {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 3px;
+  gap: 7px;
+  margin-top: 5px;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
 .modal:has(.agenda-service-team-users) .agenda-service-team-user {
+  display: inline-flex;
   width: auto;
   min-width: 0;
-  min-height: 28px;
-  flex: 0 1 auto;
-  gap: 5px;
-  padding: 5px 8px;
-  border-radius: 999px;
+  min-height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid #ccd7ea;
+  border-radius: 10px;
+  color: #52627a;
+  background: #ffffff;
   box-shadow: none;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .modal:has(.agenda-service-team-users) .agenda-service-team-user:hover {
-  box-shadow: none;
+  border-color: #9db1e9;
+  color: #3157d5;
+  background: #f7f9ff;
+  box-shadow: 0 0 0 2px rgba(49, 87, 213, 0.05);
   transform: none;
 }
 
 .modal:has(.agenda-service-team-users) .agenda-service-team-user input[type="checkbox"] {
   width: 13px;
   height: 13px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--primary);
 }
 
 .modal:has(.agenda-service-team-users) .agenda-service-team-user span {
-  font-size: 9px;
+  color: inherit;
+  font-size: 9.5px;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .modal:has(.agenda-service-team-users) .agenda-service-team-user-active {
-  border-color: #9db0ed;
-  color: #294fc5;
-  background: #edf2ff;
+  border-color: #8ca5ee;
+  color: #244bc5;
+  background: #eef3ff;
+  box-shadow: inset 0 0 0 1px rgba(49, 87, 213, 0.04);
+}
+
+.modal:has(.agenda-service-team-users) .agenda-service-team-user-active:hover {
+  border-color: #6f8de8;
+  background: #e8efff;
 }
 
 .modal:has(.agenda-service-team-users) .vehicle-addon-settings {
@@ -225,6 +252,6 @@
   }
 
   .modal:has(.agenda-service-team-users) .agenda-service-team-user {
-    flex: 1 1 calc(50% - 5px);
+    flex: 1 1 calc(50% - 7px);
   }
 }
