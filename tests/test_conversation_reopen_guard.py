@@ -78,6 +78,7 @@ def test_reabrir_funciona_quando_nao_existe_outra_conversa_ativa() -> None:
         patch.object(conversa_routes, "_ensure_access"),
         patch.object(conversa_routes, "_lock_client_conversation_scope"),
         patch.object(conversa_routes, "_conversa_ativa_existente", return_value=None),
+        patch.object(conversa_routes, "require_can_receive_conversation"),
         patch.object(conversa_routes, "add_audit_log"),
         patch.object(
             conversa_routes,
