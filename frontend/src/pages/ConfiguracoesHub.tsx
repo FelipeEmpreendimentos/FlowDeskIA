@@ -2,6 +2,7 @@ import { Link, useOutletContext } from "react-router";
 import { Icon, type IconName } from "../components/Icon";
 import { PageHeader } from "../components/UI";
 import type { AppOutletContext, CargoUsuario } from "../types";
+import type { ModuleCode } from "../types/accessControl";
 
 type ConfiguracaoGrupo = "OPERACAO" | "ADMINISTRACAO" | "SISTEMA";
 
@@ -12,6 +13,7 @@ interface ConfiguracaoCard {
   icon: IconName;
   cargos: CargoUsuario[];
   grupo: ConfiguracaoGrupo;
+  module?: ModuleCode;
   badge?: string;
   variant?: "upcoming" | "info";
 }
@@ -65,14 +67,14 @@ const cards: ConfiguracaoCard[] = [
     badge: "Automação",
   },
   {
+    to: "/configuracoes/whatsapp",
     title: "WhatsApp e integrações",
     description:
-      "Conecte o WhatsApp da empresa e acompanhe integrações externas usadas pelo FlowDeskIA.",
+      "Conecte o WhatsApp da empresa à API oficial da Meta e acompanhe o status da integração.",
     icon: "chat",
-    cargos: ["ADMIN", "GERENTE"],
+    cargos: ["ADMIN", "GERENTE", "FUNCIONARIO"],
     grupo: "OPERACAO",
-    badge: "Em breve",
-    variant: "upcoming",
+    module: "WHATSAPP",
   },
   {
     to: "/configuracoes/dados",
@@ -141,9 +143,11 @@ const cargoLabel: Record<CargoUsuario, string> = {
 };
 
 export function ConfiguracoesHub() {
-  const { usuario } = useOutletContext<AppOutletContext>();
-  const cardsDisponiveis = cards.filter((card) =>
-    card.cargos.includes(usuario.cargo),
+  const { usuario, modulos } = useOutletContext<AppOutletContext>();
+  const cardsDisponiveis = cards.filter(
+    (card) =>
+      card.cargos.includes(usuario.cargo) &&
+      (!card.module || Boolean(modulos[card.module])),
   );
   const funcionario = usuario.cargo === "FUNCIONARIO";
 
