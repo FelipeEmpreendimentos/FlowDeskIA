@@ -32,6 +32,7 @@ import "./attendance-mobile-cleanup.css";
 import "./conversation-responsive-v2.css";
 import "./form-visual-refinement.css";
 import "./service-editor-refinement.css";
+import "./whatsapp-settings.css";
 
 installContactInputGuards();
 
