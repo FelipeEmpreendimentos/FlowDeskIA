@@ -310,7 +310,11 @@ export function ConfiguracaoWhatsApp() {
   if (!modulos.WHATSAPP) {
     return (
       <div className="page whatsapp-settings-page">
-        <PageHeader eyebrow="Integrações" title="WhatsApp" />
+        <PageHeader
+          eyebrow="Integrações"
+          title="WhatsApp"
+          description="Esta integração não está liberada para o seu usuário."
+        />
         <Alert>Esta integração não está liberada para o seu usuário.</Alert>
       </div>
     );
