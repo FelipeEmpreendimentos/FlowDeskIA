@@ -27,6 +27,11 @@ MODULES = (
     ModuleDefinition("FINANCEIRO", "Financeiro", "Recebimentos, pendências e estornos."),
     ModuleDefinition("RELATORIOS", "Relatórios", "Indicadores de operação e desempenho."),
     ModuleDefinition("EQUIPE", "Equipe", "Usuários, jornadas e bloqueios da agenda."),
+    ModuleDefinition(
+        "WHATSAPP",
+        "WhatsApp e integrações",
+        "Conexão do WhatsApp Business e gerenciamento da Cloud API da Meta.",
+    ),
 )
 MODULE_CODES = {item.code for item in MODULES}
 VIEW_ONLY_MODULES = {"RELATORIOS"}
