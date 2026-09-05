@@ -36,6 +36,7 @@ from app.api.routes import (
     system,
     usuarios,
     veiculos,
+    whatsapp,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -72,6 +73,7 @@ api_router.include_router(horarios.router)
 api_router.include_router(bloqueios.router)
 api_router.include_router(conversas.router)
 api_router.include_router(ia.router)
+api_router.include_router(whatsapp.router)
 # O endpoint agregado de canais vem primeiro para eliminar o N+1 da listagem.
 api_router.include_router(chat_interno_fast.router)
 api_router.include_router(chat_interno.router)
