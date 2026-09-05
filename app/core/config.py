@@ -84,6 +84,11 @@ class Settings:
     openai_timeout_seconds: int
     openai_max_output_tokens: int
 
+    meta_app_id: str | None
+    meta_app_secret: str | None
+    meta_whatsapp_verify_token: str | None
+    meta_graph_version: str
+
     cors_origins: list[str]
 
     @property
@@ -98,6 +103,14 @@ class Settings:
     @property
     def openai_configured(self) -> bool:
         return bool(self.openai_api_key)
+
+    @property
+    def meta_whatsapp_configured(self) -> bool:
+        return bool(
+            self.meta_app_id
+            and self.meta_app_secret
+            and self.meta_whatsapp_verify_token
+        )
 
 
 settings = Settings(
@@ -134,6 +147,10 @@ settings = Settings(
     openai_model=os.getenv("OPENAI_MODEL", "gpt-5-mini").strip(),
     openai_timeout_seconds=int(os.getenv("OPENAI_TIMEOUT_SECONDS", "30")),
     openai_max_output_tokens=int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "500")),
+    meta_app_id=_optional("META_APP_ID"),
+    meta_app_secret=_optional("META_APP_SECRET"),
+    meta_whatsapp_verify_token=_optional("META_WHATSAPP_VERIFY_TOKEN"),
+    meta_graph_version=os.getenv("META_GRAPH_VERSION", "v25.0").strip(),
     cors_origins=_csv(
         "CORS_ORIGINS",
         "http://localhost:3000,http://localhost:5173",
@@ -176,6 +193,8 @@ if settings.openai_timeout_seconds <= 0:
     raise RuntimeError("OPENAI_TIMEOUT_SECONDS precisa ser maior que zero.")
 if settings.openai_max_output_tokens <= 0:
     raise RuntimeError("OPENAI_MAX_OUTPUT_TOKENS precisa ser maior que zero.")
+if not settings.meta_graph_version.startswith("v"):
+    raise RuntimeError("META_GRAPH_VERSION precisa usar o formato vXX.X.")
 
 if settings.environment in PRODUCTION_ENVIRONMENTS:
     if settings.jwt_secret == DEFAULT_JWT_SECRET or len(settings.jwt_secret) < 32:
