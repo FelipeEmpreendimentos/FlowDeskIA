@@ -9,7 +9,8 @@ export type ModuleCode =
   | "SERVICOS"
   | "FINANCEIRO"
   | "RELATORIOS"
-  | "EQUIPE";
+  | "EQUIPE"
+  | "WHATSAPP";
 
 export interface CurrentAccess {
   modules: Record<ModuleCode, boolean>;
