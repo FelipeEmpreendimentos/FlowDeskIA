@@ -12,6 +12,7 @@ import { ConfiguracaoAgenda } from "./pages/ConfiguracaoAgenda";
 import { ConfiguracaoIA } from "./pages/ConfiguracaoIA";
 import { ConfiguracaoIAPersonalizacao } from "./pages/ConfiguracaoIAPersonalizacao";
 import { ConfiguracaoRelatorios } from "./pages/ConfiguracaoRelatorios";
+import { ConfiguracaoWhatsApp } from "./pages/ConfiguracaoWhatsApp";
 import { Configuracoes } from "./pages/Configuracoes";
 import { ConfiguracoesHub } from "./pages/ConfiguracoesHub";
 import { Conversas } from "./pages/Conversas";
@@ -89,6 +90,7 @@ function App() {
         <Route path="/configuracoes/ia/personalizacao" element={<ConfiguracaoIAPersonalizacao />} />
         <Route path="/configuracoes/acessos" element={<ConfiguracaoAcessos />} />
         <Route path="/configuracoes/relatorios" element={<ConfiguracaoRelatorios />} />
+        <Route path="/configuracoes/whatsapp" element={<ConfiguracaoWhatsApp />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
